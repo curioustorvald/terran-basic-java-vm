@@ -115,8 +115,8 @@ class VM(memSize: Int, stackSize: Int = 192, var suppressWarnings: Boolean = fal
      */
     fun malloc(size: Int): Pointer {
         var mPtr = stackEnd
-        varTable.forEach { _, varPtr ->
-            mPtr += varPtr.size()
+        varTable.forEach { _, variable ->
+            mPtr += variable.pointer.size()
         }
         if (memory.size - mPtr < size) throw OutOfMemoryError()
 
@@ -124,8 +124,8 @@ class VM(memSize: Int, stackSize: Int = 192, var suppressWarnings: Boolean = fal
     }
     fun calloc(size: Int): Pointer {
         var mPtr = stackEnd
-        varTable.forEach { _, varPtr ->
-            mPtr += varPtr.size()
+        varTable.forEach { _, variable ->
+            mPtr += variable.pointer.size()
         }
         if (memory.size - mPtr < size) throw OutOfMemoryError()
 
@@ -137,8 +137,8 @@ class VM(memSize: Int, stackSize: Int = 192, var suppressWarnings: Boolean = fal
     fun free(variable: TBASValue) {
         // move blocks back
         val moveOffset = variable.sizeOf()
-        varTable.filter { it.value.memAddr > variable.pointer.memAddr }.forEach { variable, ptr ->
-            System.arraycopy(memory, ptr.memAddr, memory, ptr.memAddr - moveOffset, variable.sizeOf())
+        varTable.filter { it.value.pointer.memAddr > variable.pointer.memAddr }.forEach { _, variable ->
+            System.arraycopy(memory, variable.pointer.memAddr, memory, variable.pointer.memAddr - moveOffset, variable.sizeOf())
         }
     }
 
@@ -160,7 +160,7 @@ class VM(memSize: Int, stackSize: Int = 192, var suppressWarnings: Boolean = fal
     private val memory = ByteArray(memSize)
     private val lineCounter = -1 // BASIC statement line number
 
-    private val varTable = HashMap<TBASValue, Pointer>()
+    private val varTable = HashMap<String, TBASValue>()
     private val callStack = Stack(this, 256, stackSize)
 
     private val stackEnd = 256 + (4 * stackSize)
