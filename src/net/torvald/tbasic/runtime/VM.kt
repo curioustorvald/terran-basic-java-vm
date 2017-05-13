@@ -135,6 +135,7 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
             else if (value is Long) write(value as Long)
             else if (value is ByteArray) write(value as ByteArray)
             else if (value is String) write(value as String)
+            else if (value is Pointer) write(value.readData())
             else throw IllegalArgumentException("Unsupported type: ${value.javaClass.canonicalName}")
         }
     }
@@ -184,24 +185,24 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
      *
      * Will throw nullPointerException if program is not loaded
      */
-    fun malloc(size: Int): Pointer {
+    fun malloc(bytes: Int): Pointer {
         var mPtr = uspStart!!
         varTable.forEach { _, variable ->
             mPtr += variable.pointer.size()
         }
-        if (memory.size - mPtr < size) throw OutOfMemoryError()
+        if (memory.size - mPtr < bytes) throw OutOfMemoryError()
 
         return Pointer(this, mPtr)
     }
-    fun calloc(size: Int): Pointer {
+    fun calloc(bytes: Int): Pointer {
         var mPtr = uspStart!!
         varTable.forEach { _, variable ->
             mPtr += variable.pointer.size()
         }
-        if (memory.size - mPtr < size) throw OutOfMemoryError()
+        if (memory.size - mPtr < bytes) throw OutOfMemoryError()
 
         // fill zero
-        (0..size - 1).forEach { memory[mPtr + it] = 0.toByte() }
+        (0..bytes - 1).forEach { memory[mPtr + it] = 0.toByte() }
 
         return Pointer(this, mPtr)
     }

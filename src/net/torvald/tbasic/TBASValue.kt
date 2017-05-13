@@ -18,11 +18,8 @@ interface TBASValue {
     fun getPointerType(): VM.Pointer.PointerType
 }
 
-class TBASNil() : TBASValue {
-    override val pointer: VM.Pointer
-        get() = TODO("not available")
-
-    override fun toBytes() = byteArrayOf(0.toByte())
+class TBASNil(override val pointer: VM.Pointer) : TBASValue {
+override fun toBytes() = byteArrayOf(0.toByte())
     override fun sizeOf() = VM.Pointer.sizeOf(getPointerType())
     override fun equals(other: Any?) = (other is TBASNil)
     override fun getValue() = this
