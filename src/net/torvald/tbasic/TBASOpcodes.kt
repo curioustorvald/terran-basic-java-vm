@@ -1,13 +1,19 @@
 package net.torvald.tbasic
 
 import net.torvald.tbasic.runtime.VM
+import kotlin.experimental.and
 
-/**
- * Created by minjaesong on 2017-05-10.
- */
 
 typealias Register = Int
 
+/**
+ * Register usage:
+ *
+ * * r1-r4: function arguments
+ * * b1-b4: function argument supplements (type marker, etc)
+ *
+ * Created by minjaesong on 2017-05-10.
+ */
 class TBASOpcodes(val vm: VM) {
 
     // variable control //
@@ -15,9 +21,12 @@ class TBASOpcodes(val vm: VM) {
 
     // flow control //
 
-    fun RETURN() { vm.callStack.pop() }
-    fun GOSUB() { vm.callStack.push(vm.pc) }
-    fun GOTO() { vm.pc = vm.r1.readData() as Int } // must be LOADINT'd first
+    fun PUSH(addr: Int) { vm.callStack[vm.sp++] = addr }
+    fun POP() = vm.callStack[vm.sp--]
+
+    fun RETURN() { vm.pc = POP() }
+    fun GOSUB(addr: Int) { PUSH(vm.pc); vm.pc = addr }
+    fun GOTO(addr: Int) { vm.pc = addr }
 
     fun END() { vm.terminate = true }
 
@@ -25,108 +34,84 @@ class TBASOpcodes(val vm: VM) {
     // stdIO //
     
 
-    /* Registers map
-
-       r1: the main value
-       r2, r3, r4: arguments for operators
-       r5: flags for r1-r4; 16 flags for each (0b444..44_333..33_222..22_111..11)
-            arguments flag:
-            0   false: constant; true: pointer
-            1   true: vararg (Number array)
-            2-4 type (000: nil, 001: Boolean, 010: Number, 011: ByteArray -- String, also should be a pointer)
-
-
-       r6, r7, r8: TBA
-     */
 
     // MATHEMATICAL OPERATORS //
 
     /**
      * r1 <- r2 op r3 (no vararg)
      */
-    fun ADD() { vm.r1.write(vm.r2.readAsDouble() + vm.r3.readAsDouble()) }
-    fun SUB() { vm.r1.write(vm.r2.readAsDouble() - vm.r3.readAsDouble()) }
-    fun MUL() { vm.r1.write(vm.r2.readAsDouble() * vm.r3.readAsDouble()) }
-    fun DIV() { vm.r1.write(vm.r2.readAsDouble() / vm.r3.readAsDouble()) }
-    fun POW() { vm.r1.write(Math.pow(vm.r2.readAsDouble(), vm.r3.readAsDouble())) }
-    fun MOD() { vm.r1.write(Math.floorMod((vm.r2.readAsDouble()).toLong(), (vm.r3.readAsDouble()).toLong()).toDouble()) } // FMOD
+    fun ADD() { vm.r1 = vm.r2 + vm.r3 }
+    fun SUB() { vm.r1 = vm.r2 - vm.r3 }
+    fun MUL() { vm.r1 = vm.r2 * vm.r3 }
+    fun DIV() { vm.r1 = vm.r2 / vm.r3 }
+    fun POW() { vm.r1 = Math.pow(vm.r2, vm.r3) }
+    fun MOD() { vm.r1 = Math.floorMod(vm.r2.toLong(), vm.r3.toLong()).toDouble() } // FMOD
 
     /**
      * r1 <- r2 (no vararg)
      */
-    fun ABS() { vm.r1.write(Math.abs(vm.r2.readAsDouble())) }
-    fun SIN() { vm.r1.write(Math.sin(vm.r2.readAsDouble())) }
-    fun COS() { vm.r1.write(Math.cos(vm.r2.readAsDouble())) }
-    fun TAN() { vm.r1.write(Math.tan(vm.r2.readAsDouble())) }
-    fun FLOOR() { vm.r1.write(Math.floor(vm.r2.readAsDouble())) }
-    fun CEIL()  { vm.r1.write(Math.ceil(vm.r2.readAsDouble())) }
-    fun ROUND() { vm.r1.write(Math.round(vm.r2.readAsDouble()).toDouble()) }
-    fun LOG() { vm.r1.write(Math.log(vm.r2.readAsDouble())) }
-    fun INT() { if (vm.r2.readAsDouble() >= 0) FLOOR() else CEIL() }
-    fun RND() { vm.r1.write(Math.random()) }
-    fun SGN() { vm.r1.write(Math.signum(vm.r2.readAsDouble())) }
+    fun ABS()   { vm.r1 = Math.abs  (vm.r2) }
+    fun SIN()   { vm.r1 = Math.sin  (vm.r2) }
+    fun COS()   { vm.r1 = Math.cos  (vm.r2) }
+    fun TAN()   { vm.r1 = Math.tan  (vm.r2) }
+    fun FLOOR() { vm.r1 = Math.floor(vm.r2) }
+    fun CEIL()  { vm.r1 = Math.ceil (vm.r2) }
+    fun ROUND() { vm.r1 = Math.round(vm.r2).toDouble() }
+    fun LOG()   { vm.r1 = Math.log  (vm.r2) }
+    fun INT()   { if (vm.r2 >= 0.0) FLOOR() else CEIL() }
+    fun RND()   { vm.r1 = Math.random() }
+    fun SGN()   { vm.r1 = Math.signum(vm.r2) }
     fun SQRT() { LOADNUM(2.0, 3); POW() }
     fun CBRT() { LOADNUM(3.0, 3); POW() }
     fun INV() { MOV(2, 3); LOADNUM(1.0, 2); DIV() }
-    fun RAD() { LOADINT(0x4081ABE4B73FEFB5, 3); DIV() } // r1 <- r2 / (180.0 * PI)
+    fun RAD() { LOADINT(0x4081ABE4B73FEFB5L, 3); DIV() } // r1 <- r2 / (180.0 * PI)
 
     // INTERNAL //
+
+    /*
+     b registers:
+
+     0 - true if INT, false if Number
+     1 - true if Pointer
+     2, 3, 4 - Type ID
+     */
 
     /**
      * r1 <- Number (Double)
      *
-     * @param register 1-8 for r1-r8
+     * @param register 1-4 for r1-r4
      */
     fun LOADNUM(number: Double, register: Register) {
-        vm.registers[register - 1].write(number)
-        if (register in 1..4) {
-            // flag that says this is a constant
-            val bits = 0L
-            val bitMask = 1L.shl(16 * (register - 1))
-            vm.r5.write(vm.r5.readAsLong() and bitMask or bits)
-        }
+        vm.writereg(register, number)
+        vm.writebreg(register, 0.toByte())
     }
     /**
      * r1 <- Int (raw Double value) transformed to Double
      *
-     * @param register 1-8 for r1-r8
+     * @param register 1-4 for r1-r4
      */
     fun LOADINT(num_as_bytes: Long, register: Register) {
-        vm.registers[register - 1].write(num_as_bytes)
-        if (register in 1..4) {
-            // flag that says this is a constant
-            val bits = 0L
-            val bitMask = 1L.shl(16 * (register - 1))
-            vm.r5.write(vm.r5.readAsLong() and bitMask or bits)
-        }
+        vm.writereg(register, java.lang.Double.longBitsToDouble(num_as_bytes))
+        vm.writebreg(register, 1.toByte())
     }
 
     /**
      * Loads pointer's pointing address to r1, along with the marker that states r1 now holds memory address
      */
     fun LOADPOINTER(addr: Int, register: Register) {
-        vm.registers[register - 1].write(addr.toLong())
-        if (register in 1..4) {
-            // flag that says this is a pointer
-            val bits = 1L
-            val bitMask = 1L.shl(16 * (register - 1))
-            vm.r5.write(vm.r5.readAsLong() and bitMask or bits)
-        }
+        vm.writereg(register, java.lang.Double.longBitsToDouble(addr.toLong()))
+        vm.writebreg(register, 3.toByte())
     }
 
     /**
      * r(to) <- r(from)
      *
-     * @param from 1-8 for r1-r8
-     * @param to 1-8 for r1-r8
+     * @param from 1-4 for r1-r4
+     * @param to 1-4 for r1-r4
      */
     fun MOV(from: Register, to: Register) {
-        vm.registers[to - 1].write(vm.registers[from - 1].readData())
-
-        // move args flag
-        if (from in 1..4 && to in 1..4) {
-            setRegisterFlags(to, getRegisterFlags(from))
-        }
+        vm.writereg(to, vm.readreg(from))
+        vm.writebreg(to, vm.readbreg(from))
     }
 
     /**
@@ -137,8 +122,8 @@ class TBASOpcodes(val vm: VM) {
      * save whatever on r1 to variables table
      */
     fun SETVARIABLE(identifier: String) {
-        val typeIndex = getRegisterFlags(1).shr(2).and(0b111)
-        val isPointer = getRegisterFlags(1).and(1) == 1L
+        val isPointer = vm.b1.and(0b10) != 0.toByte()
+        val typeIndex = vm.b1.and(0b11100).toInt().ushr(2)
 
         if (!isPointer) {
             val byteSize = getByteSizeOfType(typeIndex)
@@ -146,11 +131,11 @@ class TBASOpcodes(val vm: VM) {
             varPtr.type = getPointerTypeFromID(typeIndex)
 
             if (byteSize == 8)
-                varPtr.write(vm.r1.readAsDouble())
+                varPtr.write(vm.r1)
             else if (byteSize == 4) // just in case
-                varPtr.write(vm.r1.readAsLong().and(0xFFFFFFFF).toInt())
+                varPtr.write(java.lang.Double.doubleToRawLongBits(vm.r1).and(0xFFFFFFFF).toInt())
             else if (byteSize == 1)
-                varPtr.write(vm.r1.readAsLong().and(0xFF).toByte())
+                varPtr.write(java.lang.Double.doubleToRawLongBits(vm.r1).and(0xFF).toByte())
 
 
             val tbasValue: TBASValue = when(typeIndex) {
@@ -168,33 +153,17 @@ class TBASOpcodes(val vm: VM) {
     }
 
 
-    private fun getRegisterFlags(register: Register): Long {
-        if (register in 1..4) {
-            return vm.r5.readAsLong().ushr(16 * (register - 1)).and(0xFFFF)
-        }
-        else {
-            throw IllegalArgumentException()
-        }
-    }
-    private fun setRegisterFlags(register: Register, bits: Long) {
-        if (register in 1..4) {
-            val bits = bits.shl(16 * (register - 1))
-            val bitMask = 0xFFFFL.shl(16 * (register - 1))
-            vm.r5.write(vm.r5.readAsLong() and bitMask or bits)
-        }
-        else {
-            throw IllegalArgumentException()
-        }
-    }
 
-    private fun getByteSizeOfType(typeID: Long): Int = when(typeID) {
+
+
+    private fun getByteSizeOfType(typeID: Int): Int = when(typeID) {
         TYPE_NIL -> 1
         TYPE_BOOLEAN -> 1
         TYPE_BYTES -> 1
         TYPE_NUMBER -> 8
         else -> throw IllegalArgumentException()
     }
-    private fun getPointerTypeFromID(typeID: Long): VM.Pointer.PointerType = when(typeID) {
+    private fun getPointerTypeFromID(typeID: Int): VM.Pointer.PointerType = when(typeID) {
         TYPE_NIL -> VM.Pointer.PointerType.VOID
         TYPE_BOOLEAN -> VM.Pointer.PointerType.BOOLEAN
         TYPE_BYTES -> VM.Pointer.PointerType.BYTE
@@ -202,10 +171,10 @@ class TBASOpcodes(val vm: VM) {
         else -> throw IllegalArgumentException()
     }
 
-    private val TYPE_NIL = 0L
-    private val TYPE_BOOLEAN = 1L
-    private val TYPE_NUMBER = 2L
-    private val TYPE_BYTES = 3L
+    private val TYPE_NIL = 0
+    private val TYPE_BOOLEAN = 1
+    private val TYPE_NUMBER = 2
+    private val TYPE_BYTES = 3
 
     /*
 

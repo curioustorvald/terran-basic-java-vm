@@ -10,12 +10,13 @@ typealias Number = Double
  * Takes care of mallocs. Endianness is LITTLE
  *
  * @param memSize Memory size in bytes, max size is (2 GB - 1 byte)
+ * @param stackSize Note: stack is separated from system memory
  *
  * @throws ArrayIndexOutOfBoundsException whenever
  *
  * Created by minjaesong on 2017-05-09.
  */
-class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: Boolean = false) {
+class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: Boolean = false) {
 
     companion object {
         val charset = Charsets.UTF_8
@@ -186,7 +187,7 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
      * Will throw nullPointerException if program is not loaded
      */
     fun malloc(bytes: Int): Pointer {
-        var mPtr = uspStart!!
+        var mPtr = userSpaceStart!!
         varTable.forEach { _, variable ->
             mPtr += variable.pointer.size()
         }
@@ -195,7 +196,7 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
         return Pointer(this, mPtr)
     }
     fun calloc(bytes: Int): Pointer {
-        var mPtr = uspStart!!
+        var mPtr = userSpaceStart!!
         varTable.forEach { _, variable ->
             mPtr += variable.pointer.size()
         }
@@ -220,8 +221,8 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
     /**
      * Memory Map
      *
-     * 0    256    1024*          uspStart      memSize
-     * | Reg | CStck | Program space | User space |
+     * 0         userSpaceStart  memSize
+     * | program space | User space |
      *
      * Reg: Register
      *  - Function arguments
@@ -232,33 +233,67 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
     private val memory = ByteArray(memSize)
 
     val varTable = HashMap<String, TBASValue>()
-    var callStack = IntStack(this, 256, stackSize)
-        private set
+    val callStack = IntArray(stackSize, { 0 })
 
-    private val prgStart = 256 + (4 * stackSize)
-    private var uspStart: Int? = null // lateinit
-
+    var userSpaceStart: Int? = null // lateinit
     var programLoaded = false
         private set
 
     var terminate = false
 
-    val userSpaceSize: Int
-        get() = memory.size - uspStart!!
+    // number registers (64 bit, function args)
+    var r1 = 0.0
+    var r2 = 0.0
+    var r3 = 0.0
+    var r4 = 0.0
 
-    // NOTE: if you want, you can ignore r1-r8 here and devise your by referencing the memory directly
-    val r1 = Pointer(this,  0, Pointer.PointerType.INT64, noCast = true) // I think null pointer is unnecessary
-    val r2 = Pointer(this,  8, Pointer.PointerType.INT64, noCast = true)
-    val r3 = Pointer(this, 16, Pointer.PointerType.INT64, noCast = true)
-    val r4 = Pointer(this, 24, Pointer.PointerType.INT64, noCast = true)
-    val r5 = Pointer(this, 32, Pointer.PointerType.INT64, noCast = true)
-    val r6 = Pointer(this, 40, Pointer.PointerType.INT64, noCast = true)
-    val r7 = Pointer(this, 48, Pointer.PointerType.INT64, noCast = true)
-    val r8 = Pointer(this, 56, Pointer.PointerType.INT64, noCast = true)
+    fun writereg(register: Int, data: Number) {
+        when (register) {
+            1 -> r1 = data
+            2 -> r2 = data
+            3 -> r3 = data
+            4 -> r4 = data
+            else -> throw IllegalArgumentException("No such register: r$register")
+        }
+    }
+    fun readreg(register: Int) = when (register) {
+        1 -> r1
+        2 -> r2
+        3 -> r3
+        4 -> r4
+        else -> throw IllegalArgumentException("No such register: r$register")
+    }
+    fun writebreg(register: Int, data: Byte) {
+        when (register) {
+            1 -> b1 = data
+            2 -> b2 = data
+            3 -> b3 = data
+            4 -> b4 = data
+            else -> throw IllegalArgumentException("No such register: r$register")
+        }
+    }
+    fun readbreg(register: Int) = when (register) {
+        1 -> b1
+        2 -> b2
+        3 -> b3
+        4 -> b4
+        else -> throw IllegalArgumentException("No such register: r$register")
+    }
 
-    val registers = arrayOf(r1,r2,r3,r4,r5,r6,r7,r8)
+    // byte registers (function args; also be used as supplements for r registers)
+    var b1 = 0.toByte()
+    var b2 = 0.toByte()
+    var b3 = 0.toByte()
+    var b4 = 0.toByte()
 
-    var pc = 0
+    // general registers (32-bit)
+    var i1 = 0
+    var i2 = 0
+    var i3 = 0
+    var i4 = 0
+
+    var pc = 0 // program counter
+    var sp = 0 // stack pointer
 
 
     init {
@@ -271,16 +306,16 @@ class VM(memSize: Int, private val stackSize: Int = 192, var suppressWarnings: B
     }
 
     fun loadProgram(opcodes: ByteArray) {
-        System.arraycopy(opcodes, 0, memory, prgStart, opcodes.size)
-        uspStart = prgStart + opcodes.size
+        System.arraycopy(opcodes, 0, memory, 0, opcodes.size)
+        userSpaceStart = opcodes.size
         programLoaded = true
     }
 
     fun reset() {
         varTable.clear()
-        callStack = IntStack(this, 256, stackSize)
+        Arrays.fill(callStack, 0)
         programLoaded = false
-        uspStart = null
+        userSpaceStart = null
     }
 
 
