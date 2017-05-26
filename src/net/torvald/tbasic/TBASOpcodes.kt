@@ -78,7 +78,7 @@ object TBASOpcodes {
     fun JGT(addr: Int) { if (vm.m1 > 0) GOTO(addr) }
     fun JLE(addr: Int) { if (vm.m1 < 0) GOTO(addr) }
 
-    fun END() { vm.terminate = true }
+    fun HALT() { vm.terminate = true }
 
     
     // stdIO //
@@ -181,6 +181,20 @@ object TBASOpcodes {
 
     fun NOT() { vm.r1 = vm.r2.toInt().inv().toDouble() }
 
+    
+    fun INC1() { vm.r1 += 1.0 }
+    fun INC2() { vm.r1 += 1.0 }
+    fun INC3() { vm.r1 += 1.0 }
+    fun INC4() { vm.r1 += 1.0 }
+    fun INCM() { vm.m1 += 1 }
+
+    fun DEC1() { vm.r1 -= 1.0 }
+    fun DEC2() { vm.r1 -= 1.0 }
+    fun DEC3() { vm.r1 -= 1.0 }
+    fun DEC4() { vm.r1 -= 1.0 }
+    fun DECM() { vm.m1 -= 1 }
+    
+    
 
     // INTERNAL //
 
@@ -214,6 +228,15 @@ object TBASOpcodes {
         vm.writereg(register, number)
         vm.writebreg(register, 0.toByte())
     }
+    
+    fun LOADMNUM(number: Int) {
+        vm.m1 = number
+    }
+
+    fun REGTOM() {
+        vm.m1 = vm.r1.toInt()
+    }
+
     /**
      * r1 <- Int (raw Double value) transformed to Double
      *
@@ -242,10 +265,6 @@ object TBASOpcodes {
         }
     }
 
-    fun LOADFLAG(int: Int) {
-        vm.m1 = int
-    }
-
     fun LOADSTR(register: Register, string: ByteArray) {
         try {
             val strPtr = vm.makeStringDB(string)
@@ -266,6 +285,15 @@ object TBASOpcodes {
     fun MOV(from: Register, to: Register) {
         vm.writereg(to, vm.readreg(from))
         vm.writebreg(to, vm.readbreg(from))
+    }
+
+    fun XCHG(a: Register, b: Register) {
+        val rTmp = vm.readreg(b)
+        val bTmp = vm.readbreg(b)
+        vm.writereg(b, vm.readreg(a))
+        vm.writebreg(b, vm.readbreg(a))
+        vm.writereg(a, rTmp)
+        vm.writebreg(a, bTmp)
     }
 
     /**
@@ -367,7 +395,7 @@ object TBASOpcodes {
             "POW" to 5.toByte(),
             "MOD" to 6.toByte(),
 
-            "END" to 0.toByte(),
+            "HALT" to 0.toByte(),
 
             "GOTO"   to 8.toByte(),
             "GOSUB"  to 9.toByte(),
@@ -407,7 +435,7 @@ object TBASOpcodes {
             "LOADPTR" to 39.toByte(),
             "LOADVARIABLE" to 40.toByte(),
             "SETVARIABLE" to 41.toByte(),
-            "LOADFLAG" to 42.toByte(),
+            "LOADMNUM" to 42.toByte(),
             "LOADSTR" to 43.toByte(),
 
             "PUTCHAR" to 44.toByte(),
@@ -419,7 +447,22 @@ object TBASOpcodes {
             "JGT" to 50.toByte(),
             "JLE" to 51.toByte(),
 
-            "CMP" to 52.toByte()
+            "CMP" to 52.toByte(),
+            "XCHG" to 53.toByte(),
+
+            "REGTOM" to 54.toByte(),
+
+            "INC1" to 55.toByte(),
+            "INC2" to 56.toByte(),
+            "INC3" to 57.toByte(),
+            "INC4" to 58.toByte(),
+            "INCM" to 59.toByte(),
+
+            "DEC1" to 55.toByte(),
+            "DEC2" to 56.toByte(),
+            "DEC3" to 57.toByte(),
+            "DEC4" to 58.toByte(),
+            "DECM" to 59.toByte()
 
     )
 
@@ -432,7 +475,7 @@ object TBASOpcodes {
     val POW = byteArrayOf(5)
     val MOD = byteArrayOf(6)
 
-    val END = byteArrayOf(0)
+    val HALT = byteArrayOf(0)
 
     val GOTO   = byteArrayOf(8)
     val GOSUB  = byteArrayOf(9)
@@ -472,7 +515,7 @@ object TBASOpcodes {
     val LOADPTR = byteArrayOf(39)
     val LOADVARIABLE = byteArrayOf(40)
     val SETVARIABLE = byteArrayOf(41)
-    val LOADFLAG = byteArrayOf(42)
+    val LOADMNUM = byteArrayOf(42)
     val LOADSTR = byteArrayOf(43)
 
     val PUTCHAR = byteArrayOf(44)
@@ -485,53 +528,68 @@ object TBASOpcodes {
     val JLE = byteArrayOf(51)
 
     val CMP = byteArrayOf(52)
+    val XCHG = byteArrayOf(53)
+
+    val REGTOM = byteArrayOf(54)
+
+    val INC1 = byteArrayOf(55)
+    val INC2 = byteArrayOf(56)
+    val INC3 = byteArrayOf(57)
+    val INC4 = byteArrayOf(58)
+    val INCM = byteArrayOf(59)
+
+    val DEC1 = byteArrayOf(55)
+    val DEC2 = byteArrayOf(56)
+    val DEC3 = byteArrayOf(57)
+    val DEC4 = byteArrayOf(58)
+    val DECM = byteArrayOf(59)
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
         opcodesList.keys.forEach { opcodesListInverse.put(opcodesList[it]!!, it) }
     }
     val opcodesFunList = hashMapOf<String, (List<ByteArray>) -> Unit>(
-            "NOP" to fun(args: List<ByteArray>) { NOP() },
+            "NOP" to fun(_) { NOP() },
 
-            "ADD" to fun(args: List<ByteArray>) { ADD() },
-            "SUB" to fun(args: List<ByteArray>) { SUB() },
-            "MUL" to fun(args: List<ByteArray>) { MUL() },
-            "DIV" to fun(args: List<ByteArray>) { DIV() },
-            "POW" to fun(args: List<ByteArray>) { POW() },
-            "MOD" to fun(args: List<ByteArray>) { MOD() },
+            "ADD" to fun(_) { ADD() },
+            "SUB" to fun(_) { SUB() },
+            "MUL" to fun(_) { MUL() },
+            "DIV" to fun(_) { DIV() },
+            "POW" to fun(_) { POW() },
+            "MOD" to fun(_) { MOD() },
 
-            "END" to fun(args: List<ByteArray>) { END() },
+            "HALT" to fun(_) { HALT() },
 
             "GOTO"   to fun(args: List<ByteArray>) { GOTO(args[0].toLittleInt()) },
             "GOSUB"  to fun(args: List<ByteArray>) { GOSUB(args[0].toLittleInt()) },
-            "RETURN" to fun(args: List<ByteArray>) { RETURN() },
+            "RETURN" to fun(_) { RETURN() },
             "PUSH"   to fun(args: List<ByteArray>) { PUSH(args[0].toLittleInt()) },
-            "POP"    to fun(args: List<ByteArray>) { POP() },
+            "POP"    to fun(_) { POP() },
             "MOV"    to fun(args: List<ByteArray>) { MOV(args[0][0].toInt(), args[1][0].toInt()) },
-            "POKE"   to fun(args: List<ByteArray>) { POKE() },
-            "PEEK"   to fun(args: List<ByteArray>) { PEEK() },
+            "POKE"   to fun(_) { POKE() },
+            "PEEK"   to fun(_) { PEEK() },
 
-            "SHL"  to fun(args: List<ByteArray>) { SHL() },
-            "SHR"  to fun(args: List<ByteArray>) { SHR() },
-            "USHR" to fun(args: List<ByteArray>) { USHR() },
-            "AND"  to fun(args: List<ByteArray>) { AND() },
-            "OR"   to fun(args: List<ByteArray>) { OR() },
-            "XOR"  to fun(args: List<ByteArray>) { XOR() },
-            "NOT"  to fun(args: List<ByteArray>) { NOT() },
+            "SHL"  to fun(_) { SHL() },
+            "SHR"  to fun(_) { SHR() },
+            "USHR" to fun(_) { USHR() },
+            "AND"  to fun(_) { AND() },
+            "OR"   to fun(_) { OR() },
+            "XOR"  to fun(_) { XOR() },
+            "NOT"  to fun(_) { NOT() },
 
-            "ABS"   to fun(args: List<ByteArray>) { ABS() },
-            "SIN"   to fun(args: List<ByteArray>) { SIN() },
-            "FLOOR" to fun(args: List<ByteArray>) { COS() },
-            "CEIL"  to fun(args: List<ByteArray>) { TAN() },
-            "ROUND" to fun(args: List<ByteArray>) { FLOOR() },
-            "LOG"   to fun(args: List<ByteArray>) { CEIL() },
-            "INT"   to fun(args: List<ByteArray>) { ROUND() },
-            "RND"   to fun(args: List<ByteArray>) { LOG() },
-            "SGN"   to fun(args: List<ByteArray>) { INT() },
-            "SQRT"  to fun(args: List<ByteArray>) { RND() },
-            "CBRT"  to fun(args: List<ByteArray>) { SGN() },
-            "INV"   to fun(args: List<ByteArray>) { SQRT() },
-            "RAD"   to fun(args: List<ByteArray>) { CBRT() },
+            "ABS"   to fun(_) { ABS() },
+            "SIN"   to fun(_) { SIN() },
+            "FLOOR" to fun(_) { COS() },
+            "CEIL"  to fun(_) { TAN() },
+            "ROUND" to fun(_) { FLOOR() },
+            "LOG"   to fun(_) { CEIL() },
+            "INT"   to fun(_) { ROUND() },
+            "RND"   to fun(_) { LOG() },
+            "SGN"   to fun(_) { INT() },
+            "SQRT"  to fun(_) { RND() },
+            "CBRT"  to fun(_) { SGN() },
+            "INV"   to fun(_) { SQRT() },
+            "RAD"   to fun(_) { CBRT() },
 
             "INTERRUPT" to fun(args: List<ByteArray>) { INTERRUPT(args[0][0].toInt()) },
 
@@ -540,33 +598,46 @@ object TBASOpcodes {
             "LOADPTR" to fun(args: List<ByteArray>) { LOADPTR(args[0].toLittleInt(), args[1][0].toInt()) },
             "LOADVARIABLE" to fun(args: List<ByteArray>) { LOADVARIABLE(args[0].toString(VM.charset)) },
             "SETVARIABLE" to fun(args: List<ByteArray>) { SETVARIABLE(args[0].toString(VM.charset)) },
-            "LOADFLAG" to fun(args: List<ByteArray>) { LOADFLAG(args[0].toLittleInt()) },
+            "LOADMNUM" to fun(args: List<ByteArray>) { LOADMNUM(args[0].toLittleInt()) },
             "LOADSTR" to fun(args: List<ByteArray>) { LOADSTR(args[0][0].toInt(), args[1]) },
 
-            "PUTCHAR" to fun(args: List<ByteArray>) { PUTCHAR() },
-            "PRINTSTR" to fun(args: List<ByteArray>) { PRINTSTR() },
-            "PRINTNUM" to fun(args: List<ByteArray>) { PRINTNUM() },
+            "PUTCHAR" to fun(_) { PUTCHAR() },
+            "PRINTSTR" to fun(_) { PRINTSTR() },
+            "PRINTNUM" to fun(_) { PRINTNUM() },
 
             "JZ" to fun(args: List<ByteArray>) { JZ(args[0].toLittleInt()) },
             "JNZ" to fun(args: List<ByteArray>) { JNZ(args[0].toLittleInt()) },
             "JGT" to fun(args: List<ByteArray>) { JGT(args[0].toLittleInt()) },
             "JLE" to fun(args: List<ByteArray>) { JLE(args[0].toLittleInt()) },
 
-            "CMP" to fun(args: List<ByteArray>) { CMP() }
+            "CMP" to fun(_) { CMP() },
+            "XCHG" to fun(args: List<ByteArray>) { XCHG(args[0][0].toInt(), args[1][0].toInt()) },
 
-    )
-    val opcodesFunListTwoArgs = hashMapOf<String, (ByteArray, ByteArray) -> Unit>(
+            "REGTOM" to fun(_) { REGTOM() },
+
+            "INC1" to fun(_) { INC1() },
+            "INC2" to fun(_) { INC2() },
+            "INC3" to fun(_) { INC3() },
+            "INC4" to fun(_) { INC4() },
+            "INCM" to fun(_) { INCM() },
+
+            "DEC1" to fun(_) { DEC1() },
+            "DEC2" to fun(_) { DEC2() },
+            "DEC3" to fun(_) { DEC3() },
+            "DEC4" to fun(_) { DEC4() },
+            "DECM" to fun(_) { DECM() }
 
     )
     val opcodeArgsList = hashMapOf<String, IntArray>( // null == 0 operands
             "MOV" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
+            "XCHG" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
             "LOADNUM" to intArrayOf(SIZEOF_NUMBER, SIZEOF_BYTE),
             "LOADRAWNUM" to intArrayOf(SIZEOF_NUMBER, SIZEOF_BYTE),
             "LOADPTR" to intArrayOf(SIZEOF_POINTER, SIZEOF_BYTE),
             "LOADVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "PUSH" to intArrayOf(SIZEOF_POINTER),
-            "LOADFLAG" to intArrayOf(SIZEOF_INT32),
+            "LOADMNUM" to intArrayOf(SIZEOF_INT32),
             "LOADSTR" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
             "JZ" to intArrayOf(SIZEOF_INT32),

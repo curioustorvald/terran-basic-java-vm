@@ -355,7 +355,7 @@ class VM(memSize: Int,
         //TBASOpcodes.initTBasicEnv()
 
         System.arraycopy(opcodes, 0, memory, ivtSize, opcodes.size)
-        memory[opcodes.size + ivtSize] = TBASOpcodes.opcodesList["END"]!!
+        memory[opcodes.size + ivtSize] = TBASOpcodes.opcodesList["HALT"]!!
 
         pc = ivtSize
         userSpaceStart = opcodes.size + 1 + ivtSize
@@ -407,7 +407,7 @@ class VM(memSize: Int,
                 val totalArgsSize = arguments.map { it.size }.sum()
                 execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pc")
 
-                if (instAsm == "END") terminate = true
+                if (instAsm == "HALT") terminate = true
 
                 // execute
                 pc += (1 + totalArgsSize)
