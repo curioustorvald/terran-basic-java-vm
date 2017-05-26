@@ -35,7 +35,7 @@ class TBASBoolean(override val pointer: VM.Pointer) : TBASValue {
 }
 
 class TBASNumber(override val pointer: VM.Pointer) : TBASValue {
-    override fun toBytes() = pointer.parent.memSlice(pointer.memAddr, sizeOf())
+    override fun toBytes() = pointer.parent.memSliceBySize(pointer.memAddr, sizeOf())
     override fun sizeOf() = VM.Pointer.sizeOf(getPointerType())
     override fun getValue() = pointer.readData() as Number
     override fun equals(other: Any?) = Arrays.equals(this.toBytes(), (other as? TBASValue)?.toBytes())
@@ -48,7 +48,7 @@ class TBASNumberArray(override val pointer: VM.Pointer, val dimensional: IntArra
     n    +8  +16  +32
     | d1 | d2 | d3 | ... | data data data |
      */
-    override fun toBytes() = pointer.parent.memSlice(pointer.memAddr, sizeOf())
+    override fun toBytes() = pointer.parent.memSliceBySize(pointer.memAddr, sizeOf())
     override fun sizeOf(): Int {
         var memSize = 1
         dimensional.forEach { memSize *= it * VM.Pointer.sizeOf(getPointerType()) }
@@ -63,12 +63,25 @@ class TBASNumberArray(override val pointer: VM.Pointer, val dimensional: IntArra
 
 /**
  * Protip: String is just ByteArray
+ *
+ * Memory map
+ * | data | (terminated by NULL (0))
  */
-class TBASString(override val pointer: VM.Pointer, val length: Int) : TBASValue {
-    override fun toBytes() = pointer.parent.memSlice(pointer.memAddr, sizeOf())
-    override fun sizeOf(): Int = length
-    override fun getValue() = String(toBytes(), VM.charset)
+class TBASString(override val pointer: VM.Pointer) : TBASValue {
+    override fun toBytes() = pointer.parent.memSliceBySize(pointer.memAddr, sizeOf())
+    override fun sizeOf(): Int {
+        var l = 0
+        var b = pointer.parent.memory[pointer.memAddr]
+        while (b != 0.toByte()) {
+            b = pointer.parent.memory[pointer.memAddr + l]
+            l++
+        }
+        return l
+    }
+    override fun getValue() = String(pointer.parent.memSliceBySize(pointer.memAddr, sizeOf()), VM.charset)
     override fun equals(other: Any?) = Arrays.equals(this.toBytes(), (other as? TBASValue)?.toBytes())
     override fun toString(): String = getValue() as String
     override fun getPointerType() = VM.Pointer.PointerType.BYTE
 }
+
+

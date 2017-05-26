@@ -1,13 +1,17 @@
 package net.torvald.tbasic.runtime
 
 import net.torvald.tbasic.*
+import net.torvald.tbasic.TBASOpcodes.READ_UNTIL_ZERO
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.*
+import kotlin.collections.ArrayList
 
 
 typealias Number = Double
 
 /**
- * Takes care of mallocs. Endianness is LITTLE
+ * VM with minimal operation system that takes care of mallocs. Endianness is LITTLE
  *
  * @param memSize Memory size in bytes, max size is (2 GB - 1 byte)
  * @param stackSize Note: stack is separated from system memory
@@ -16,19 +20,13 @@ typealias Number = Double
  *
  * Created by minjaesong on 2017-05-09.
  */
-class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: Boolean = false) {
-
-    companion object {
-        val charset = Charsets.UTF_8
-    }
-
-
-    private fun Int.KB() = this shl 10
-    private fun Int.MB() = this shl 20
-    private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] $any") }
-
-
-    class Pointer(val parent: VM, var memAddr: Int, type: PointerType = Pointer.PointerType.BYTE, var noCast: Boolean = false) {
+class VM(memSize: Int,
+         private val stackSize: Int = 2500,
+         val stdout: OutputStream = System.out,
+         val stdin: InputStream = System.`in`,
+         var suppressWarnings: Boolean = false
+) {
+    class Pointer(val parent: VM, var memAddr: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
         /*
         VOID    in memory: 0x00
         BOOLEAN in memory: 0x00 if false, 0xFF if true
@@ -127,7 +125,8 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
             System.arraycopy(byteArray, 0, parent.memory, memAddr, byteArray.size)
         }
         fun write(string: String) {
-            write(string.toByteArray(VM.charset))
+            val strBytes = string.toByteArray(VM.charset)
+            write(strBytes.size.toLittle() + strBytes) // according to TBASString
         }
         fun write(value: Any) {
             if (value is Byte) write(value as Byte)
@@ -139,6 +138,8 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
             else if (value is Pointer) write(value.readData())
             else throw IllegalArgumentException("Unsupported type: ${value.javaClass.canonicalName}")
         }
+
+        fun toLittle() = memAddr.toLittle()
     }
 
     class IntStack(vm: VM, val startPointer: Int, val stackSize: Int) {
@@ -179,40 +180,84 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fun memSlice(from: Int, size: Int) = memory.sliceArray(from..from + size - 1)
+    fun memSliceBySize(from: Int, size: Int): ByteArray = memory.sliceArray(from..from + size - 1)
+    fun memSlice(from: Int, to: Int): ByteArray = memory.sliceArray(from..to)
+
+    private val mallocList = ArrayList<IntRange>()
+
+    private fun findEmptySlotForMalloc(size: Int): Int {
+        if (mallocList.isEmpty())
+            return userSpaceStart!!
+
+        mallocList.sortBy { it.first }
+
+        val gaps = ArrayList<IntRange>()
+        var foundRightGap = true
+        for (it in 1..mallocList.lastIndex) {
+            val gap = mallocList[it - 1].endInclusive + 1..mallocList[it].start - 1
+            gaps.add(gap)
+
+            if (gap.endInclusive - gap.start + 1 == size) {
+                foundRightGap = true
+                break
+            } // found right gap, no need to search further
+        }
+
+        if (foundRightGap) {
+            return gaps.last().start
+        }
+        else {
+            gaps.forEach {
+                if (it.endInclusive - it.start + 1 >= size)
+                    return it.start
+            }
+
+            return gaps.last().endInclusive + 1
+        }
+    }
 
     /**
      * This function assumes all pointers are well placed, without gaps
      *
      * Will throw nullPointerException if program is not loaded
      */
-    fun malloc(bytes: Int): Pointer {
-        var mPtr = userSpaceStart!!
-        varTable.forEach { _, variable ->
-            mPtr += variable.pointer.size()
-        }
-        if (memory.size - mPtr < bytes) throw OutOfMemoryError()
+    fun malloc(size: Int): Pointer {
+        val addr = findEmptySlotForMalloc(size)
+        mallocList.add(addr..addr + size - 1)
 
-        return Pointer(this, mPtr)
+        return Pointer(this, addr)
     }
-    fun calloc(bytes: Int): Pointer {
-        var mPtr = userSpaceStart!!
-        varTable.forEach { _, variable ->
-            mPtr += variable.pointer.size()
-        }
-        if (memory.size - mPtr < bytes) throw OutOfMemoryError()
+    fun calloc(size: Int): Pointer {
+        val addr = findEmptySlotForMalloc(size)
+        mallocList.add(addr..addr + size - 1)
 
-        // fill zero
-        (0..bytes - 1).forEach { memory[mPtr + it] = 0.toByte() }
+        (0..size - 1).forEach { memory[addr + it] = 0.toByte() }
 
-        return Pointer(this, mPtr)
+        return Pointer(this, addr)
     }
     fun freeBlock(variable: TBASValue) {
-        // move blocks back
-        val moveOffset = variable.sizeOf()
-        varTable.filter { it.value.pointer.memAddr > variable.pointer.memAddr }.forEach { _, variable ->
-            System.arraycopy(memory, variable.pointer.memAddr, memory, variable.pointer.memAddr - moveOffset, variable.sizeOf())
+        if (!mallocList.remove(variable.pointer.memAddr..variable.pointer.memAddr + variable.sizeOf() - 1)) {
+            interruptSegmentationFault()
+            throw RuntimeException("Access violation -- no such block was assigned by operation system.")
         }
+    }
+
+    fun makeStringDB(string: ByteArray): Pointer {
+        return makeBytesDB(string + 0)
+    }
+    fun makeStringDB(string: String): Pointer {
+        return makeBytesDB(string.toByteArray(VM.charset) + 0)
+    }
+    fun makeNumberDB(number: Number): TBASNumber {
+        val ptr = malloc(8)
+        ptr.type = Pointer.PointerType.INT64
+        ptr.write(number)
+        return TBASNumber(ptr)
+    }
+    fun makeBytesDB(bytes: ByteArray): Pointer {
+        val ptr = malloc(bytes.size)
+        ptr.write(bytes)
+        return ptr
     }
 
 
@@ -221,8 +266,8 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
     /**
      * Memory Map
      *
-     * 0         userSpaceStart  memSize
-     * | program space | User space |
+     * 0     32        userSpaceStart  memSize
+     * | IVT | program space | User space |
      *
      * Reg: Register
      *  - Function arguments
@@ -230,14 +275,14 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
      * CStck: Call stack
      *  - Stack pointer end: use val stackEnd (256 + (4 * stackSize))
      */
-    private val memory = ByteArray(memSize)
+    internal val memory = ByteArray(memSize)
 
     val varTable = HashMap<String, TBASValue>()
     val callStack = IntArray(stackSize, { 0 })
 
     var userSpaceStart: Int? = null // lateinit
-    var programLoaded = false
         private set
+    val ivtSize = 4 * VM.interruptCount
 
     var terminate = false
 
@@ -286,36 +331,95 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
     var b3 = 0.toByte()
     var b4 = 0.toByte()
 
-    // general registers (32-bit)
-    var i1 = 0
-    var i2 = 0
-    var i3 = 0
-    var i4 = 0
-
+    // memory registers (32-bit)
+    var m1 = 0 // general-use flags or variable
     var pc = 0 // program counter
     var sp = 0 // stack pointer
+    var lr = 0 // link register
 
 
     init {
         if (memSize > 16.MB()) {
             warn("Memory size might be too big — recommended max is 16 MBytes")
         }
-        else if (memSize < 4.KB()) { // 4 KB is arbitrary TBH
-            throw Error("Memory size too small — minimum allowed is 4 KBytes")
+        else if (memSize < 256) { // arbitrary unit
+            throw Error("Memory size too small — minimum allowed is 256 bytes")
         }
+
     }
 
     fun loadProgram(opcodes: ByteArray) {
-        System.arraycopy(opcodes, 0, memory, 0, opcodes.size)
-        userSpaceStart = opcodes.size
-        programLoaded = true
+        reset()
+
+        TBASOpcodes.invoke(this)
+        //TBASOpcodes.initTBasicEnv()
+
+        System.arraycopy(opcodes, 0, memory, ivtSize, opcodes.size)
+        memory[opcodes.size + ivtSize] = TBASOpcodes.opcodesList["END"]!!
+
+        pc = ivtSize
+        userSpaceStart = opcodes.size + 1 + ivtSize
+
+        execDebug("Program loaded; pc: $pc, userSpaceStart: $userSpaceStart")
     }
 
     fun reset() {
         varTable.clear()
         Arrays.fill(callStack, 0)
-        programLoaded = false
         userSpaceStart = null
+        terminate = false
+    }
+
+    fun execDebugMain(any: Any?) { if (false) print(any) }
+    fun execDebug(any: Any?)     { if (false) print(any) }
+
+    fun execute() {
+        if (userSpaceStart != null) {
+            while (!terminate) {
+
+                //(0..512).forEach { print("${memory[it]} ") }
+
+                val instruction = memory[pc]
+                val instAsm = TBASOpcodes.opcodesListInverse[instruction]!!
+
+                execDebugMain("\nExec: $instAsm, ")
+
+                val argumentsInfo = TBASOpcodes.opcodeArgsList[instAsm] ?: intArrayOf()
+
+                val arguments = argumentsInfo.mapIndexed { index, i ->
+                    if (i > 0) {
+                        memSliceBySize(pc + 1 + (0..index - 1).map { argumentsInfo[it] }.sum(), i)
+                    }
+                    else if (i == READ_UNTIL_ZERO) { // READ_UNTIL_ZERO(-2) is guaranteed to be the last
+                        val indexStart = pc + 1 + (0..index - 1).map { argumentsInfo[it] }.sum()
+                        var indexEnd = indexStart
+                        while (memory[indexEnd] != 0.toByte()) {
+                            indexEnd += 1
+                        }
+                        // indexEnd now points \0
+                        execDebug("[varargCounter] indexStart: $indexStart, indexEnd: $indexEnd (byteat: ${memory[indexEnd]})")
+                        memSlice(indexStart, indexEnd)
+                    }
+                    else {
+                        throw InternalError("Unknown arguments flag: $i")
+                    }
+                }
+                val totalArgsSize = arguments.map { it.size }.sum()
+                execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pc")
+
+                if (instAsm == "END") terminate = true
+
+                // execute
+                pc += (1 + totalArgsSize)
+                execDebugMain(", PC-next: $pc\n")
+                TBASOpcodes.opcodesFunList[instAsm]!!(arguments)
+
+
+                if (pc >= memory.size) {
+                    interruptOutOfMem()
+                }
+            }
+        }
     }
 
 
@@ -325,7 +429,112 @@ class VM(memSize: Int, private val stackSize: Int = 250, var suppressWarnings: B
 
 
 
+    ///////////////
+    // CONSTANTS //
+    ///////////////
+    companion object {
+        val charset = Charsets.UTF_8
+
+        val interruptCount = 8
+        val INT_DIV_BY_ZERO = 0
+        val INT_ILLEGAL_OP = 1
+        val INT_OUT_OF_MEMORY = 2
+        val INT_STACK_OVERFLOW = 3
+        val INT_MATH_ERROR = 4
+        val INT_SEGFAULT = 5
+    }
 
 
+    private fun Int.KB() = this shl 10
+    private fun Int.MB() = this shl 20
+    private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
 
+    // Interrupt handlers (its just JMPs) //
+    fun interruptDivByZero() { pc = memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt() }
+    fun interruptIllegalOp() { pc = memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt() }
+    fun interruptOutOfMem()  { pc = memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt() }
+    fun interruptStackOverflow() { pc = memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt() }
+    fun interruptMathError() { pc = memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt() }
+    fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
+}
+
+
+fun String.toCString() = this.toByteArray(VM.charset) + 0.toByte()
+fun Int.toLittle() = byteArrayOf(
+        this.and(0xFF).toByte(),
+        this.ushr(8).and(0xFF).toByte(),
+        this.ushr(16).and(0xFF).toByte(),
+        this.ushr(24).and(0xFF).toByte()
+)
+fun Long.toLittle() = byteArrayOf(
+        this.and(0xFF).toByte(),
+        this.ushr(8).and(0xFF).toByte(),
+        this.ushr(16).and(0xFF).toByte(),
+        this.ushr(24).and(0xFF).toByte(),
+        this.ushr(32).and(0xFF).toByte(),
+        this.ushr(40).and(0xFF).toByte(),
+        this.ushr(48).and(0xFF).toByte(),
+        this.ushr(56).and(0xFF).toByte()
+)
+fun Double.toLittle() = java.lang.Double.doubleToRawLongBits(this).toLittle()
+fun Boolean.toLittle() = byteArrayOf(if (this) 0xFF.toByte() else 0.toByte())
+
+fun ByteArray.toLittleInt() =
+        this[0].toInt() or
+                this[1].toInt().shl(8) or
+                this[2].toInt().shl(16) or
+                this[3].toInt().shl(24)
+fun ByteArray.toLittleLong() =
+        this[0].toLong() or
+                this[1].toLong().shl(8) or
+                this[2].toLong().shl(16) or
+                this[3].toLong().shl(24) or
+                this[4].toLong().shl(32) or
+                this[5].toLong().shl(40) or
+                this[6].toLong().shl(48) or
+                this[7].toLong().shl(56)
+fun ByteArray.toLittleDouble() = java.lang.Double.longBitsToDouble(this.toLittleLong())
+
+/**
+ * Return first occurrence of the byte pattern
+ * @return starting index of the first occurrence of the pattern, or null if not found
+ * @see https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm
+ */
+fun ByteArray.search(pattern: ByteArray, start: Int = 0, length: Int = pattern.size - start): Int? {
+    /*
+    this: text to be searched
+    pattern: the word sought
+    */
+
+    var m = 0
+    var i = 0
+    val T = IntArray(this.size)
+
+
+    while (m + 1 < this.size) {
+        if (pattern[i] == this[m + i]) {
+            i += 1
+            if (i == pattern.size) {
+                /*val return_m = m
+
+                m = m + i - T[i]
+                i = T[i]
+
+                return return_m*/
+                return m
+            }
+        }
+        else {
+            if (T[i] > -1) {
+                m = m + i - T[i]
+                i = T[i]
+            }
+            else {
+                m += i + 1
+                i = 0
+            }
+        }
+    }
+
+    return null
 }
