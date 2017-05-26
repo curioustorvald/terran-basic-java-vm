@@ -27,7 +27,7 @@ object TBASOpcodes {
     /*
     rudimentary Hello World:
 
-    LOADSTRING  "Hello, world!\n"   r1
+    LOADSTR  "Hello, world!\n"   r1
     PRINTSTR
 
      */
@@ -39,21 +39,21 @@ object TBASOpcodes {
         val writePointer = VM.Pointer(vm, 0, VM.Pointer.PointerType.INT32, true)
 
         run { // --> SYNTAX ERROR (invalid opcode??)
-            val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRING"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTR"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_ILLEGAL_OP * 4
             writePointer.write(syntaxErrorPtr.memAddr)
         }
 
         run { // --> DIVISION BY ZERO ERROR (invalid opcode??)
-            val div0Ptr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRING"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val div0Ptr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTR"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_DIV_BY_ZERO * 4
             writePointer.write(div0Ptr.memAddr)
         }
 
         run { // --> OUT OF MEMORY ERROR
-            val oomPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRING"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val oomPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTR"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_OUT_OF_MEMORY * 4
             writePointer.write(oomPtr.memAddr)
@@ -105,13 +105,32 @@ object TBASOpcodes {
      */
     fun PRINTNUM() {
         val str = vm.r1.toString()
-        val strBytes = str.length.toLittle() + str.toCString()
-        val numStrPtr = vm.malloc(strBytes.size)
+
+        // LOADSTR
+        try {
+            val strPtr = vm.makeStringDB(str)
+            // LOADPTR
+            vm.writereg(1, java.lang.Double.longBitsToDouble(strPtr.memAddr.toLong()))
+            if (strPtr.memAddr == -1) {
+                vm.writebreg(1, 0b10.toByte())
+            } else {
+                vm.writebreg(1, 0b11.toByte())
+            }
+        }
+        catch (e: OutOfMemoryError) {
+            e.printStackTrace(System.out)
+            vm.interruptOutOfMem()
+        }
+        // END LOADSTR
 
         val string = TBASString(VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt()))
         vm.m1 = 0 // string counter
-        while (vm.r1 != 0.0) {
+
+        while (true) {
             vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.m1].toUint().toLong())
+
+            if (vm.r1 == 0.0) break
+
             PUTCHAR()
             vm.m1++
         }
@@ -208,7 +227,7 @@ object TBASOpcodes {
     /**
      * Loads pointer's pointing address to r1, along with the marker that states r1 now holds memory address
      */
-    fun LOADPOINTER(addr: Int, register: Register) {
+    fun LOADPTR(addr: Int, register: Register) {
         try {
             vm.writereg(register, java.lang.Double.longBitsToDouble(addr.toLong()))
             if (addr == -1) {
@@ -227,10 +246,10 @@ object TBASOpcodes {
         vm.m1 = int
     }
 
-    fun LOADSTRING(register: Register, string: ByteArray) {
+    fun LOADSTR(register: Register, string: ByteArray) {
         try {
             val strPtr = vm.makeStringDB(string)
-            LOADPOINTER(strPtr.memAddr, register)
+            LOADPTR(strPtr.memAddr, register)
         }
         catch (e: OutOfMemoryError) {
             e.printStackTrace(System.out)
@@ -252,7 +271,7 @@ object TBASOpcodes {
     /**
      * load variable to r1 as pointer. If the variable does not exist, null pointer will be loaded instead.
      */
-    fun LOADVARIABLE(identifier: String) { LOADPOINTER(vm.varTable[identifier]?.pointer?.memAddr ?: -1, 1) }
+    fun LOADVARIABLE(identifier: String) { LOADPTR(vm.varTable[identifier]?.pointer?.memAddr ?: -1, 1) }
     /**
      * save whatever on r1 (either an Immediate or Pointer) to variables table
      */
@@ -385,11 +404,11 @@ object TBASOpcodes {
 
             "LOADNUM" to 37.toByte(),
             "LOADRAWNUM" to 38.toByte(),
-            "LOADPOINTER" to 39.toByte(),
+            "LOADPTR" to 39.toByte(),
             "LOADVARIABLE" to 40.toByte(),
             "SETVARIABLE" to 41.toByte(),
             "LOADFLAG" to 42.toByte(),
-            "LOADSTRING" to 43.toByte(),
+            "LOADSTR" to 43.toByte(),
 
             "PUTCHAR" to 44.toByte(),
             "PRINTSTR" to 45.toByte(),
@@ -403,6 +422,70 @@ object TBASOpcodes {
             "CMP" to 52.toByte()
 
     )
+
+    val NOP = byteArrayOf(7)
+
+    val ADD = byteArrayOf(1)
+    val SUB = byteArrayOf(2)
+    val MUL = byteArrayOf(3)
+    val DIV = byteArrayOf(4)
+    val POW = byteArrayOf(5)
+    val MOD = byteArrayOf(6)
+
+    val END = byteArrayOf(0)
+
+    val GOTO   = byteArrayOf(8)
+    val GOSUB  = byteArrayOf(9)
+    val RETURN = byteArrayOf(10)
+    val PUSH   = byteArrayOf(11)
+    val POP    = byteArrayOf(12)
+    val MOV    = byteArrayOf(13)
+    val POKE   = byteArrayOf(14)
+    val PEEK   = byteArrayOf(15)
+
+    val SHL  = byteArrayOf(16)
+    val SHR  = byteArrayOf(17)
+    val USHR = byteArrayOf(18)
+    val AND  = byteArrayOf(19)
+    val OR   = byteArrayOf(20)
+    val XOR  = byteArrayOf(21)
+    val NOT  = byteArrayOf(22)
+
+    val ABS   = byteArrayOf(23)
+    val SIN   = byteArrayOf(24)
+    val FLOOR = byteArrayOf(25)
+    val CEIL  = byteArrayOf(26)
+    val ROUND = byteArrayOf(27)
+    val LOG   = byteArrayOf(28)
+    val INT   = byteArrayOf(29)
+    val RND   = byteArrayOf(20)
+    val SGN   = byteArrayOf(31)
+    val SQRT  = byteArrayOf(32)
+    val CBRT  = byteArrayOf(33)
+    val INV   = byteArrayOf(34)
+    val RAD   = byteArrayOf(35)
+
+    val INTERRUPT = byteArrayOf(36)
+
+    val LOADNUM = byteArrayOf(37)
+    val LOADRAWNUM = byteArrayOf(38)
+    val LOADPTR = byteArrayOf(39)
+    val LOADVARIABLE = byteArrayOf(40)
+    val SETVARIABLE = byteArrayOf(41)
+    val LOADFLAG = byteArrayOf(42)
+    val LOADSTR = byteArrayOf(43)
+
+    val PUTCHAR = byteArrayOf(44)
+    val PRINTSTR = byteArrayOf(45)
+    val PRINTNUM = byteArrayOf(46)
+
+    val JZ = byteArrayOf(48)
+    val JNZ = byteArrayOf(49)
+    val JGT = byteArrayOf(50)
+    val JLE = byteArrayOf(51)
+
+    val CMP = byteArrayOf(52)
+
     val opcodesListInverse = HashMap<Byte, String>()
     init {
         opcodesList.keys.forEach { opcodesListInverse.put(opcodesList[it]!!, it) }
@@ -454,11 +537,11 @@ object TBASOpcodes {
 
             "LOADNUM" to fun(args: List<ByteArray>) { LOADNUM(args[0].toLittleDouble(), args[1][0].toInt()) },
             "LOADRAWNUM" to fun(args: List<ByteArray>) { LOADRAWNUM(args[0].toLittleLong(), args[1][0].toInt()) },
-            "LOADPOINTER" to fun(args: List<ByteArray>) { LOADPOINTER(args[0].toLittleInt(), args[1][0].toInt()) },
+            "LOADPTR" to fun(args: List<ByteArray>) { LOADPTR(args[0].toLittleInt(), args[1][0].toInt()) },
             "LOADVARIABLE" to fun(args: List<ByteArray>) { LOADVARIABLE(args[0].toString(VM.charset)) },
             "SETVARIABLE" to fun(args: List<ByteArray>) { SETVARIABLE(args[0].toString(VM.charset)) },
             "LOADFLAG" to fun(args: List<ByteArray>) { LOADFLAG(args[0].toLittleInt()) },
-            "LOADSTRING" to fun(args: List<ByteArray>) { LOADSTRING(args[0][0].toInt(), args[1]) },
+            "LOADSTR" to fun(args: List<ByteArray>) { LOADSTR(args[0][0].toInt(), args[1]) },
 
             "PUTCHAR" to fun(args: List<ByteArray>) { PUTCHAR() },
             "PRINTSTR" to fun(args: List<ByteArray>) { PRINTSTR() },
@@ -479,12 +562,12 @@ object TBASOpcodes {
             "MOV" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
             "LOADNUM" to intArrayOf(SIZEOF_NUMBER, SIZEOF_BYTE),
             "LOADRAWNUM" to intArrayOf(SIZEOF_NUMBER, SIZEOF_BYTE),
-            "LOADPOINTER" to intArrayOf(SIZEOF_POINTER, SIZEOF_BYTE),
+            "LOADPTR" to intArrayOf(SIZEOF_POINTER, SIZEOF_BYTE),
             "LOADVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "PUSH" to intArrayOf(SIZEOF_POINTER),
             "LOADFLAG" to intArrayOf(SIZEOF_INT32),
-            "LOADSTRING" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
+            "LOADSTR" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
             "JZ" to intArrayOf(SIZEOF_INT32),
             "JNZ" to intArrayOf(SIZEOF_INT32),

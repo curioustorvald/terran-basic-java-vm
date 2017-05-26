@@ -2,6 +2,7 @@ package net.torvald.tbasic
 
 import net.torvald.tbasic.runtime.VM
 import net.torvald.tbasic.runtime.toCString
+import net.torvald.tbasic.runtime.toLittle
 
 /**
  * Created by minjaesong on 2017-05-25.
@@ -15,11 +16,18 @@ class Executable {
     val vm = VM(256)
 
     val rudimentaryHello =
-            byteArrayOf(TBASOpcodes.opcodesList["LOADSTRING"]!!) + 1.toByte() + "Hell\no, w\norld!325432".toCString() +
-            byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!)
+            TBASOpcodes.LOADSTR + 1.toByte() + "Hell\no, w\norld!325432".toCString() +
+                    TBASOpcodes.PRINTSTR
+
+    val twoPlusTwo =
+            TBASOpcodes.LOADNUM + 2.0.toLittle() + 2.toByte() +
+                    TBASOpcodes.LOADNUM + 2.0.toLittle() + 3.toByte() +
+                    TBASOpcodes.ADD +
+                    TBASOpcodes.PRINTNUM
+
 
     fun main() {
-        vm.loadProgram(rudimentaryHello)
+        vm.loadProgram(twoPlusTwo)
         //(0..255).forEach { print("${vm.memory[it]} ") }
         vm.execute()
     }
