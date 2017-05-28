@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.experimental.or
 
 
 typealias Number = Double
@@ -88,7 +89,7 @@ class VM(memSize: Int,
                         parent.memory[memAddr + 6].toLong().shl(48) or parent.memory[memAddr + 7].toLong().shl(56)
             }
             PointerType.INT16 -> {
-                parent.memory[memAddr].toLong() or parent.memory[memAddr + 1].toLong().shl(8)
+                (parent.memory[memAddr].toInt() or parent.memory[memAddr + 1].toInt().shl(8)).toShort()
             }
         }
         fun readAsDouble(): Double {
@@ -127,6 +128,9 @@ class VM(memSize: Int,
         fun write(string: String) {
             val strBytes = string.toByteArray(VM.charset)
             write(strBytes.size.toLittle() + strBytes) // according to TBASString
+        }
+        fun write(boolean: Boolean) {
+            if (boolean) write(0xFF.toByte()) else write(0.toByte())
         }
         fun write(value: Any) {
             if (value is Byte) write(value as Byte)
@@ -236,10 +240,17 @@ class VM(memSize: Int,
         return Pointer(this, addr)
     }
     fun freeBlock(variable: TBASValue) {
-        if (!mallocList.remove(variable.pointer.memAddr..variable.pointer.memAddr + variable.sizeOf() - 1)) {
+        freeBlock(variable.pointer.memAddr..variable.pointer.memAddr + variable.sizeOf() - 1)
+    }
+    fun freeBlock(range: IntRange) {
+        if (!mallocList.remove(range)) {
             interruptSegmentationFault()
             throw RuntimeException("Access violation -- no such block was assigned by operation system.")
         }
+    }
+    fun reduceAllocatedBlock(range: IntRange, sizeToReduce: Int) {
+        freeBlock(range)
+        mallocList.add(range.start..range.endInclusive - sizeToReduce)
     }
 
     fun makeStringDB(string: ByteArray): Pointer {
@@ -263,6 +274,8 @@ class VM(memSize: Int,
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    val peripherals = ArrayList<VMPeripheralWrapper>()
+
     /**
      * Memory Map
      *
@@ -277,12 +290,12 @@ class VM(memSize: Int,
      */
     internal val memory = ByteArray(memSize)
 
-    val varTable = HashMap<String, TBASValue>()
+    val varTable = HashMap<String, TBASValue>() // UPPERCASE ONLY!
     val callStack = IntArray(stackSize, { 0 })
 
+    val ivtSize = 4 * VM.interruptCount
     var userSpaceStart: Int? = null // lateinit
         private set
-    val ivtSize = 4 * VM.interruptCount
 
     var terminate = false
 
@@ -291,6 +304,10 @@ class VM(memSize: Int,
     var r2 = 0.0
     var r3 = 0.0
     var r4 = 0.0
+    var r5 = 0.0
+    var r6 = 0.0
+    var r7 = 0.0
+    var r8 = 0.0
 
     fun writereg(register: Int, data: Number) {
         when (register) {
@@ -298,6 +315,10 @@ class VM(memSize: Int,
             2 -> r2 = data
             3 -> r3 = data
             4 -> r4 = data
+            5 -> r5 = data
+            6 -> r6 = data
+            7 -> r7 = data
+            8 -> r8 = data
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
@@ -306,6 +327,10 @@ class VM(memSize: Int,
         2 -> r2
         3 -> r3
         4 -> r4
+        5 -> r5
+        6 -> r6
+        7 -> r7
+        8 -> r8
         else -> throw IllegalArgumentException("No such register: r$register")
     }
     fun writebreg(register: Int, data: Byte) {
@@ -314,6 +339,10 @@ class VM(memSize: Int,
             2 -> b2 = data
             3 -> b3 = data
             4 -> b4 = data
+            5 -> b5 = data
+            6 -> b6 = data
+            7 -> b7 = data
+            8 -> b8 = data
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
@@ -322,14 +351,22 @@ class VM(memSize: Int,
         2 -> b2
         3 -> b3
         4 -> b4
+        5 -> b5
+        6 -> b6
+        7 -> b7
+        8 -> b8
         else -> throw IllegalArgumentException("No such register: r$register")
     }
 
-    // byte registers (function args; also be used as supplements for r registers)
+    // byte registers (flags for r registers)
     var b1 = 0.toByte()
     var b2 = 0.toByte()
     var b3 = 0.toByte()
     var b4 = 0.toByte()
+    var b5 = 0.toByte()
+    var b6 = 0.toByte()
+    var b7 = 0.toByte()
+    var b8 = 0.toByte()
 
     // memory registers (32-bit)
     var m1 = 0 // general-use flags or variable
@@ -337,13 +374,22 @@ class VM(memSize: Int,
     var sp = 0 // stack pointer
     var lr = 0 // link register
 
+    private var uptimeHolder = 0L
+    val uptime: Int // uptime register
+        get() {
+            val currentTime = System.currentTimeMillis()
+            val ret = currentTime - uptimeHolder
+            uptimeHolder = currentTime
+            return ret.toInt()
+        }
+
 
     init {
         if (memSize > 16.MB()) {
-            warn("Memory size might be too big — recommended max is 16 MBytes")
+            warn("VM memory size might be too big — recommended max is 16 MBytes")
         }
         else if (memSize < 256) { // arbitrary unit
-            throw Error("Memory size too small — minimum allowed is 256 bytes")
+            throw Error("VM memory size too small — minimum allowed is 256 bytes")
         }
 
     }
@@ -375,6 +421,10 @@ class VM(memSize: Int,
 
     fun execute() {
         if (userSpaceStart != null) {
+
+            uptimeHolder = System.currentTimeMillis()
+
+
             while (!terminate) {
 
                 //(0..512).forEach { print("${memory[it]} ") }
@@ -407,7 +457,6 @@ class VM(memSize: Int,
                 val totalArgsSize = arguments.map { it.size }.sum()
                 execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pc")
 
-                if (instAsm == "HALT") terminate = true
 
                 // execute
                 pc += (1 + totalArgsSize)
@@ -445,8 +494,6 @@ class VM(memSize: Int,
     }
 
 
-    private fun Int.KB() = this shl 10
-    private fun Int.MB() = this shl 20
     private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
 
     // Interrupt handlers (its just JMPs) //
@@ -458,6 +505,8 @@ class VM(memSize: Int,
     fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
 }
 
+fun Int.KB() = this shl 10
+fun Int.MB() = this shl 20
 
 fun String.toCString() = this.toByteArray(VM.charset) + 0.toByte()
 fun Int.toLittle() = byteArrayOf(

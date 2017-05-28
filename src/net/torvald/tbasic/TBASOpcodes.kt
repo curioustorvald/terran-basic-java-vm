@@ -16,12 +16,15 @@ typealias Register = Int
  */
 object TBASOpcodes {
 
+    val TBASVERSION = 0.4
+
     lateinit var vm: VM
 
     fun invoke(vm: VM) {
         this.vm = vm
 
         //initTBasicEnv()
+        //resetTBASVarTable()
     }
 
     /*
@@ -60,9 +63,47 @@ object TBASOpcodes {
         }
     }
 
+    fun resetTBASVarTable() {
+        val ptrM_PI = vm.malloc(SIZEOF_NUMBER)
+        ptrM_PI.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_PI.write(3.141592653589793)
+        val ptrM_2PI = vm.malloc(SIZEOF_NUMBER)
+        ptrM_2PI.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_2PI.write(6.283185307179586)
+        val ptrM_E = vm.malloc(SIZEOF_NUMBER)
+        ptrM_E.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_E.write(2.718281828459045)
+        val ptrM_ROOT2 = vm.malloc(SIZEOF_NUMBER)
+        ptrM_ROOT2.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_ROOT2.write(1.414213562373095)
+        val ptrTRUE = vm.malloc(SIZEOF_BYTE)
+        ptrM_PI.type = VM.Pointer.PointerType.BOOLEAN
+        ptrM_PI.write(true)
+        val ptrFALSE = vm.malloc(SIZEOF_BYTE)
+        ptrM_PI.type = VM.Pointer.PointerType.BOOLEAN
+        ptrM_PI.write(false)
+        val ptrNIL = vm.malloc(SIZEOF_BYTE)
+        ptrM_PI.type = VM.Pointer.PointerType.VOID
+        ptrM_PI.write(false)
+        val ptr_VERSION = vm.malloc(SIZEOF_NUMBER)
+        ptrM_PI.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_PI.write(TBASVERSION)
+
+        vm.varTable.clear()
+        vm.varTable.put("M_PI", TBASNumber(ptrM_PI))
+        vm.varTable.put("M_2PI", TBASNumber(ptrM_2PI))
+        vm.varTable.put("M_E", TBASNumber(ptrM_E))
+        vm.varTable.put("M_ROOT2", TBASNumber(ptrM_ROOT2))
+        vm.varTable.put("TRUE", TBASBoolean(ptrTRUE))
+        vm.varTable.put("FALSE", TBASBoolean(ptrFALSE))
+        vm.varTable.put("NIL", TBASNil(ptrNIL))
+        vm.varTable.put("_VERSION", TBASNumber(ptr_VERSION))
+    }
+
 
     // variable control //
 
+    fun CLR() { resetTBASVarTable() }
 
     // flow control //
 
@@ -71,17 +112,20 @@ object TBASOpcodes {
 
     fun RETURN() { POP(); vm.pc = vm.lr }
     fun GOSUB(addr: Int) { PUSH(vm.pc); vm.pc = addr }
-    fun GOTO(addr: Int) { vm.pc = addr }
+    fun JMP(addr: Int) { vm.pc = addr }
 
-    fun JZ(addr: Int) { if (vm.m1 == 0) GOTO(addr) }
-    fun JNZ(addr: Int) { if (vm.m1 != 0) GOTO(addr) }
-    fun JGT(addr: Int) { if (vm.m1 > 0) GOTO(addr) }
-    fun JLE(addr: Int) { if (vm.m1 < 0) GOTO(addr) }
+    fun JZ(addr: Int) { if (vm.m1 == 0) JMP(addr) }
+    fun JNZ(addr: Int) { if (vm.m1 != 0) JMP(addr) }
+    fun JGT(addr: Int) { if (vm.m1 > 0) JMP(addr) }
+    fun JLS(addr: Int) { if (vm.m1 < 0) JMP(addr) }
 
     fun HALT() { vm.terminate = true }
 
     
     // stdIO //
+    /**
+     * prints any byte (stored as Number) on r1 as a character. If r1 has a number of 33.0, '!' will be printed.
+     */
     fun PUTCHAR() { vm.stdout.write(java.lang.Double.doubleToRawLongBits(vm.r1).toInt()); vm.stdout.flush() }
     /**
      * print a string. String is prepared to r1 as pointer.
@@ -98,6 +142,30 @@ object TBASOpcodes {
             PUTCHAR()
             vm.m1++
         }
+    }
+    fun GETCHAR() { vm.r1 = vm.stdin.read().toDouble() }
+    /** Any pre-existing variable will be overwritten. */
+    fun READSTR(varname: String) {
+        val maxStrLen = 255 // plus null terminator
+        val readTerminator = '\n'.toInt().toDouble()
+
+        val strPtr = vm.calloc(maxStrLen + 1)
+        val strPtrInitPos = strPtr.memAddr
+        vm.r1 = -1.0
+
+        while (vm.r1 != readTerminator && strPtr.memAddr - strPtrInitPos <= maxStrLen) {
+            GETCHAR()
+            strPtr.write(vm.r1.toByte())
+            strPtr.inc()
+            PUTCHAR() // print out what the hell the user has just hit
+        }
+
+        // truncate and free remaining bytes
+        vm.reduceAllocatedBlock(strPtrInitPos..strPtrInitPos + maxStrLen, strPtrInitPos + maxStrLen - strPtr.memAddr)
+
+
+        LOADPTR(strPtr.memAddr, 1)
+        SETVARIABLE(varname)
     }
 
     /**
@@ -139,6 +207,10 @@ object TBASOpcodes {
     }
 
 
+    /** r1 <- VM memory size in bytes */
+    fun MEM() { vm.r1 = vm.memory.size.toDouble() }
+
+
     // MATHEMATICAL OPERATORS //
 
     /**
@@ -174,24 +246,32 @@ object TBASOpcodes {
     fun INT()   { if (vm.r2 >= 0.0) FLOOR() else CEIL() }
     fun RND()   { vm.r1 = Math.random() }
     fun SGN()   { vm.r1 = Math.signum(vm.r2) }
-    fun SQRT() { LOADNUM(2.0, 3); POW() }
-    fun CBRT() { LOADNUM(3.0, 3); POW() }
-    fun INV() { MOV(2, 3); LOADNUM(1.0, 2); DIV() }
-    fun RAD() { LOADRAWNUM(0x4081ABE4B73FEFB5L, 3); DIV() } // r1 <- r2 / (180.0 * PI)
+    fun SQRT() { LOADNUM(3, 2.0); POW() }
+    fun CBRT() { LOADNUM(3, 3.0); POW() }
+    fun INV() { MOV(2, 3); LOADNUM(2, 1.0); DIV() }
+    fun RAD() { LOADRAWNUM(3, 0x4081ABE4B73FEFB5L); DIV() } // r1 <- r2 / (180.0 * PI)
 
     fun NOT() { vm.r1 = vm.r2.toInt().inv().toDouble() }
 
     
     fun INC1() { vm.r1 += 1.0 }
-    fun INC2() { vm.r1 += 1.0 }
-    fun INC3() { vm.r1 += 1.0 }
-    fun INC4() { vm.r1 += 1.0 }
+    fun INC2() { vm.r2 += 1.0 }
+    fun INC3() { vm.r3 += 1.0 }
+    fun INC4() { vm.r4 += 1.0 }
+    fun INC5() { vm.r5 += 1.0 }
+    fun INC6() { vm.r6 += 1.0 }
+    fun INC7() { vm.r7 += 1.0 }
+    fun INC8() { vm.r8 += 1.0 }
     fun INCM() { vm.m1 += 1 }
 
     fun DEC1() { vm.r1 -= 1.0 }
-    fun DEC2() { vm.r1 -= 1.0 }
-    fun DEC3() { vm.r1 -= 1.0 }
-    fun DEC4() { vm.r1 -= 1.0 }
+    fun DEC2() { vm.r2 -= 1.0 }
+    fun DEC3() { vm.r3 -= 1.0 }
+    fun DEC4() { vm.r4 -= 1.0 }
+    fun DEC5() { vm.r5 -= 1.0 }
+    fun DEC6() { vm.r6 -= 1.0 }
+    fun DEC7() { vm.r7 -= 1.0 }
+    fun DEC8() { vm.r8 -= 1.0 }
     fun DECM() { vm.m1 -= 1 }
     
     
@@ -201,13 +281,24 @@ object TBASOpcodes {
     fun NOP() { }
 
     fun INTERRUPT(interrupt: Int) {
-        GOTO(interrupt * 4)
+        JMP(interrupt * 4)
     }
 
     /** memory(r2) <- r1 */
     fun POKE() { vm.memory[vm.r2.toInt()] = vm.r1.toByte() }
     /** r1 <- data in memory addr r2 */
     fun PEEK() { vm.r1 = vm.memory[vm.r2.toInt()].toUint().toDouble() }
+
+    /** Peripheral(r3).memory(r2) <- r1 */
+    fun POKEPERI() { vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()] = vm.r1.toByte() }
+    /** r1 <- data in memory addr r2 of peripheral r3 */
+    fun PEEKPERI() { vm.r1 = vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()].toUint().toDouble() }
+
+
+    /** Memory copy - source: r2, destination: r3, length: r4 */
+    fun MEMCPY() { System.arraycopy(vm.memory, vm.r2.toInt(), vm.memory, vm.r3.toInt(), vm.r4.toInt()) }
+    /** Memory copy - peripheral index: r5, source (machine): r2, destination (peripheral): r3, length: r4 */
+    fun MEMCPYPERI() { System.arraycopy(vm.memory, vm.r2.toInt(), vm.peripherals[vm.r5.toInt()], vm.r3.toInt(), vm.r4.toInt()) }
 
 
     /*
@@ -224,7 +315,7 @@ object TBASOpcodes {
      *
      * @param register 1-4 for r1-r4
      */
-    fun LOADNUM(number: Double, register: Register) {
+    fun LOADNUM(register: Register, number: Double) {
         vm.writereg(register, number)
         vm.writebreg(register, 0.toByte())
     }
@@ -242,7 +333,7 @@ object TBASOpcodes {
      *
      * @param register 1-4 for r1-r4
      */
-    fun LOADRAWNUM(num_as_bytes: Long, register: Register) {
+    fun LOADRAWNUM(register: Register, num_as_bytes: Long) {
         vm.writereg(register, java.lang.Double.longBitsToDouble(num_as_bytes))
         vm.writebreg(register, 1.toByte())
     }
@@ -250,7 +341,7 @@ object TBASOpcodes {
     /**
      * Loads pointer's pointing address to r1, along with the marker that states r1 now holds memory address
      */
-    fun LOADPTR(addr: Int, register: Register) {
+    fun LOADPTR(register: Register, addr: Int) {
         try {
             vm.writereg(register, java.lang.Double.longBitsToDouble(addr.toLong()))
             if (addr == -1) {
@@ -337,6 +428,15 @@ object TBASOpcodes {
     }
 
 
+    fun SLP(millisec: Number) {
+        Thread.sleep(millisec.toLong())
+    }
+
+    fun UPTIME() {
+        vm.r1 = vm.uptime.toDouble()
+    }
+
+
 
 
 
@@ -380,7 +480,7 @@ object TBASOpcodes {
 
 
     val SIZEOF_BYTE = VM.Pointer.sizeOf(VM.Pointer.PointerType.BYTE)
-    val SIZEOF_POINTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
+    //val SIZEOF_POINTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
     val SIZEOF_INT32 = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
     val SIZEOF_NUMBER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT64)
     val READ_UNTIL_ZERO = -2
@@ -397,7 +497,7 @@ object TBASOpcodes {
 
             "HALT" to 0.toByte(),
 
-            "GOTO"   to 8.toByte(),
+            "JMP"   to 8.toByte(),
             "GOSUB"  to 9.toByte(),
             "RETURN" to 10.toByte(),
             "PUSH"   to 11.toByte(),
@@ -445,7 +545,7 @@ object TBASOpcodes {
             "JZ" to 48.toByte(),
             "JNZ" to 49.toByte(),
             "JGT" to 50.toByte(),
-            "JLE" to 51.toByte(),
+            "JLS" to 51.toByte(),
 
             "CMP" to 52.toByte(),
             "XCHG" to 53.toByte(),
@@ -456,13 +556,39 @@ object TBASOpcodes {
             "INC2" to 56.toByte(),
             "INC3" to 57.toByte(),
             "INC4" to 58.toByte(),
+
+            "INC5" to 64.toByte(),
+            "INC6" to 65.toByte(),
+            "INC7" to 66.toByte(),
+            "INC8" to 67.toByte(),
+
             "INCM" to 59.toByte(),
 
             "DEC1" to 55.toByte(),
             "DEC2" to 56.toByte(),
             "DEC3" to 57.toByte(),
             "DEC4" to 58.toByte(),
-            "DECM" to 59.toByte()
+
+            "DEC5" to 68.toByte(),
+            "DEC6" to 69.toByte(),
+            "DEC7" to 70.toByte(),
+            "DEC8" to 71.toByte(),
+
+            "DECM" to 59.toByte(),
+
+            "MEMCPY" to 60.toByte(),
+            "MEMCPYPERI" to 61.toByte(),
+
+            "POKEPERI" to 62.toByte(),
+            "PEEKPERI" to 63.toByte(),
+
+            "MEM" to 64.toByte(),
+
+            "SLP" to 65.toByte(),
+
+            "CLR" to 66.toByte(),
+
+            "UPTIME" to 67.toByte()
 
     )
 
@@ -477,7 +603,7 @@ object TBASOpcodes {
 
     val HALT = byteArrayOf(0)
 
-    val GOTO   = byteArrayOf(8)
+    val JMP   = byteArrayOf(8)
     val GOSUB  = byteArrayOf(9)
     val RETURN = byteArrayOf(10)
     val PUSH   = byteArrayOf(11)
@@ -525,24 +651,50 @@ object TBASOpcodes {
     val JZ = byteArrayOf(48)
     val JNZ = byteArrayOf(49)
     val JGT = byteArrayOf(50)
-    val JLE = byteArrayOf(51)
+    val JLS = byteArrayOf(51)
 
     val CMP = byteArrayOf(52)
     val XCHG = byteArrayOf(53)
 
-    val REGTOM = byteArrayOf(54)
+    val REGTOM = byteArrayOf(54) // m1 <- r1.toInt()
 
     val INC1 = byteArrayOf(55)
     val INC2 = byteArrayOf(56)
     val INC3 = byteArrayOf(57)
     val INC4 = byteArrayOf(58)
+
+    val INC5 = byteArrayOf(64)
+    val INC6 = byteArrayOf(65)
+    val INC7 = byteArrayOf(66)
+    val INC8 = byteArrayOf(67)
+
     val INCM = byteArrayOf(59)
 
     val DEC1 = byteArrayOf(55)
     val DEC2 = byteArrayOf(56)
     val DEC3 = byteArrayOf(57)
     val DEC4 = byteArrayOf(58)
+
+    val DEC5 = byteArrayOf(68)
+    val DEC6 = byteArrayOf(69)
+    val DEC7 = byteArrayOf(70)
+    val DEC8 = byteArrayOf(71)
+
     val DECM = byteArrayOf(59)
+
+    val MEMCPY = byteArrayOf(60)
+    val MEMCPYPERI = byteArrayOf(61)
+
+    val POKEPERI = byteArrayOf(62)
+    val PEEKPERI = byteArrayOf(63)
+
+    val MEM = byteArrayOf(64)
+
+    val SLP = byteArrayOf(65)
+
+    val CLR = byteArrayOf(66)
+
+    val UPTIME = byteArrayOf(67)
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -560,7 +712,7 @@ object TBASOpcodes {
 
             "HALT" to fun(_) { HALT() },
 
-            "GOTO"   to fun(args: List<ByteArray>) { GOTO(args[0].toLittleInt()) },
+            "JMP"   to fun(args: List<ByteArray>) { JMP(args[0].toLittleInt()) },
             "GOSUB"  to fun(args: List<ByteArray>) { GOSUB(args[0].toLittleInt()) },
             "RETURN" to fun(_) { RETURN() },
             "PUSH"   to fun(args: List<ByteArray>) { PUSH(args[0].toLittleInt()) },
@@ -588,14 +740,14 @@ object TBASOpcodes {
             "SGN"   to fun(_) { INT() },
             "SQRT"  to fun(_) { RND() },
             "CBRT"  to fun(_) { SGN() },
-            "INV"   to fun(_) { SQRT() },
-            "RAD"   to fun(_) { CBRT() },
+            "INV"   to fun(_) { INV() },
+            "RAD"   to fun(_) { RAD() },
 
             "INTERRUPT" to fun(args: List<ByteArray>) { INTERRUPT(args[0][0].toInt()) },
 
-            "LOADNUM" to fun(args: List<ByteArray>) { LOADNUM(args[0].toLittleDouble(), args[1][0].toInt()) },
-            "LOADRAWNUM" to fun(args: List<ByteArray>) { LOADRAWNUM(args[0].toLittleLong(), args[1][0].toInt()) },
-            "LOADPTR" to fun(args: List<ByteArray>) { LOADPTR(args[0].toLittleInt(), args[1][0].toInt()) },
+            "LOADNUM" to fun(args: List<ByteArray>) { LOADNUM(args[0][0].toInt(), args[1].toLittleDouble()) },
+            "LOADRAWNUM" to fun(args: List<ByteArray>) { LOADRAWNUM(args[0][0].toInt(), args[1].toLittleLong()) },
+            "LOADPTR" to fun(args: List<ByteArray>) { LOADPTR(args[0][0].toInt(), args[1].toLittleInt()) },
             "LOADVARIABLE" to fun(args: List<ByteArray>) { LOADVARIABLE(args[0].toString(VM.charset)) },
             "SETVARIABLE" to fun(args: List<ByteArray>) { SETVARIABLE(args[0].toString(VM.charset)) },
             "LOADMNUM" to fun(args: List<ByteArray>) { LOADMNUM(args[0].toLittleInt()) },
@@ -608,7 +760,7 @@ object TBASOpcodes {
             "JZ" to fun(args: List<ByteArray>) { JZ(args[0].toLittleInt()) },
             "JNZ" to fun(args: List<ByteArray>) { JNZ(args[0].toLittleInt()) },
             "JGT" to fun(args: List<ByteArray>) { JGT(args[0].toLittleInt()) },
-            "JLE" to fun(args: List<ByteArray>) { JLE(args[0].toLittleInt()) },
+            "JLS" to fun(args: List<ByteArray>) { JLS(args[0].toLittleInt()) },
 
             "CMP" to fun(_) { CMP() },
             "XCHG" to fun(args: List<ByteArray>) { XCHG(args[0][0].toInt(), args[1][0].toInt()) },
@@ -619,30 +771,57 @@ object TBASOpcodes {
             "INC2" to fun(_) { INC2() },
             "INC3" to fun(_) { INC3() },
             "INC4" to fun(_) { INC4() },
+
+            "INC5" to fun(_) { INC5() },
+            "INC6" to fun(_) { INC6() },
+            "INC7" to fun(_) { INC7() },
+            "INC8" to fun(_) { INC8() },
+
             "INCM" to fun(_) { INCM() },
 
             "DEC1" to fun(_) { DEC1() },
             "DEC2" to fun(_) { DEC2() },
             "DEC3" to fun(_) { DEC3() },
             "DEC4" to fun(_) { DEC4() },
-            "DECM" to fun(_) { DECM() }
+
+            "DEC5" to fun(_) { DEC5() },
+            "DEC6" to fun(_) { DEC6() },
+            "DEC7" to fun(_) { DEC7() },
+            "DEC8" to fun(_) { DEC8() },
+
+            "DECM" to fun(_) { DECM() },
+
+            "MEMCPY" to fun(_) { MEMCPY() },
+            "MEMCPYPERI" to fun(_) { MEMCPYPERI() },
+
+            "POKEPERI" to fun(_) { POKEPERI () },
+            "PEEKPERI" to fun(_) { PEEKPERI() },
+
+            "MEM" to fun(_) { MEM() },
+
+            "SLP" to fun(args: List<ByteArray>) { SLP(args[0].toLittleDouble()) },
+
+            "CLR" to fun(_) { CLR() },
+
+            "UPTIME" to fun(_) { UPTIME() }
 
     )
     val opcodeArgsList = hashMapOf<String, IntArray>( // null == 0 operands
             "MOV" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
             "XCHG" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
-            "LOADNUM" to intArrayOf(SIZEOF_NUMBER, SIZEOF_BYTE),
-            "LOADRAWNUM" to intArrayOf(SIZEOF_NUMBER, SIZEOF_BYTE),
-            "LOADPTR" to intArrayOf(SIZEOF_POINTER, SIZEOF_BYTE),
+            "LOADNUM" to intArrayOf(SIZEOF_BYTE, SIZEOF_NUMBER),
+            "LOADRAWNUM" to intArrayOf(SIZEOF_BYTE, SIZEOF_NUMBER),
+            "LOADPTR" to intArrayOf(SIZEOF_BYTE, SIZEOF_INT32),
             "LOADVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
-            "PUSH" to intArrayOf(SIZEOF_POINTER),
+            "PUSH" to intArrayOf(SIZEOF_INT32),
             "LOADMNUM" to intArrayOf(SIZEOF_INT32),
             "LOADSTR" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
             "JZ" to intArrayOf(SIZEOF_INT32),
             "JNZ" to intArrayOf(SIZEOF_INT32),
             "JGT" to intArrayOf(SIZEOF_INT32),
-            "JLE" to intArrayOf(SIZEOF_INT32)
+            "JLS" to intArrayOf(SIZEOF_INT32),
+            "SLP" to intArrayOf(SIZEOF_NUMBER)
     )
 }

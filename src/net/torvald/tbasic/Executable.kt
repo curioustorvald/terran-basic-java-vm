@@ -1,5 +1,6 @@
 package net.torvald.tbasic
 
+import net.torvald.tbasic.runtime.TBASOpcodeAssembler
 import net.torvald.tbasic.runtime.VM
 import net.torvald.tbasic.runtime.toCString
 import net.torvald.tbasic.runtime.toLittle
@@ -20,14 +21,23 @@ class Executable {
                     TBASOpcodes.PRINTSTR
 
     val twoPlusTwo =
-            TBASOpcodes.LOADNUM + 2.0.toLittle() + 2.toByte() +
-                    TBASOpcodes.LOADNUM + 2.0.toLittle() + 3.toByte() +
+            TBASOpcodes.LOADNUM + 2.toByte() + 2.0.toLittle() +
+                    TBASOpcodes.LOADNUM + 3.toByte() + 2.0.toLittle() +
                     TBASOpcodes.ADD +
                     TBASOpcodes.PRINTNUM
 
+    val testProgram = TBASOpcodeAssembler("""
+; komment
+LOADNUM 2, 2.0
+LOADNUM 3, 2.0
+ADD
+PRINTNUM
+""")
 
     fun main() {
-        vm.loadProgram(twoPlusTwo)
+        //testProgram.forEach { print("$it ") }
+
+        vm.loadProgram(testProgram)
         //(0..255).forEach { print("${vm.memory[it]} ") }
         vm.execute()
     }
