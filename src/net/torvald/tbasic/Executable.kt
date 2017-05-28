@@ -17,7 +17,7 @@ class Executable {
     val vm = VM(256)
 
     val rudimentaryHello =
-            TBASOpcodes.LOADSTR + 1.toByte() + "Hell\no, w\norld!325432".toCString() +
+            TBASOpcodes.LOADSTR + 1.toByte() + "ab\ncd".toCString() +
                     TBASOpcodes.PRINTSTR
 
     val twoPlusTwo =
@@ -26,20 +26,24 @@ class Executable {
                     TBASOpcodes.ADD +
                     TBASOpcodes.PRINTNUM
 
-    val testProgram = TBASOpcodeAssembler("""
-; komment
-LOADNUM 2, 2.0
-LOADNUM 3, 2.0
-ADD
-PRINTNUM
+    val testProgram = TBASOpcodeAssembler(""";
+LOADSTR 1, Helvetti world!
+;                            # String with \n
+PRINTSTR;
+LOADSTR 1, wut;              # String without \n
+PRINTSTR;
+LOADSTR 1, face
+;
+PRINTSTR;
 """)
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
         vm.loadProgram(testProgram)
-        //(0..255).forEach { print("${vm.memory[it]} ") }
+        //(0..255).forEach { print("${vm.memory[it]} ") }; println()
         vm.execute()
+        //(0..255).forEach { print("${vm.memory[it]} ") }; println()
     }
 
 

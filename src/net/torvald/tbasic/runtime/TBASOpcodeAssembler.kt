@@ -4,18 +4,18 @@ import net.torvald.tbasic.TBASOpcodes
 
 /**
  * - Space/Tab/comma is a delimiter.
- * - Any line starts with ; is comment
- * - Any text after ; is a comment
+ * - Any line starts with # is comment
+ * - Any text after # is a comment
  * - Labelling: @label_name
  * - String is surrounded with double quote
- * - Zero or one instructions per line
+ * - A statement must end with ;
  *
  * Example program
  *
- * LOADSTR 1, "Helvetti world!\n"
- * PRINTSTR
+ * LOADSTR 1, Helvetti world!;
+ * PRINTSTR;
  *
- * This prints out 'Helvetti world!\n' on the standard output.
+ * This prints out 'Helvetti world!' on the standard output.
  *
  *
  * Created by minjaesong on 2017-05-28.
@@ -23,17 +23,23 @@ import net.torvald.tbasic.TBASOpcodes
 object TBASOpcodeAssembler {
 
     private val delimeters = Regex("[ \t,]+")
-    private val stringR = Regex("\"[^\n]*\"")
-    private val comments = Regex(";[^\n]*")
-    private val labelMarker = "@"
+    private val comments = Regex("#[^\n]*")
+    private val blankLines = Regex("(?<=;)[\n ]+")
+    private val labelMarker = '@'
+    private val lineEndMarker = ';'
 
     private val labelTable = HashMap<String, Int>()
 
 
+    fun debug(any: Any?) { if (false) println(any) }
+
     operator fun invoke(userProgram: String): ByteArray {
         val ret = ArrayList<Byte>()
 
-        userProgram.replace(comments, "").lines().forEach { line ->
+        userProgram
+                .replace(comments, "")
+                .replace(blankLines, "")
+                .split(lineEndMarker).forEach { line ->
 
             val lineSplitted = line.split(delimeters)
 
@@ -43,9 +49,9 @@ object TBASOpcodeAssembler {
             }
             else if (!line.startsWith(labelMarker)) {
 
-                println("[TBASASM] line: $line")
+                debug("[TBASASM] line: $line")
                 lineSplitted.forEach {
-                    println("    > $it")
+                    debug("--> $it")
                 }
 
 
@@ -63,7 +69,7 @@ object TBASOpcodeAssembler {
                 if (argumentInfo.isNotEmpty()) {
                     argumentInfo.forEachIndexed { index, it ->
 
-                        println("[TBASASM] argsInfo index: $index, size: $it")
+                        debug("[TBASASM] argsInfo index: $index, size: $it")
 
                         if (it == TBASOpcodes.SIZEOF_BYTE) {
                             ret.add(lineSplitted[index + 1].toByte())
@@ -82,13 +88,15 @@ object TBASOpcodeAssembler {
                         }
                         else if (it == TBASOpcodes.READ_UNTIL_ZERO) {
 
-                            println("match: ${stringR.matchEntire(line)}")
+                            val strStart = line.indexOf(lineSplitted[index + 1], ignoreCase = false)
+                            val strEnd = line.length
 
-                            val match = stringR.matchEntire(line)!!.groupValues[0]
-                            match.substring(1..match.length - 2).toByteArray(VM.charset).forEach {
-                                ret.add(it)
-                            }
-                            ret.add(0.toByte())
+                            val strArg = line.substring(strStart, strEnd)
+
+                            debug("--> strArg: $strArg")
+
+                            strArg.toCString().forEach { ret.add(it) }
+                            // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
                         }
                         else {
                             throw IllegalArgumentException("Unknown argument type/size")
