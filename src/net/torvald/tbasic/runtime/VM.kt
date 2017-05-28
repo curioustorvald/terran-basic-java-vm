@@ -254,10 +254,20 @@ class VM(memSize: Int,
     }
 
     fun makeStringDB(string: ByteArray): Pointer {
-        return makeBytesDB(string + 0)
+        val string = if (string.last() == 0.toByte()) string else string + 0 // safeguard null terminator
+
+        // look for dupes
+        val existingPtnStart = memory.search(string)
+
+        if (existingPtnStart == null) {
+            return makeBytesDB(string)
+        }
+        else {
+            return Pointer(this, existingPtnStart)
+        }
     }
     fun makeStringDB(string: String): Pointer {
-        return makeBytesDB(string.toByteArray(VM.charset) + 0)
+        return makeStringDB(string.toCString())
     }
     fun makeNumberDB(number: Number): TBASNumber {
         val ptr = malloc(8)
@@ -508,7 +518,7 @@ class VM(memSize: Int,
 fun Int.KB() = this shl 10
 fun Int.MB() = this shl 20
 
-fun String.toCString() = this.toByteArray(VM.charset) + 0.toByte()
+fun String.toCString() = this.toByteArray(VM.charset) + 0
 fun Int.toLittle() = byteArrayOf(
         this.and(0xFF).toByte(),
         this.ushr(8).and(0xFF).toByte(),
@@ -557,10 +567,15 @@ fun ByteArray.search(pattern: ByteArray, start: Int = 0, length: Int = pattern.s
 
     var m = 0
     var i = 0
-    val T = IntArray(this.size)
+    val T = IntArray(this.size, { -1 })
 
+
+    //println("Searching pattern (ptn len: ${pattern.size})")
 
     while (m + 1 < this.size) {
+
+        //println("m: $m, i: $i")
+
         if (pattern[i] == this[m + i]) {
             i += 1
             if (i == pattern.size) {

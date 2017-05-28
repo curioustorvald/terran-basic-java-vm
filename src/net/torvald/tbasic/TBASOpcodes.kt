@@ -359,7 +359,7 @@ object TBASOpcodes {
     fun LOADSTR(register: Register, string: ByteArray) {
         try {
             val strPtr = vm.makeStringDB(string)
-            LOADPTR(strPtr.memAddr, register)
+            LOADPTR(register, strPtr.memAddr)
         }
         catch (e: OutOfMemoryError) {
             e.printStackTrace(System.out)
@@ -390,7 +390,7 @@ object TBASOpcodes {
     /**
      * load variable to r1 as pointer. If the variable does not exist, null pointer will be loaded instead.
      */
-    fun LOADVARIABLE(identifier: String) { LOADPTR(vm.varTable[identifier]?.pointer?.memAddr ?: -1, 1) }
+    fun LOADVARIABLE(identifier: String) { LOADPTR(1, vm.varTable[identifier]?.pointer?.memAddr ?: -1) }
     /**
      * save whatever on r1 (either an Immediate or Pointer) to variables table
      */
