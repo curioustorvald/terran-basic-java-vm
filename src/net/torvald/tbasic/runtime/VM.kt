@@ -6,7 +6,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
 import kotlin.collections.ArrayList
-import kotlin.experimental.or
 
 
 typealias Number = Double
@@ -418,7 +417,7 @@ class VM(memSize: Int,
     }
 
     fun loadProgram(opcodes: ByteArray) {
-        reset()
+        softReset()
 
         TBASOpcodes.invoke(this)
         //TBASOpcodes.initTBasicEnv()
@@ -432,12 +431,51 @@ class VM(memSize: Int,
         execDebug("Program loaded; pc: $pc, userSpaceStart: $userSpaceStart")
     }
 
-    fun reset() {
+    fun softReset() {
         varTable.clear()
         Arrays.fill(callStack, 0)
         userSpaceStart = null
         terminate = false
+
+        // reset malloc table
+        mallocList.clear()
+
+        // reset registers
+        r1 = 0.0
+        r2 = 0.0
+        r3 = 0.0
+        r4 = 0.0
+        r5 = 0.0
+        r6 = 0.0
+        r7 = 0.0
+        r8 = 0.0
+        b1 = 0.toByte()
+        b2 = 0.toByte()
+        b3 = 0.toByte()
+        b4 = 0.toByte()
+        b5 = 0.toByte()
+        b6 = 0.toByte()
+        b7 = 0.toByte()
+        b8 = 0.toByte()
+        m1 = 0
+        strCntr = 0
+        pc = 0
+        sp = 0
+        lr = 0
+        //... but don't reset the uptime
     }
+
+    fun hardReset() {
+        softReset()
+
+        // reset system uptime timer
+        uptimeHolder = 0L
+
+        // erase memory
+        Arrays.fill(memory, 0)
+    }
+
+
 
     fun execDebugMain(any: Any?) { if (false) print(any) }
     fun execDebug(any: Any?)     { if (false) print(any) }
