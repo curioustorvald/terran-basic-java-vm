@@ -4,7 +4,9 @@
     <list default="true" id="7d458e43-04df-482b-879c-88336e290950" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" />
     </list>
     <ignored path="$PROJECT_DIR$/out/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -22,22 +24,12 @@
             <file leaf-file-name="TBASOpcodes.kt" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="629">
-                    <caret line="360" column="33" lean-forward="false" selection-start-line="360" selection-start-column="33" selection-end-line="360" selection-end-column="33" />
+                  <state relative-caret-position="5054">
+                    <caret line="361" column="33" lean-forward="false" selection-start-line="361" selection-start-column="33" selection-end-line="361" selection-end-column="33" />
                     <folding>
                       <element signature="e#28#94#0" expanded="true" />
-                      <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+                      <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
                     </folding>
-                  </state>
-                </provider>
-              </entry>
-            </file>
-            <file leaf-file-name="VMPeripheralWrapper.kt" pinned="false" current-in-tab="false">
-              <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt">
-                <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="252">
-                    <caret line="18" column="1" lean-forward="false" selection-start-line="18" selection-start-column="1" selection-end-line="18" selection-end-column="1" />
-                    <folding />
                   </state>
                 </provider>
               </entry>
@@ -45,8 +37,8 @@
             <file leaf-file-name="Executable.kt" pinned="false" current-in-tab="true">
               <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="448">
-                    <caret line="32" column="48" lean-forward="false" selection-start-line="32" selection-start-column="48" selection-end-line="32" selection-end-column="48" />
+                  <state relative-caret-position="966">
+                    <caret line="69" column="10" lean-forward="false" selection-start-line="69" selection-start-column="10" selection-end-line="69" selection-end-column="10" />
                     <folding>
                       <element signature="e#28#205#0" expanded="true" />
                     </folding>
@@ -81,8 +73,8 @@
       <file leaf-file-name="VM.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1443">
-              <caret line="506" column="71" lean-forward="true" selection-start-line="506" selection-start-column="71" selection-end-line="506" selection-end-column="71" />
+            <state relative-caret-position="621">
+              <caret line="455" column="118" lean-forward="false" selection-start-line="455" selection-start-column="118" selection-end-line="455" selection-end-column="118" />
               <folding>
                 <element signature="e#36#257#0" expanded="true" />
                 <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
@@ -104,24 +96,24 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="TBASOpcodes.kt" pinned="false" current-in-tab="false">
+      <file leaf-file-name="TBASOpcodes.kt" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="541">
-              <caret line="360" column="32" lean-forward="true" selection-start-line="360" selection-start-column="32" selection-end-line="360" selection-end-column="32" />
+            <state relative-caret-position="-8581">
+              <caret line="114" column="8" lean-forward="false" selection-start-line="114" selection-start-column="8" selection-end-line="114" selection-end-column="8" />
               <folding>
                 <element signature="e#28#94#0" expanded="true" />
-                <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+                <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="TBASOpcodeAssembler.kt" pinned="false" current-in-tab="true">
+      <file leaf-file-name="TBASOpcodeAssembler.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="266">
-              <caret line="19" column="2" lean-forward="true" selection-start-line="19" selection-start-column="2" selection-end-line="19" selection-end-column="2" />
+            <state relative-caret-position="-579">
+              <caret line="77" column="17" lean-forward="false" selection-start-line="77" selection-start-column="17" selection-end-line="77" selection-end-column="17" />
               <folding />
             </state>
           </provider>
@@ -162,11 +154,20 @@
       <find>LOADPTR</find>
       <find>LOADNUM</find>
       <find>LOADRAWNUM</find>
+      <find>m1 =</find>
+      <find>JNZ</find>
+      <find>XCHG</find>
+      <find>PRINTSTR</find>
+      <find>MUL</find>
       <find>LOADSTR</find>
+      <find>delimeter</find>
+      <find>println</find>
+      <find>JMP()</find>
     </findStrings>
     <replaceStrings>
       <replace>readAsDouble()</replace>
       <replace>LOADMNUM</replace>
+      <replace>delimiter</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -195,10 +196,10 @@
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralDelegate.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" />
       </list>
     </option>
   </component>
@@ -229,8 +230,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scratches" />
-      <pane id="PackagesPane" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -285,7 +284,9 @@
           </PATH>
         </subPane>
       </pane>
+      <pane id="PackagesPane" />
       <pane id="Scope" />
+      <pane id="Scratches" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -720,12 +721,13 @@
       <workItem from="1495813717359" duration="1263000" />
       <workItem from="1495820107572" duration="7405000" />
       <workItem from="1495884104643" duration="1081000" />
-      <workItem from="1495961044712" duration="9797000" />
+      <workItem from="1495961044712" duration="14342000" />
+      <workItem from="1496075854035" duration="8048000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="98878000" />
+    <option name="totallyTimeSpent" value="111471000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-7" y="0" width="1214" height="1887" extended-state="0" />
@@ -737,13 +739,14 @@
       <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.19669327" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.19669327" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.17850953" sideWeight="0.49488056" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18110919" sideWeight="0.49488056" order="0" side_tool="false" content_ui="combo" />
       <window_info id="LuaJ" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Database" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3289624" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="UI Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
@@ -754,7 +757,6 @@
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3289624" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -765,7 +767,7 @@
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="1" />
+      <option name="time" value="2" />
     </breakpoint-manager>
     <watches-manager />
   </component>
@@ -813,7 +815,7 @@
           <caret line="65" column="44" lean-forward="true" selection-start-line="65" selection-start-column="44" selection-end-line="65" selection-end-column="44" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
@@ -857,7 +859,7 @@
           <caret line="25" column="0" lean-forward="true" selection-start-line="25" selection-start-column="0" selection-end-line="25" selection-end-column="0" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
@@ -901,7 +903,7 @@
           <caret line="23" column="5" lean-forward="true" selection-start-line="23" selection-start-column="5" selection-end-line="23" selection-end-column="5" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
@@ -945,7 +947,7 @@
           <caret line="16" column="0" lean-forward="true" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
@@ -977,7 +979,7 @@
           <caret line="14" column="30" lean-forward="false" selection-start-line="14" selection-start-column="30" selection-end-line="14" selection-end-column="30" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
@@ -1033,7 +1035,7 @@
           <caret line="14" column="30" lean-forward="true" selection-start-line="14" selection-start-column="30" selection-end-line="14" selection-end-column="30" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
@@ -1169,17 +1171,6 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/luavm/LuaOpcodes.kt" />
     <entry file="file://$PROJECT_DIR$/arstrsatrsa.java" />
-    <entry file="file://$PROJECT_DIR$/README.md">
-      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-        <state split_layout="SPLIT">
-          <first_editor relative-caret-position="0">
-            <caret line="0" column="50" lean-forward="false" selection-start-line="0" selection-start-column="50" selection-end-line="0" selection-end-column="50" />
-            <folding />
-          </first_editor>
-          <second_editor />
-        </state>
-      </provider>
-    </entry>
     <entry file="jar://$KOTLIN_BUNDLED$/lib/kotlin-runtime-sources.jar!/kotlin/reflect/jvm/internal/KPropertyImpl.kt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="576">
@@ -1210,6 +1201,29 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor relative-caret-position="0">
+            <caret line="0" column="50" lean-forward="false" selection-start-line="0" selection-start-column="50" selection-end-line="0" selection-end-column="50" />
+            <folding />
+          </first_editor>
+          <second_editor />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="621">
+          <caret line="455" column="118" lean-forward="false" selection-start-line="455" selection-start-column="118" selection-end-line="455" selection-end-column="118" />
+          <folding>
+            <element signature="e#36#257#0" expanded="true" />
+            <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
+            <element signature="n#!!block;n#Stack#0;n#!!block;n#VM#0" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASValue.kt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="476">
@@ -1220,44 +1234,32 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="541">
-          <caret line="360" column="32" lean-forward="true" selection-start-line="360" selection-start-column="32" selection-end-line="360" selection-end-column="32" />
-          <folding>
-            <element signature="e#28#94#0" expanded="true" />
-            <marker date="1495983282763" expanded="true" signature="6747:6799" ph="{...}" />
-          </folding>
+        <state relative-caret-position="-579">
+          <caret line="77" column="17" lean-forward="false" selection-start-line="77" selection-start-column="17" selection-end-line="77" selection-end-column="17" />
+          <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1443">
-          <caret line="506" column="71" lean-forward="true" selection-start-line="506" selection-start-column="71" selection-end-line="506" selection-end-column="71" />
+        <state relative-caret-position="5054">
+          <caret line="361" column="33" lean-forward="false" selection-start-line="361" selection-start-column="33" selection-end-line="361" selection-end-column="33" />
           <folding>
-            <element signature="e#36#257#0" expanded="true" />
-            <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
-            <element signature="n#!!block;n#Stack#0;n#!!block;n#VM#0" expanded="false" />
+            <element signature="e#28#94#0" expanded="true" />
+            <marker date="1496122934108" expanded="true" signature="6831:6888" ph="{...}" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="448">
-          <caret line="32" column="48" lean-forward="false" selection-start-line="32" selection-start-column="48" selection-end-line="32" selection-end-column="48" />
+        <state relative-caret-position="966">
+          <caret line="69" column="10" lean-forward="false" selection-start-line="69" selection-start-column="10" selection-end-line="69" selection-end-column="10" />
           <folding>
             <element signature="e#28#205#0" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="266">
-          <caret line="19" column="2" lean-forward="true" selection-start-line="19" selection-start-column="2" selection-end-line="19" selection-end-column="2" />
-          <folding />
         </state>
       </provider>
     </entry>

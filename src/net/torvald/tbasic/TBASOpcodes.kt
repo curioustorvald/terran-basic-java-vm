@@ -132,15 +132,15 @@ object TBASOpcodes {
      */
     fun PRINTSTR() {
         val string = TBASString(VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt()))
-        vm.m1 = 0 // string counter
+        vm.strCntr = 0 // string counter
 
         while (true) {
-            vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.m1].toUint().toLong())
+            vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.strCntr].toUint().toLong())
 
             if (vm.r1 == 0.0) break
 
             PUTCHAR()
-            vm.m1++
+            vm.strCntr++
         }
     }
     fun GETCHAR() { vm.r1 = vm.stdin.read().toDouble() }
@@ -172,6 +172,8 @@ object TBASOpcodes {
      * prints out whatever number in r1 register
      */
     fun PRINTNUM() {
+        val oldnum = vm.r1 // little cheat, but whatever.
+
         val str = vm.r1.toString()
 
         // LOADSTR
@@ -192,23 +194,22 @@ object TBASOpcodes {
         // END LOADSTR
 
         val string = TBASString(VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt()))
-        vm.m1 = 0 // string counter
+        vm.strCntr = 0 // string counter
 
         while (true) {
-            vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.m1].toUint().toLong())
+            vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.strCntr].toUint().toLong())
 
             if (vm.r1 == 0.0) break
 
             PUTCHAR()
-            vm.m1++
+            vm.strCntr++
         }
+
+        vm.r1 = oldnum
 
         vm.freeBlock(string)
     }
 
-
-    /** r1 <- VM memory size in bytes */
-    fun MEM() { vm.r1 = vm.memory.size.toDouble() }
 
 
     // MATHEMATICAL OPERATORS //
@@ -432,9 +433,10 @@ object TBASOpcodes {
         Thread.sleep(millisec.toLong())
     }
 
-    fun UPTIME() {
-        vm.r1 = vm.uptime.toDouble()
-    }
+    /** r1 <- VM memory size in bytes */
+    fun MEM() { vm.r1 = vm.memory.size.toDouble() }
+    /** r1 <- System uptime in milliseconds */
+    fun UPTIME() { vm.r1 = vm.uptime.toDouble() }
 
 
 
@@ -556,145 +558,137 @@ object TBASOpcodes {
             "INC2" to 56.toByte(),
             "INC3" to 57.toByte(),
             "INC4" to 58.toByte(),
+            "INC5" to 59.toByte(),
+            "INC6" to 60.toByte(),
+            "INC7" to 61.toByte(),
+            "INC8" to 62.toByte(),
+            "INCM" to 63.toByte(),
 
-            "INC5" to 64.toByte(),
-            "INC6" to 65.toByte(),
-            "INC7" to 66.toByte(),
-            "INC8" to 67.toByte(),
-
-            "INCM" to 59.toByte(),
-
-            "DEC1" to 55.toByte(),
-            "DEC2" to 56.toByte(),
-            "DEC3" to 57.toByte(),
-            "DEC4" to 58.toByte(),
-
+            "DEC1" to 64.toByte(),
+            "DEC2" to 65.toByte(),
+            "DEC3" to 66.toByte(),
+            "DEC4" to 67.toByte(),
             "DEC5" to 68.toByte(),
             "DEC6" to 69.toByte(),
             "DEC7" to 70.toByte(),
             "DEC8" to 71.toByte(),
+            "DECM" to 72.toByte(),
 
-            "DECM" to 59.toByte(),
+            "MEMCPY" to 73.toByte(),
+            "MEMCPYPERI" to 74.toByte(),
 
-            "MEMCPY" to 60.toByte(),
-            "MEMCPYPERI" to 61.toByte(),
+            "POKEPERI" to 75.toByte(),
+            "PEEKPERI" to 76.toByte(),
 
-            "POKEPERI" to 62.toByte(),
-            "PEEKPERI" to 63.toByte(),
+            "MEM" to 77.toByte(),
 
-            "MEM" to 64.toByte(),
+            "SLP" to 78.toByte(),
 
-            "SLP" to 65.toByte(),
+            "CLR" to 79.toByte(),
 
-            "CLR" to 66.toByte(),
-
-            "UPTIME" to 67.toByte()
+            "UPTIME" to 80.toByte()
 
     )
 
-    val NOP = byteArrayOf(7)
+    val NOP = 7.toByte()
 
-    val ADD = byteArrayOf(1)
-    val SUB = byteArrayOf(2)
-    val MUL = byteArrayOf(3)
-    val DIV = byteArrayOf(4)
-    val POW = byteArrayOf(5)
-    val MOD = byteArrayOf(6)
+    val ADD = 1.toByte()
+    val SUB = 2.toByte()
+    val MUL = 3.toByte()
+    val DIV = 4.toByte()
+    val POW = 5.toByte()
+    val MOD = 6.toByte()
 
-    val HALT = byteArrayOf(0)
+    val HALT = 0.toByte()
 
-    val JMP   = byteArrayOf(8)
-    val GOSUB  = byteArrayOf(9)
-    val RETURN = byteArrayOf(10)
-    val PUSH   = byteArrayOf(11)
-    val POP    = byteArrayOf(12)
-    val MOV    = byteArrayOf(13)
-    val POKE   = byteArrayOf(14)
-    val PEEK   = byteArrayOf(15)
+    val JMP   = 8.toByte()
+    val GOSUB  = 9.toByte()
+    val RETURN = 10.toByte()
+    val PUSH   = 11.toByte()
+    val POP    = 12.toByte()
+    val MOV    = 13.toByte()
+    val POKE   = 14.toByte()
+    val PEEK   = 15.toByte()
 
-    val SHL  = byteArrayOf(16)
-    val SHR  = byteArrayOf(17)
-    val USHR = byteArrayOf(18)
-    val AND  = byteArrayOf(19)
-    val OR   = byteArrayOf(20)
-    val XOR  = byteArrayOf(21)
-    val NOT  = byteArrayOf(22)
+    val SHL  = 16.toByte()
+    val SHR  = 17.toByte()
+    val USHR = 18.toByte()
+    val AND  = 19.toByte()
+    val OR   = 20.toByte()
+    val XOR  = 21.toByte()
+    val NOT  = 22.toByte()
 
-    val ABS   = byteArrayOf(23)
-    val SIN   = byteArrayOf(24)
-    val FLOOR = byteArrayOf(25)
-    val CEIL  = byteArrayOf(26)
-    val ROUND = byteArrayOf(27)
-    val LOG   = byteArrayOf(28)
-    val INT   = byteArrayOf(29)
-    val RND   = byteArrayOf(20)
-    val SGN   = byteArrayOf(31)
-    val SQRT  = byteArrayOf(32)
-    val CBRT  = byteArrayOf(33)
-    val INV   = byteArrayOf(34)
-    val RAD   = byteArrayOf(35)
+    val ABS   = 23.toByte()
+    val SIN   = 24.toByte()
+    val FLOOR = 25.toByte()
+    val CEIL  = 26.toByte()
+    val ROUND = 27.toByte()
+    val LOG   = 28.toByte()
+    val INT   = 29.toByte()
+    val RND   = 20.toByte()
+    val SGN   = 31.toByte()
+    val SQRT  = 32.toByte()
+    val CBRT  = 33.toByte()
+    val INV   = 34.toByte()
+    val RAD   = 35.toByte()
 
-    val INTERRUPT = byteArrayOf(36)
+    val INTERRUPT = 36.toByte()
 
-    val LOADNUM = byteArrayOf(37)
-    val LOADRAWNUM = byteArrayOf(38)
-    val LOADPTR = byteArrayOf(39)
-    val LOADVARIABLE = byteArrayOf(40)
-    val SETVARIABLE = byteArrayOf(41)
-    val LOADMNUM = byteArrayOf(42)
-    val LOADSTR = byteArrayOf(43)
+    val LOADNUM = 37.toByte()
+    val LOADRAWNUM = 38.toByte()
+    val LOADPTR = 39.toByte()
+    val LOADVARIABLE = 40.toByte()
+    val SETVARIABLE = 41.toByte()
+    val LOADMNUM = 42.toByte()
+    val LOADSTR = 43.toByte()
 
-    val PUTCHAR = byteArrayOf(44)
-    val PRINTSTR = byteArrayOf(45)
-    val PRINTNUM = byteArrayOf(46)
+    val PUTCHAR = 44.toByte()
+    val PRINTSTR = 45.toByte()
+    val PRINTNUM = 46.toByte()
 
-    val JZ = byteArrayOf(48)
-    val JNZ = byteArrayOf(49)
-    val JGT = byteArrayOf(50)
-    val JLS = byteArrayOf(51)
+    val JZ = 48.toByte()
+    val JNZ = 49.toByte()
+    val JGT = 50.toByte()
+    val JLS = 51.toByte()
 
-    val CMP = byteArrayOf(52)
-    val XCHG = byteArrayOf(53)
+    val CMP = 52.toByte()
+    val XCHG = 53.toByte()
 
-    val REGTOM = byteArrayOf(54) // m1 <- r1.toInt()
+    val REGTOM = 54.toByte() // m1 <- r1.toInt()
 
-    val INC1 = byteArrayOf(55)
-    val INC2 = byteArrayOf(56)
-    val INC3 = byteArrayOf(57)
-    val INC4 = byteArrayOf(58)
+    val INC1 = 55.toByte()
+    val INC2 = 56.toByte()
+    val INC3 = 57.toByte()
+    val INC4 = 58.toByte()
+    val INC5 = 59.toByte()
+    val INC6 = 60.toByte()
+    val INC7 = 61.toByte()
+    val INC8 = 62.toByte()
+    val INCM = 63.toByte()
 
-    val INC5 = byteArrayOf(64)
-    val INC6 = byteArrayOf(65)
-    val INC7 = byteArrayOf(66)
-    val INC8 = byteArrayOf(67)
+    val DEC1 = 64.toByte()
+    val DEC2 = 65.toByte()
+    val DEC3 = 66.toByte()
+    val DEC4 = 67.toByte()
+    val DEC5 = 68.toByte()
+    val DEC6 = 69.toByte()
+    val DEC7 = 70.toByte()
+    val DEC8 = 71.toByte()
+    val DECM = 72.toByte()
 
-    val INCM = byteArrayOf(59)
+    val MEMCPY = 73.toByte()
+    val MEMCPYPERI = 74.toByte()
 
-    val DEC1 = byteArrayOf(55)
-    val DEC2 = byteArrayOf(56)
-    val DEC3 = byteArrayOf(57)
-    val DEC4 = byteArrayOf(58)
+    val POKEPERI = 75.toByte()
+    val PEEKPERI = 76.toByte()
 
-    val DEC5 = byteArrayOf(68)
-    val DEC6 = byteArrayOf(69)
-    val DEC7 = byteArrayOf(70)
-    val DEC8 = byteArrayOf(71)
+    val MEM = 77.toByte()
 
-    val DECM = byteArrayOf(59)
+    val SLP = 78.toByte()
 
-    val MEMCPY = byteArrayOf(60)
-    val MEMCPYPERI = byteArrayOf(61)
+    val CLR = 79.toByte()
 
-    val POKEPERI = byteArrayOf(62)
-    val PEEKPERI = byteArrayOf(63)
-
-    val MEM = byteArrayOf(64)
-
-    val SLP = byteArrayOf(65)
-
-    val CLR = byteArrayOf(66)
-
-    val UPTIME = byteArrayOf(67)
+    val UPTIME = 80.toByte()
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -771,24 +765,20 @@ object TBASOpcodes {
             "INC2" to fun(_) { INC2() },
             "INC3" to fun(_) { INC3() },
             "INC4" to fun(_) { INC4() },
-
             "INC5" to fun(_) { INC5() },
             "INC6" to fun(_) { INC6() },
             "INC7" to fun(_) { INC7() },
             "INC8" to fun(_) { INC8() },
-
             "INCM" to fun(_) { INCM() },
 
             "DEC1" to fun(_) { DEC1() },
             "DEC2" to fun(_) { DEC2() },
             "DEC3" to fun(_) { DEC3() },
             "DEC4" to fun(_) { DEC4() },
-
             "DEC5" to fun(_) { DEC5() },
             "DEC6" to fun(_) { DEC6() },
             "DEC7" to fun(_) { DEC7() },
             "DEC8" to fun(_) { DEC8() },
-
             "DECM" to fun(_) { DECM() },
 
             "MEMCPY" to fun(_) { MEMCPY() },
@@ -818,6 +808,7 @@ object TBASOpcodes {
             "LOADMNUM" to intArrayOf(SIZEOF_INT32),
             "LOADSTR" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
+            "JMP" to intArrayOf(SIZEOF_INT32),
             "JZ" to intArrayOf(SIZEOF_INT32),
             "JNZ" to intArrayOf(SIZEOF_INT32),
             "JGT" to intArrayOf(SIZEOF_INT32),

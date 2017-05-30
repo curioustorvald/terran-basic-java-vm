@@ -16,32 +16,56 @@ class Executable {
 
     val vm = VM(256)
 
-    val rudimentaryHello =
-            TBASOpcodes.LOADSTR + 1.toByte() + "ab\ncd".toCString() +
-                    TBASOpcodes.PRINTSTR
 
-    val twoPlusTwo =
-            TBASOpcodes.LOADNUM + 2.toByte() + 2.0.toLittle() +
-                    TBASOpcodes.LOADNUM + 3.toByte() + 2.0.toLittle() +
-                    TBASOpcodes.ADD +
-                    TBASOpcodes.PRINTNUM
-
-    val testProgram = TBASOpcodeAssembler(""";
-LOADSTR 1, Helvetti world!
+    /*val rudimentaryHello = TBASOpcodeAssembler(""";
+    LOADSTR 1, Helvetti world!
 ;                            # String with \n
 PRINTSTR;
 LOADSTR 1, wut;              # String without \n
 PRINTSTR;
-LOADSTR 1, face
+LOADSTR 1, face              # String with \n
 ;
 PRINTSTR;
+""")*/
+
+    val testProgram = TBASOpcodeAssembler("""# Hello world on TBASASM
+.data;
+    string hai, Helvetti world!
+;
+.code;
+    LOADPTR 1, @hai;
+    PRINTSTR;
 """)
+
+    /*val testLoop = TBASOpcodeAssembler(""";
+LOADMNUM 10;
+LOADNUM 1, 1.0;
+
+PRINTNUM;
+MOV 1, 4;   # append \n
+LOADSTR 1,  #
+;           #
+PRINTSTR;   #
+MOV 4, 1;   # END append \n
+
+MOV 1, 2;
+MOV 1, 3;
+MUL;
+
+DECM;
+
+JNZ 47;
+
+LOADSTR 1, Ende;
+PRINTSTR;
+
+""")*/
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
         vm.loadProgram(testProgram)
-        //(0..255).forEach { print("${vm.memory[it]} ") }; println()
+        (0..255).forEach { print("${vm.memory[it]} ") }; println()
         vm.execute()
         //(0..255).forEach { print("${vm.memory[it]} ") }; println()
     }

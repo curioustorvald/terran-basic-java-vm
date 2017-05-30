@@ -25,7 +25,9 @@ class VM(memSize: Int,
          private val stackSize: Int = 2500,
          val stdout: OutputStream = System.out,
          val stdin: InputStream = System.`in`,
-         var suppressWarnings: Boolean = false
+         var suppressWarnings: Boolean = false,
+         // following is an options for VM's micro operation system
+         val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC
 ) {
     class Pointer(val parent: VM, var memAddr: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
         /*
@@ -196,7 +198,7 @@ class VM(memSize: Int,
         mallocList.sortBy { it.first }
 
         val gaps = ArrayList<IntRange>()
-        var foundRightGap = true
+        var foundRightGap = false
         for (it in 1..mallocList.lastIndex) {
             val gap = mallocList[it - 1].endInclusive + 1..mallocList[it].start - 1
             gaps.add(gap)
@@ -211,12 +213,17 @@ class VM(memSize: Int,
             return gaps.last().start
         }
         else {
-            gaps.forEach {
-                if (it.endInclusive - it.start + 1 >= size)
-                    return it.start
+            if (gaps.isEmpty()) {
+                return mallocList.last().endInclusive + 1
             }
+            else {
+                gaps.forEach {
+                    if (it.endInclusive - it.start + 1 >= size)
+                        return it.start
+                }
 
-            return gaps.last().endInclusive + 1
+                return gaps.last().endInclusive + 1
+            }
         }
     }
 
@@ -244,8 +251,8 @@ class VM(memSize: Int,
     }
     fun freeBlock(range: IntRange) {
         if (!mallocList.remove(range)) {
-            interruptSegmentationFault()
-            throw RuntimeException("Access violation -- no such block was assigned by operation system.")
+            //interruptSegmentationFault()
+            //throw RuntimeException("Access violation -- no such block was assigned by operation system.")
         }
     }
     fun reduceAllocatedBlock(range: IntRange, sizeToReduce: Int) {
@@ -257,13 +264,18 @@ class VM(memSize: Int,
         val string = if (string.last() == 0.toByte()) string else string + 0 // safeguard null terminator
 
         // look for dupes
-        val existingPtnStart = memory.search(string)
+        if (tbasic_remove_string_dupes) {
+            val existingPtnStart = memory.search(string)
 
-        if (existingPtnStart == null) {
-            return makeBytesDB(string)
+            if (existingPtnStart == null) {
+                return makeBytesDB(string)
+            }
+            else {
+                return Pointer(this, existingPtnStart)
+            }
         }
         else {
-            return Pointer(this, existingPtnStart)
+            return makeBytesDB(string)
         }
     }
     fun makeStringDB(string: String): Pointer {
@@ -380,6 +392,7 @@ class VM(memSize: Int,
 
     // memory registers (32-bit)
     var m1 = 0 // general-use flags or variable
+    var strCntr = 0
     var pc = 0 // program counter
     var sp = 0 // stack pointer
     var lr = 0 // link register
@@ -440,7 +453,7 @@ class VM(memSize: Int,
                 //(0..512).forEach { print("${memory[it]} ") }
 
                 val instruction = memory[pc]
-                val instAsm = TBASOpcodes.opcodesListInverse[instruction]!!
+                val instAsm = TBASOpcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction")
 
                 execDebugMain("\nExec: $instAsm, ")
 
@@ -518,6 +531,7 @@ class VM(memSize: Int,
 fun Int.KB() = this shl 10
 fun Int.MB() = this shl 20
 
+/** Turn string into byte array with null terminator */
 fun String.toCString() = this.toByteArray(VM.charset) + 0
 fun Int.toLittle() = byteArrayOf(
         this.and(0xFF).toByte(),
