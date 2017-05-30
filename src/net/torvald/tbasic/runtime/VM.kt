@@ -442,18 +442,15 @@ class VM(memSize: Int,
     fun execDebugMain(any: Any?) { if (false) print(any) }
     fun execDebug(any: Any?)     { if (false) print(any) }
 
-    fun execute() {
+    fun execute(delayInMills: Int? = null) {
         if (userSpaceStart != null) {
 
             uptimeHolder = System.currentTimeMillis()
 
 
             while (!terminate) {
-
-                //(0..512).forEach { print("${memory[it]} ") }
-
                 val instruction = memory[pc]
-                val instAsm = TBASOpcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction")
+                val instAsm = TBASOpcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pc")
 
                 execDebugMain("\nExec: $instAsm, ")
 
@@ -489,6 +486,11 @@ class VM(memSize: Int,
 
                 if (pc >= memory.size) {
                     interruptOutOfMem()
+                }
+
+
+                if (delayInMills != null) {
+                    Thread.sleep(delayInMills.toLong())
                 }
             }
         }
@@ -553,20 +555,25 @@ fun Double.toLittle() = java.lang.Double.doubleToRawLongBits(this).toLittle()
 fun Boolean.toLittle() = byteArrayOf(if (this) 0xFF.toByte() else 0.toByte())
 
 fun ByteArray.toLittleInt() =
-        this[0].toInt() or
-                this[1].toInt().shl(8) or
-                this[2].toInt().shl(16) or
-                this[3].toInt().shl(24)
+        if (this.size != 4) throw Error()
+        else this[0].toInt() or
+                this[1].toUint().shl(8) or
+                this[2].toUint().shl(16) or
+                this[3].toUint().shl(24)
 fun ByteArray.toLittleLong() =
-        this[0].toLong() or
-                this[1].toLong().shl(8) or
-                this[2].toLong().shl(16) or
-                this[3].toLong().shl(24) or
-                this[4].toLong().shl(32) or
-                this[5].toLong().shl(40) or
-                this[6].toLong().shl(48) or
-                this[7].toLong().shl(56)
+        if (this.size != 8) throw Error()
+        else this[0].toUlong() or
+                this[1].toUlong().shl(8) or
+                this[2].toUlong().shl(16) or
+                this[3].toUlong().shl(24) or
+                this[4].toUlong().shl(32) or
+                this[5].toUlong().shl(40) or
+                this[6].toUlong().shl(48) or
+                this[7].toUlong().shl(56)
 fun ByteArray.toLittleDouble() = java.lang.Double.longBitsToDouble(this.toLittleLong())
+
+fun Byte.toUlong() = java.lang.Byte.toUnsignedLong(this)
+fun Byte.toUint() = java.lang.Byte.toUnsignedInt(this)
 
 /**
  * Return first occurrence of the byte pattern

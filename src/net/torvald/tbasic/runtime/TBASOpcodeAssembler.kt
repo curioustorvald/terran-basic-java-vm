@@ -14,8 +14,9 @@ import net.torvald.tbasic.TBASOpcodes
  * Example program
  * ```
  * .code
- *      LOADSTR 1, Helvetti world!;
- *      PRINTSTR;
+ *
+ * LOADSTRINLINE 1, Helvetti world!;
+ * PRINTSTR;
  * ```
  * This prints out 'Helvetti world!' on the standard output.
  *
@@ -28,7 +29,7 @@ import net.torvald.tbasic.TBASOpcodes
  * - data
  * - code
  *
- * Indentation after section header is optional.
+ * Indentation after section header is optional (and you probably don't want it anyway).
  *
  * ### Data
  * Data section has following syntax:
@@ -161,7 +162,7 @@ object TBASOpcodeAssembler {
 
                             int.toLittle().forEach { ret.add(it) }
                         }
-                        else -> throw IllegalArgumentException("Unsupported data type: [$type]")
+                        else -> throw IllegalArgumentException("Unsupported data type: [$type] (or you missed a semicolon?)")
                     }
 
                 }
@@ -216,7 +217,7 @@ object TBASOpcodeAssembler {
                                     }
                                     TBASOpcodes.READ_UNTIL_ZERO -> {
                                         if (words[index + 1].startsWith(labelMarker)) {
-                                            throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTR, what you will want to use is LOADPTR.")
+                                            throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
                                         }
                                         else {
                                             val strStart = line.indexOf(words[index + 1], ignoreCase = false)

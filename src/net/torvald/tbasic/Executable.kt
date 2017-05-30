@@ -1,9 +1,6 @@
 package net.torvald.tbasic
 
-import net.torvald.tbasic.runtime.TBASOpcodeAssembler
-import net.torvald.tbasic.runtime.VM
-import net.torvald.tbasic.runtime.toCString
-import net.torvald.tbasic.runtime.toLittle
+import net.torvald.tbasic.runtime.*
 
 /**
  * Created by minjaesong on 2017-05-25.
@@ -17,18 +14,18 @@ class Executable {
     val vm = VM(256)
 
 
-    /*val rudimentaryHello = TBASOpcodeAssembler(""";
-    LOADSTR 1, Helvetti world!
-;                            # String with \n
+    /*val rudimentaryHello = TBASOpcodeAssembler("""# Hello world on TBASASM using in-line strings
+    LOADSTRINLINE 1, Helvetti world! #
+;                              # String with \n
 PRINTSTR;
-LOADSTR 1, wut;              # String without \n
+LOADSTRINLINE 1, wut;                # String without \n
 PRINTSTR;
-LOADSTR 1, face              # String with \n
-;
+LOADSTRINLINE 1, face                #
+;                              # String with \n
 PRINTSTR;
 """)*/
 
-    val testProgram = TBASOpcodeAssembler("""# Hello world on TBASASM
+    val testProgram = TBASOpcodeAssembler("""# Hello world on TBASASM using data section
 .data;
     string hai, Helvetti world!
 ;
@@ -37,18 +34,20 @@ PRINTSTR;
     PRINTSTR;
 """)
 
-    /*val testLoop = TBASOpcodeAssembler(""";
+    val testLoop = TBASOpcodeAssembler("""# Power of twos
+.code; # when there's no other sections, this section marker is optional.
+
 LOADMNUM 10;
 LOADNUM 1, 1.0;
 
 PRINTNUM;
 MOV 1, 4;   # append \n
-LOADSTR 1,  #
+LOADSTRINLINE 1,  #
 ;           #
 PRINTSTR;   #
 MOV 4, 1;   # END append \n
 
-MOV 1, 2;
+LOADNUM 2, 2.0;
 MOV 1, 3;
 MUL;
 
@@ -56,16 +55,16 @@ DECM;
 
 JNZ 47;
 
-LOADSTR 1, Ende;
+LOADSTRINLINE 1, You are terminated
+;
 PRINTSTR;
-
-""")*/
+""")
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
-        vm.loadProgram(testProgram)
-        (0..255).forEach { print("${vm.memory[it]} ") }; println()
+        vm.loadProgram(testLoop)
+        (0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
         vm.execute()
         //(0..255).forEach { print("${vm.memory[it]} ") }; println()
     }
@@ -73,4 +72,6 @@ PRINTSTR;
 
     private fun Int.KB() = this shl 10
     private fun Int.MB() = this shl 20
+    private fun Byte.toUint() = java.lang.Byte.toUnsignedInt(this)
+
 }

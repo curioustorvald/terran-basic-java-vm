@@ -30,7 +30,7 @@ object TBASOpcodes {
     /*
     rudimentary Hello World:
 
-    LOADSTR  "Hello, world!\n"   r1
+    LOADSTRINLINE  "Hello, world!\n"   r1
     PRINTSTR
 
      */
@@ -42,21 +42,21 @@ object TBASOpcodes {
         val writePointer = VM.Pointer(vm, 0, VM.Pointer.PointerType.INT32, true)
 
         run { // --> SYNTAX ERROR (invalid opcode??)
-            val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTR"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_ILLEGAL_OP * 4
             writePointer.write(syntaxErrorPtr.memAddr)
         }
 
         run { // --> DIVISION BY ZERO ERROR (invalid opcode??)
-            val div0Ptr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTR"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val div0Ptr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_DIV_BY_ZERO * 4
             writePointer.write(div0Ptr.memAddr)
         }
 
         run { // --> OUT OF MEMORY ERROR
-            val oomPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTR"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val oomPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_OUT_OF_MEMORY * 4
             writePointer.write(oomPtr.memAddr)
@@ -176,7 +176,7 @@ object TBASOpcodes {
 
         val str = vm.r1.toString()
 
-        // LOADSTR
+        // LOADSTRINLINE
         try {
             val strPtr = vm.makeStringDB(str)
             // LOADPTR
@@ -191,7 +191,7 @@ object TBASOpcodes {
             e.printStackTrace(System.out)
             vm.interruptOutOfMem()
         }
-        // END LOADSTR
+        // END LOADSTRINLINE
 
         val string = TBASString(VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt()))
         vm.strCntr = 0 // string counter
@@ -357,7 +357,7 @@ object TBASOpcodes {
         }
     }
 
-    fun LOADSTR(register: Register, string: ByteArray) {
+    fun LOADSTRINLINE(register: Register, string: ByteArray) { // made the name longer to avoid confusion with LOADPTR
         try {
             val strPtr = vm.makeStringDB(string)
             LOADPTR(register, strPtr.memAddr)
@@ -538,7 +538,7 @@ object TBASOpcodes {
             "LOADVARIABLE" to 40.toByte(),
             "SETVARIABLE" to 41.toByte(),
             "LOADMNUM" to 42.toByte(),
-            "LOADSTR" to 43.toByte(),
+            "LOADSTRINLINE" to 43.toByte(),
 
             "PUTCHAR" to 44.toByte(),
             "PRINTSTR" to 45.toByte(),
@@ -640,7 +640,7 @@ object TBASOpcodes {
     val LOADVARIABLE = 40.toByte()
     val SETVARIABLE = 41.toByte()
     val LOADMNUM = 42.toByte()
-    val LOADSTR = 43.toByte()
+    val LOADSTRINLINE = 43.toByte()
 
     val PUTCHAR = 44.toByte()
     val PRINTSTR = 45.toByte()
@@ -745,7 +745,7 @@ object TBASOpcodes {
             "LOADVARIABLE" to fun(args: List<ByteArray>) { LOADVARIABLE(args[0].toString(VM.charset)) },
             "SETVARIABLE" to fun(args: List<ByteArray>) { SETVARIABLE(args[0].toString(VM.charset)) },
             "LOADMNUM" to fun(args: List<ByteArray>) { LOADMNUM(args[0].toLittleInt()) },
-            "LOADSTR" to fun(args: List<ByteArray>) { LOADSTR(args[0][0].toInt(), args[1]) },
+            "LOADSTRINLINE" to fun(args: List<ByteArray>) { LOADSTRINLINE(args[0][0].toInt(), args[1]) },
 
             "PUTCHAR" to fun(_) { PUTCHAR() },
             "PRINTSTR" to fun(_) { PRINTSTR() },
@@ -806,7 +806,7 @@ object TBASOpcodes {
             "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "PUSH" to intArrayOf(SIZEOF_INT32),
             "LOADMNUM" to intArrayOf(SIZEOF_INT32),
-            "LOADSTR" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
+            "LOADSTRINLINE" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
             "JMP" to intArrayOf(SIZEOF_INT32),
             "JZ" to intArrayOf(SIZEOF_INT32),
