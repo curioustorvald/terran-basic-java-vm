@@ -15,49 +15,50 @@ class Executable {
 
 
     /*val rudimentaryHello = TBASOpcodeAssembler("""# Hello world on TBASASM using in-line strings
-    LOADSTRINLINE 1, Helvetti world! #
+    loadstrinline 1, Helvetti world! #
 ;                              # String with \n
-PRINTSTR;
-LOADSTRINLINE 1, wut;                # String without \n
-PRINTSTR;
-LOADSTRINLINE 1, face                #
+printstr;
+loadstrinline 1, wut;                # String without \n
+printstr;
+loadstrinline 1, face                #
 ;                              # String with \n
-PRINTSTR;
+printstr;
 """)*/
 
-    val testProgram = TBASOpcodeAssembler("""# Hello world on TBASASM using data section
+    /*val testProgram = TBASOpcodeAssembler("""# Hello world on TBASASM using data section
 .data;
     string hai, Helvetti world!
 ;
 .code;
     LOADPTR 1, @hai;
     PRINTSTR;
-""")
+""")*/
 
     val testLoop = TBASOpcodeAssembler("""# Power of twos
 .code; # when there's no other sections, this section marker is optional.
 
-LOADMNUM 10;
-LOADNUM 1, 1.0;
+loadmnum 16;
+loadnum 1, 1.0;
 
-PRINTNUM;
-MOV 1, 4;   # append \n
-LOADSTRINLINE 1,  #
-;           #
-PRINTSTR;   #
-MOV 4, 1;   # END append \n
+:loopstart;
 
-LOADNUM 2, 2.0;
-MOV 1, 3;
-MUL;
+printnum;
+mov 1, 4;       # append \n
+loadstrinline 1,#
+;               #
+printstr;       #
+mov 4, 1;       # END append \n
 
-DECM;
+loadnum 2, 2.0;
+mov 1, 3;
+mul;
 
-JNZ 47;
+decm;
+jnz @loopstart;
 
-LOADSTRINLINE 1, You are terminated
+loadstrinline 1, You are terminated
 ;
-PRINTSTR;
+printstr;
 """)
 
     fun main() {

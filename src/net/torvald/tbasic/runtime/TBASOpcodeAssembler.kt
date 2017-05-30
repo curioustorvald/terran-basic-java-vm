@@ -54,6 +54,7 @@ object TBASOpcodeAssembler {
     private val blankLines = Regex("""(?<=;)[\n ]+""")
     private val stringMarker = Regex("""\"[^\n]*\"""")
     private val labelMarker = '@'
+    private val labelDefinitionMarker = ':'
     private val lineEndMarker = ';'
     private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
 
@@ -174,69 +175,75 @@ object TBASOpcodeAssembler {
                     }
 
 
-                    if (TBASOpcodes.opcodesList[cmd] == null) {
-                        throw Error("Invalid assembly: $cmd")
+                    if (cmd.startsWith(labelDefinitionMarker)) {
+                        putLabel(cmd.drop(1).toLowerCase(), getPC())
+                        // will continue to next statements
                     }
+                    else {
+                        if (TBASOpcodes.opcodesList[cmd] == null) {
+                            throw Error("Invalid assembly: $cmd")
+                        }
 
-                    ret.add(TBASOpcodes.opcodesList[cmd]!!)
+                        ret.add(TBASOpcodes.opcodesList[cmd]!!)
 
-                    val argumentInfo = TBASOpcodes.opcodeArgsList[cmd] ?: intArrayOf()
+                        val argumentInfo = TBASOpcodes.opcodeArgsList[cmd] ?: intArrayOf()
 
-                    // By the definition, "string argument" is always the last, and only one should exist.
-                    if (argumentInfo.isNotEmpty()) {
-                        argumentInfo.forEachIndexed { index, it ->
+                        // By the definition, "string argument" is always the last, and only one should exist.
+                        if (argumentInfo.isNotEmpty()) {
+                            argumentInfo.forEachIndexed { index, it ->
 
-                            debug("[TBASASM] argsInfo index: $index, size: $it")
+                                debug("[TBASASM] argsInfo index: $index, size: $it")
 
-                            try {
-                                when (it) {
-                                    TBASOpcodes.SIZEOF_BYTE -> {
-                                        ret.add(words[index + 1].toByte())
-                                    }
-                                    TBASOpcodes.SIZEOF_NUMBER -> {
-                                        if (words[index + 1].startsWith(labelMarker)) {
-                                            TODO("label that points to Number")
+                                try {
+                                    when (it) {
+                                        TBASOpcodes.SIZEOF_BYTE -> {
+                                            ret.add(words[index + 1].toByte())
                                         }
-                                        else {
-                                            words[index + 1].toDouble().toLittle().forEach {
-                                                ret.add(it)
+                                        TBASOpcodes.SIZEOF_NUMBER -> {
+                                            if (words[index + 1].startsWith(labelMarker)) {
+                                                TODO("label that points to Number")
+                                            }
+                                            else {
+                                                words[index + 1].toDouble().toLittle().forEach {
+                                                    ret.add(it)
+                                                }
                                             }
                                         }
-                                    }
-                                    TBASOpcodes.SIZEOF_INT32 -> {
-                                        if (words[index + 1].startsWith(labelMarker)) {
-                                            getLabel(words[index + 1]).toLittle().forEach {
-                                                ret.add(it)
+                                        TBASOpcodes.SIZEOF_INT32 -> {
+                                            if (words[index + 1].startsWith(labelMarker)) { // label for PC or Pointer number
+                                                getLabel(words[index + 1]).toLittle().forEach {
+                                                    ret.add(it)
+                                                }
+                                            }
+                                            else {
+                                                words[index + 1].toInt().toLittle().forEach {
+                                                    ret.add(it)
+                                                }
                                             }
                                         }
-                                        else {
-                                            words[index + 1].toInt().toLittle().forEach {
-                                                ret.add(it)
+                                        TBASOpcodes.READ_UNTIL_ZERO -> {
+                                            if (words[index + 1].startsWith(labelMarker)) {
+                                                throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
+                                            }
+                                            else {
+                                                val strStart = line.indexOf(words[index + 1], ignoreCase = false)
+                                                val strEnd = line.length
+
+                                                val strArg = line.substring(strStart, strEnd)
+
+                                                debug("--> strArg: $strArg")
+
+                                                strArg.toCString().forEach { ret.add(it) }
+                                                // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
                                             }
                                         }
+                                        else -> throw IllegalArgumentException("Unknown argument type/size")
                                     }
-                                    TBASOpcodes.READ_UNTIL_ZERO -> {
-                                        if (words[index + 1].startsWith(labelMarker)) {
-                                            throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
-                                        }
-                                        else {
-                                            val strStart = line.indexOf(words[index + 1], ignoreCase = false)
-                                            val strEnd = line.length
-
-                                            val strArg = line.substring(strStart, strEnd)
-
-                                            debug("--> strArg: $strArg")
-
-                                            strArg.toCString().forEach { ret.add(it) }
-                                            // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
-                                        }
-                                    }
-                                    else -> throw IllegalArgumentException("Unknown argument type/size")
                                 }
-                            }
-                            catch (e: ArrayIndexOutOfBoundsException) {
-                                e.printStackTrace()
-                                throw Error("Argument #${index + 1} is missing for $cmd")
+                                catch (e: ArrayIndexOutOfBoundsException) {
+                                    e.printStackTrace()
+                                    throw Error("Argument #${index + 1} is missing for $cmd")
+                                }
                             }
                         }
                     }
