@@ -11,7 +11,7 @@ fun main(args: Array<String>) {
 
 class Executable {
 
-    val vm = VM(256)
+    val vm = VM(256, tbasic_remove_string_dupes = true)
 
 
     /*val rudimentaryHello = TBASOpcodeAssembler("""# Hello world on TBASASM using in-line strings
@@ -35,19 +35,20 @@ printstr;
 """)*/
 
     val testLoop = TBASOpcodeAssembler("""# Power of twos
+.data;
+
+string theend, You are terminated
+;
+
 .code; # when there's no other sections, this section marker is optional.
 
-loadmnum 16;
+loadmnum 32;
 loadnum 1, 1.0;
 
 :loopstart;
 
 printnum;
-mov 1, 4;       # append \n
-loadstrinline 1,#
-;               #
-printstr;       #
-mov 4, 1;       # END append \n
+gosub @printnewline;
 
 loadnum 2, 2.0;
 mov 1, 3;
@@ -56,9 +57,19 @@ mul;
 decm;
 jnz @loopstart;
 
-loadstrinline 1, You are terminated
-;
+loadptr 1, @theend;
 printstr;
+
+halt;
+
+
+:printnewline;
+mov 1, 4;       # append \n
+loadstrinline 1,#
+;               #
+printstr;       #
+mov 4, 1;       # END append \n
+return;
 """)
 
     fun main() {
@@ -66,8 +77,9 @@ printstr;
 
         vm.loadProgram(testLoop)
         (0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
+
         vm.execute()
-        //(0..255).forEach { print("${vm.memory[it]} ") }; println()
+        //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
     }
 
 

@@ -108,16 +108,19 @@ object TBASOpcodes {
     // flow control //
 
     fun PUSH(addr: Int) { vm.callStack[vm.sp++] = addr }
-    fun POP() { vm.lr = vm.callStack[vm.sp--] }
+    fun POP() { vm.lr = vm.callStack[--vm.sp] }
 
-    fun RETURN() { POP(); vm.pc = vm.lr }
-    fun GOSUB(addr: Int) { PUSH(vm.pc); vm.pc = addr }
     fun JMP(addr: Int) { vm.pc = addr }
+    fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + offset, 0x7FFFFFFF) }
+    fun JBW(offset: Int) { JFW(-offset) }
 
     fun JZ(addr: Int) { if (vm.m1 == 0) JMP(addr) }
     fun JNZ(addr: Int) { if (vm.m1 != 0) JMP(addr) }
     fun JGT(addr: Int) { if (vm.m1 > 0) JMP(addr) }
     fun JLS(addr: Int) { if (vm.m1 < 0) JMP(addr) }
+
+    fun RETURN() { POP(); vm.pc = vm.lr }
+    fun GOSUB(addr: Int) { PUSH(vm.pc); JMP(addr) }
 
     fun HALT() { vm.terminate = true }
 
@@ -482,7 +485,7 @@ object TBASOpcodes {
 
 
     val SIZEOF_BYTE = VM.Pointer.sizeOf(VM.Pointer.PointerType.BYTE)
-    //val SIZEOF_POINTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
+    val SIZEOF_POINTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
     val SIZEOF_INT32 = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
     val SIZEOF_NUMBER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT64)
     val READ_UNTIL_ZERO = -2
@@ -586,7 +589,10 @@ object TBASOpcodes {
 
             "CLR" to 79.toByte(),
 
-            "UPTIME" to 80.toByte()
+            "UPTIME" to 80.toByte(),
+
+            "JFW" to 81.toByte(),
+            "JBW" to 82.toByte()
 
     )
 
@@ -689,6 +695,9 @@ object TBASOpcodes {
     val CLR = 79.toByte()
 
     val UPTIME = 80.toByte()
+
+    val JFW = 81.toByte()
+    val JBW = 82.toByte()
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -793,7 +802,11 @@ object TBASOpcodes {
 
             "CLR" to fun(_) { CLR() },
 
-            "UPTIME" to fun(_) { UPTIME() }
+            "UPTIME" to fun(_) { UPTIME() },
+
+            "JFW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) },
+            "JBW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) }
+
 
     )
     val opcodeArgsList = hashMapOf<String, IntArray>( // null == 0 operands
@@ -801,18 +814,22 @@ object TBASOpcodes {
             "XCHG" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
             "LOADNUM" to intArrayOf(SIZEOF_BYTE, SIZEOF_NUMBER),
             "LOADRAWNUM" to intArrayOf(SIZEOF_BYTE, SIZEOF_NUMBER),
-            "LOADPTR" to intArrayOf(SIZEOF_BYTE, SIZEOF_INT32),
+            "LOADPTR" to intArrayOf(SIZEOF_BYTE, SIZEOF_POINTER),
             "LOADVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "PUSH" to intArrayOf(SIZEOF_INT32),
             "LOADMNUM" to intArrayOf(SIZEOF_INT32),
             "LOADSTRINLINE" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
-            "JMP" to intArrayOf(SIZEOF_INT32),
-            "JZ" to intArrayOf(SIZEOF_INT32),
-            "JNZ" to intArrayOf(SIZEOF_INT32),
-            "JGT" to intArrayOf(SIZEOF_INT32),
-            "JLS" to intArrayOf(SIZEOF_INT32),
-            "SLP" to intArrayOf(SIZEOF_NUMBER)
+            "JMP" to intArrayOf(SIZEOF_POINTER),
+            "JZ" to intArrayOf(SIZEOF_POINTER),
+            "JNZ" to intArrayOf(SIZEOF_POINTER),
+            "JFW" to intArrayOf(SIZEOF_POINTER),
+            "JBW" to intArrayOf(SIZEOF_POINTER),
+            "JGT" to intArrayOf(SIZEOF_POINTER),
+            "JLS" to intArrayOf(SIZEOF_POINTER),
+            "SLP" to intArrayOf(SIZEOF_NUMBER),
+            "GOSUB" to intArrayOf(SIZEOF_POINTER),
+            "PUSH" to intArrayOf(SIZEOF_POINTER)
     )
 }

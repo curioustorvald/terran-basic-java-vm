@@ -1,6 +1,7 @@
 package net.torvald.tbasic.runtime
 
 import net.torvald.tbasic.TBASOpcodes
+import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
 
 /**
  * ## Syntax
@@ -65,7 +66,7 @@ object TBASOpcodeAssembler {
     val asmSections = hashSetOf<String>(".CODE", ".DATA")
 
 
-    fun debug(any: Any?) { if (false) println(any) }
+    private fun debug(any: Any?) { if (true) { println(any) } }
 
 
     var flagSpecifyJMP = false
@@ -73,11 +74,11 @@ object TBASOpcodeAssembler {
 
     private fun putLabel(name: String, pointer: Int) {
         val name = labelMarker + name.toLowerCase()
-        if (labelTable[name] != null) {
-            throw Error("Label $name already defined")
+        if (labelTable[name] != null && labelTable[name] != pointer) {
+            throw Error("Label $name already defined (old: ${labelTable[name]}, new: $pointer)")
         }
         else {
-            debug(" ->> put label [$name] with pc $pointer")
+            if (labelTable[name] == null) debug("->> put label [$name] with pc $pointer")
             labelTable[name] = pointer
         }
     }
@@ -93,14 +94,157 @@ object TBASOpcodeAssembler {
         fun getPC() = VM.interruptCount * 4 + ret.size
 
 
+        // pass 1: pre-scan for labels
+        debug("== Pass 1 ==\n")
+        var virtualPC = VM.interruptCount * 4
         userProgram
                 .replace(comments, "")
                 .replace(blankLines, "")
                 .split(lineEndMarker).forEach { lline ->
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
+            val words = line.split(delimiters)
+            val cmd = words[0].toUpperCase()
 
 
+            if (line.isEmpty() || words.isEmpty()) {
+                // NOP
+            }
+            else if (!line.startsWith(labelMarker)) {
+
+                debug("[TBASASM] line: [$line]")
+                words.forEach { debug("  $it") }
+
+
+                val cmd = words[0].toUpperCase()
+
+
+                if (asmSections.contains(cmd)) { // sectioning commands
+                    currentSection = cmd
+                    // will continue to next statements
+                }
+                else if (currentSection == ".DATA") { // setup DB
+
+                    // insert JMP instruction that jumps to .code section
+                    virtualPC += (SIZEOF_POINTER + 1)
+                    //flagSpecifyJMP = true
+
+
+                    // data syntax:
+                    //      type name payload (separated by any delimiters)
+                    //      e.g.: string   hai   Hello, world!
+
+                    val type = words[0].toUpperCase()
+                    val name = words[1]
+
+                    putLabel(name, virtualPC)
+                    // putLabel must be followed by some bytes payload fed to the return array, no gaps in-between
+
+                    when (type) {
+                        "STRING" -> {
+                            val strStart = line.indexOf(words[2], ignoreCase = false)
+                            val strEnd = line.length
+                            val data = line.substring(strStart, strEnd)
+
+                            //debug("--> String payload: [$data]")
+
+                            data.toCString().forEach { virtualPC += 1 }
+                            // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
+                        }
+                        "NUMBER" -> {
+                            val number = words[2].toDouble()
+
+                            //debug("--> Number payload: [$number]")
+
+                            number.toLittle().forEach { virtualPC += 1 }
+                        }
+                        "INT" -> {
+                            val int = words[2].toInt()
+
+                            //debug("--> Int payload: [$int]")
+
+                            int.toLittle().forEach { virtualPC += 1 }
+                        }
+                        else -> throw IllegalArgumentException("Unsupported data type: [$type] (or you missed a semicolon?)")
+                    }
+
+                }
+                else if (currentSection == ".CODE") { // interpret codes
+
+                    if (cmd.startsWith(labelDefinitionMarker)) {
+                        putLabel(cmd.drop(1).toLowerCase(), virtualPC)
+                        // will continue to next statements
+                    }
+                    else {
+                        if (TBASOpcodes.opcodesList[cmd] == null) {
+                            throw Error("Invalid assembly: $cmd")
+                        }
+
+                        virtualPC += 1
+
+                        val argumentInfo = TBASOpcodes.opcodeArgsList[cmd] ?: intArrayOf()
+
+                        // By the definition, "string argument" is always the last, and only one should exist.
+                        if (argumentInfo.isNotEmpty()) {
+                            argumentInfo.forEachIndexed { index, it ->
+
+                                debug("[TBASASM] argsInfo index: $index, size: $it")
+
+                                try {
+                                    when (it) {
+                                        TBASOpcodes.SIZEOF_BYTE -> {
+                                            virtualPC += 1
+                                        }
+                                        TBASOpcodes.SIZEOF_NUMBER -> {
+                                            virtualPC += 8
+                                        }
+                                        TBASOpcodes.SIZEOF_INT32 -> {
+                                            virtualPC += 4
+                                        }
+                                        TBASOpcodes.READ_UNTIL_ZERO -> {
+                                            if (words[index + 1].startsWith(labelMarker)) {
+                                                throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
+                                            }
+                                            else {
+                                                val strStart = line.indexOf(words[index + 1], ignoreCase = false)
+                                                val strEnd = line.length
+
+                                                val strArg = line.substring(strStart, strEnd)
+
+                                                debug("--> strArg: $strArg")
+
+                                                strArg.toCString().forEach { virtualPC += 1 }
+                                                // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
+                                            }
+                                        }
+                                        else -> throw IllegalArgumentException("Unknown argument type/size")
+                                    }
+                                }
+                                catch (e: ArrayIndexOutOfBoundsException) {
+                                    e.printStackTrace()
+                                    throw Error("Argument #${index + 1} is missing for $cmd")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                TODO("ASM label 1")
+            }
+
+        }
+
+
+
+        // pass 2: program
+        debug("== Pass 2 ==\n")
+        userProgram
+                .replace(comments, "")
+                .replace(blankLines, "")
+                .split(lineEndMarker).forEach { lline ->
+
+            var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
             val words = line.split(delimiters)
 
 
@@ -110,7 +254,7 @@ object TBASOpcodeAssembler {
             else if (!line.startsWith(labelMarker)) {
 
                 debug("[TBASASM] line: [$line]")
-                words.forEach { debug("--> $it") }
+                words.forEach { debug("  $it") }
 
 
                 val cmd = words[0].toUpperCase()
@@ -124,7 +268,7 @@ object TBASOpcodeAssembler {
 
                     // insert JMP instruction that jumps to .code section
                     ret.add(TBASOpcodes.JMP)
-                    repeat(4) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
+                    repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
                     flagSpecifyJMP = true
 
 

@@ -519,7 +519,12 @@ class VM(memSize: Int,
                 // execute
                 pc += (1 + totalArgsSize)
                 execDebugMain(", PC-next: $pc\n")
+                // invoke function
                 TBASOpcodes.opcodesFunList[instAsm]!!(arguments)
+
+                if (instAsm == "HALT") {
+                    execDebugMain("HALT at PC $pc")
+                }
 
 
                 if (pc >= memory.size) {
