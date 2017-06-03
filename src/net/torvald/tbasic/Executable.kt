@@ -72,30 +72,8 @@ mov 4, 1;       # END append \n
 return;
 """)*/
 
-    val BIOS_POST = TBASOpcodeAssembler("""# Power On Self Test
-#.func;
-
-
-
-.code;
-# set interrupt vector table
-loadnum 2, 8;
-loadptr 1, @oom_handler;
-pokeint;
-
-
-# proceed to memory test
-loadnum 2, 0;
-loadnum 5, 0;
-
-:get_mem_size;
-inc2;                         #
-peek;                         # test memory
-jmp @get_mem_size;
-
-
-:memory_check_end;
-mov 2, 1;                     #
+    /*val BIOS_POST = TBASOpcodeAssembler("""# Power On Self Test
+call 255, 0;                  # load memSize to r1
 printnum;                     # print out current memSize
 
 loadnum 1, 32;                #
@@ -104,20 +82,30 @@ putchar;                      # print out a space
 loadstrinline 1, bytes OK     #
 ;                             #
 printstr;                     # " bytes OK \n"
+""")*/
 
-halt;
+    val funcSectionTest = TBASOpcodeAssembler("""# func section test
+.func;
+:hai;
+loadptr 1, @message;
+printstr;
+return;
 
 
-# oom interrupt handler
-:oom_handler;
-jmp @memory_check_end;
+.data;
+string message, Helvetti world!
+;
+
+
+.code;
+gosub @hai;
 
 """)
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
-        vm.loadProgram(BIOS_POST)
+        vm.loadProgram(funcSectionTest)
         (0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
 
         vm.execute()

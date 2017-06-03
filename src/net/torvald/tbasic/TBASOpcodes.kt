@@ -456,6 +456,11 @@ object TBASOpcodes {
 
 
 
+    fun CALL(peripheral: Byte, arg: Int) { if (peripheral == 0xFF.toByte()) vm.BIOS.call(arg) else vm.peripherals[peripheral.toUint()].call(arg) }
+
+
+
+
 
 
     private fun getByteSizeOfType(typeID: Int): Int = when(typeID) {
@@ -608,7 +613,9 @@ object TBASOpcodes {
             "JBW" to 82.toByte(),
 
             "POKEINT" to 83.toByte(),
-            "PEEKINT" to 84.toByte()
+            "PEEKINT" to 84.toByte(),
+
+            "CALL" to 85.toByte()
 
     )
 
@@ -717,6 +724,8 @@ object TBASOpcodes {
 
     val POKEINT = 83.toByte()
     val PEEKINT = 84.toByte()
+
+    val CALL = 85.toByte()
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -827,7 +836,9 @@ object TBASOpcodes {
             "JBW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) },
 
             "POKEINT" to fun(_) { POKEINT() },
-            "PEEKINT" to fun(_) { PEEKINT() }
+            "PEEKINT" to fun(_) { PEEKINT() },
+
+            "CALL" to fun(args: List<ByteArray>) { CALL(args[0][0], args[1].toLittleInt()) }
 
 
     )
@@ -852,6 +863,7 @@ object TBASOpcodes {
             "JLS" to intArrayOf(SIZEOF_POINTER),
             "SLP" to intArrayOf(SIZEOF_NUMBER),
             "GOSUB" to intArrayOf(SIZEOF_POINTER),
-            "PUSH" to intArrayOf(SIZEOF_POINTER)
+            "PUSH" to intArrayOf(SIZEOF_POINTER),
+            "CALL" to intArrayOf(SIZEOF_BYTE, SIZEOF_INT32)
     )
 }

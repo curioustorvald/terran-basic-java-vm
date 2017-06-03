@@ -28,6 +28,7 @@ import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
  *
  * Supported sections:
  * - data
+ * - func
  * - code
  *
  * Indentation after section header is optional (and you probably don't want it anyway).
@@ -71,7 +72,7 @@ object TBASOpcodeAssembler {
 
     private var currentSection = ".CODE"
 
-    val asmSections = hashSetOf<String>(".CODE", ".DATA")
+    val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
 
 
     private fun debug(any: Any?) { if (true) { println(any) } }
@@ -82,7 +83,7 @@ object TBASOpcodeAssembler {
     private fun putLabel(name: String, pointer: Int) {
         val name = labelMarker + name.toLowerCase()
         if (labelTable[name] != null && labelTable[name] != pointer) {
-            throw Error("Label $name already defined (old: ${labelTable[name]}, new: $pointer)")
+            throw Error("Labeldef conflict for $name -- old: ${labelTable[name]}, new: $pointer")
         }
         else {
             if (labelTable[name] == null) debug("->> put label [$name] with pc $pointer")
@@ -133,8 +134,10 @@ object TBASOpcodeAssembler {
                 else if (currentSection == ".DATA") { // setup DB
 
                     // insert JMP instruction that jumps to .code section
-                    virtualPC += (SIZEOF_POINTER + 1)
-                    //flagSpecifyJMP = true
+                    if (!flagSpecifyJMP) {
+                        virtualPC += (SIZEOF_POINTER + 1)
+                        flagSpecifyJMP = true
+                    }
 
 
                     // data syntax:
@@ -191,7 +194,13 @@ object TBASOpcodeAssembler {
                     }
 
                 }
-                else if (currentSection == ".CODE") { // interpret codes
+                else if (currentSection == ".CODE" || currentSection == ".FUNC") { // interpret codes
+
+                    if (currentSection == ".FUNC" && !flagSpecifyJMP) {
+                        // insert JMP instruction that jumps to .code section
+                        virtualPC += (SIZEOF_POINTER + 1)
+                        flagSpecifyJMP = true
+                    }
 
                     if (cmd.startsWith(labelDefinitionMarker)) {
                         putLabel(cmd.drop(1).toLowerCase(), virtualPC)
@@ -260,6 +269,9 @@ object TBASOpcodeAssembler {
 
 
         // pass 2: program
+        // --> reset flags
+        flagSpecifyJMP = false
+        // <-- end of reset flags
         debug("\n\n== Pass 2 ==\n\n")
         userProgram
                 .replace(comments, "")
@@ -289,9 +301,11 @@ object TBASOpcodeAssembler {
                 else if (currentSection == ".DATA") { // setup DB
 
                     // insert JMP instruction that jumps to .code section
-                    ret.add(TBASOpcodes.JMP)
-                    repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
-                    flagSpecifyJMP = true
+                    if (!flagSpecifyJMP) {
+                        ret.add(TBASOpcodes.JMP)
+                        repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
+                        flagSpecifyJMP = true
+                    }
 
 
                     // data syntax:
@@ -350,11 +364,17 @@ object TBASOpcodeAssembler {
                     }
 
                 }
-                else if (currentSection == ".CODE") { // interpret codes
-                    if (flagSpecifyJMP) {
+                else if (currentSection == ".CODE" || currentSection == ".FUNC") { // interpret codes
+                    if (flagSpecifyJMP && currentSection == ".CODE") {
                         val pcLittle = getPC().toLittle()
                         pcLittle.forEachIndexed { index, byte -> ret[1 + index] = byte }
                         flagSpecifyJMP = false
+                    }
+                    else if (!flagSpecifyJMP && currentSection == ".FUNC") {
+                        // insert JMP instruction that jumps to .code section
+                        ret.add(TBASOpcodes.JMP)
+                        repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
+                        flagSpecifyJMP = true
                     }
 
 
@@ -380,7 +400,7 @@ object TBASOpcodeAssembler {
                                 try {
                                     when (it) {
                                         TBASOpcodes.SIZEOF_BYTE -> {
-                                            ret.add(words[index + 1].toByte())
+                                            ret.add(words[index + 1].toInt().toByte())
                                         }
                                         TBASOpcodes.SIZEOF_NUMBER -> {
                                             if (words[index + 1].startsWith(labelMarker)) {

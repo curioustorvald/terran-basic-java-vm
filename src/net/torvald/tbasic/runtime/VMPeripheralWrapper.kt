@@ -5,7 +5,7 @@ package net.torvald.tbasic.runtime
  *
  * Created by minjaesong on 2017-05-27.
  */
-open class VMPeripheralWrapper(val parent: VM, memSize: Int, var suppressWarnings: Boolean = false) {
+abstract class VMPeripheralWrapper(val parent: VM, memSize: Int, var suppressWarnings: Boolean = false): VMPeripheralHardware {
 
     internal val memory = ByteArray(memSize)
 
@@ -16,4 +16,6 @@ open class VMPeripheralWrapper(val parent: VM, memSize: Int, var suppressWarning
     }
 
     private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
+
+
 }

@@ -295,7 +295,7 @@ class VM(memSize: Int,
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    val peripherals = ArrayList<VMPeripheralWrapper>()
+    val peripherals = ArrayList<VMPeripheralWrapper>() // peri addr: 0x00..0xFE; 0xFF being on-board BIOS/UEFI
 
     /**
      * Memory Map
@@ -587,6 +587,25 @@ class VM(memSize: Int,
     fun interruptStackOverflow() { pc = memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt() }
     fun interruptMathError() { pc = memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt() }
     fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
+
+
+    val BIOS = object : VMPeripheralHardware {
+        override fun call(arg: Int) {
+            when (arg) {
+                // memory check
+                // @return memory size in Number, saved to r1
+                0 -> {
+                    r1 = memory.size.toDouble()
+                }
+                // find boot device and load boot script to memory, move PC
+                // @return modified memory
+                1 -> {
+
+                }
+                else -> interruptIllegalOp()
+            }
+        }
+    }
 }
 
 fun Int.KB() = this shl 10
