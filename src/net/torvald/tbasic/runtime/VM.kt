@@ -391,6 +391,9 @@ class VM(memSize: Int,
 
     // memory registers (32-bit)
     var m1 = 0 // general-use flags or variable
+    var m2 = 0 // general-use flags or variable
+    var m3 = 0 // general-use flags or variable
+    var m4 = 0 // general-use flags or variable
     var strCntr = 0
     var pc = 0 // program counter
     var sp = 0 // stack pointer
@@ -458,6 +461,9 @@ class VM(memSize: Int,
         b7 = 0.toByte()
         b8 = 0.toByte()
         m1 = 0
+        m2 = 0
+        m3 = 0
+        m4 = 0
         strCntr = 0
         pc = 0
         sp = 0
@@ -487,6 +493,12 @@ class VM(memSize: Int,
 
 
             while (!terminate) {
+                //(0..255).forEach { print("${memory[it].toUint()} ") }; println()
+
+                if (pc >= memory.size) {
+                    interruptOutOfMem()
+                }
+
                 val instruction = memory[pc]
                 val instAsm = TBASOpcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pc")
 
@@ -520,16 +532,20 @@ class VM(memSize: Int,
                 pc += (1 + totalArgsSize)
                 execDebugMain(", PC-next: $pc\n")
                 // invoke function
-                TBASOpcodes.opcodesFunList[instAsm]!!(arguments)
+                try {
+                    TBASOpcodes.opcodesFunList[instAsm]!!(arguments)
+                }
+                catch (oom: ArrayIndexOutOfBoundsException) {
+                    execDebugMain("[TBASRT] illegal memory address access")
+                    interruptOutOfMem()
+                }
+
 
                 if (instAsm == "HALT") {
                     execDebugMain("HALT at PC $pc")
                 }
 
 
-                if (pc >= memory.size) {
-                    interruptOutOfMem()
-                }
 
 
                 if (delayInMills != null) {

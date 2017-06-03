@@ -129,16 +129,16 @@ object TBASOpcodes {
     /**
      * prints any byte (stored as Number) on r1 as a character. If r1 has a number of 33.0, '!' will be printed.
      */
-    fun PUTCHAR() { vm.stdout.write(java.lang.Double.doubleToRawLongBits(vm.r1).toInt()); vm.stdout.flush() }
+    fun PUTCHAR() { vm.stdout.write(vm.r1.toInt()); vm.stdout.flush() }
     /**
      * print a string. String is prepared to r1 as pointer.
      */
     fun PRINTSTR() {
-        val string = TBASString(VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt()))
+        val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
         vm.strCntr = 0 // string counter
 
         while (true) {
-            vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.strCntr].toUint().toLong())
+            vm.r1 = vm.memory[string.pointer.memAddr + vm.strCntr].toUint().toDouble()
 
             if (vm.r1 == 0.0) break
 
@@ -177,13 +177,16 @@ object TBASOpcodes {
     fun PRINTNUM() {
         val oldnum = vm.r1 // little cheat, but whatever.
 
-        val str = vm.r1.toString()
+        var str = vm.r1.toString()
+        // filter number string
+        if (str.endsWith(".0")) str = str.dropLast(2)
+
 
         // LOADSTRINLINE
         try {
             val strPtr = vm.makeStringDB(str)
             // LOADPTR
-            vm.writereg(1, java.lang.Double.longBitsToDouble(strPtr.memAddr.toLong()))
+            vm.writereg(1, strPtr.memAddr.toDouble())
             if (strPtr.memAddr == -1) {
                 vm.writebreg(1, 0b10.toByte())
             } else {
@@ -196,11 +199,11 @@ object TBASOpcodes {
         }
         // END LOADSTRINLINE
 
-        val string = TBASString(VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt()))
+        val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
         vm.strCntr = 0 // string counter
 
         while (true) {
-            vm.r1 = java.lang.Double.longBitsToDouble(vm.memory[string.pointer.memAddr + vm.strCntr].toUint().toLong())
+            vm.r1 = vm.memory[string.pointer.memAddr + vm.strCntr].toUint().toDouble()
 
             if (vm.r1 == 0.0) break
 
@@ -293,6 +296,16 @@ object TBASOpcodes {
     /** r1 <- data in memory addr r2 */
     fun PEEK() { vm.r1 = vm.memory[vm.r2.toInt()].toUint().toDouble() }
 
+    /** memory(r2) <- r1 */
+    fun POKEINT() { vm.r1.toInt().toLittle().forEachIndexed { index, byte -> vm.memory[vm.r2.toInt() + index] = byte } }
+    /** r1 <- data in memory addr r2 */
+    fun PEEKINT() { vm.r1 = byteArrayOf(
+            vm.memory[vm.r2.toInt()],
+            vm.memory[vm.r2.toInt() + 1],
+            vm.memory[vm.r2.toInt() + 2],
+            vm.memory[vm.r2.toInt() + 3]
+    ).toLittleInt().toDouble() }
+
     /** Peripheral(r3).memory(r2) <- r1 */
     fun POKEPERI() { vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()] = vm.r1.toByte() }
     /** r1 <- data in memory addr r2 of peripheral r3 */
@@ -347,7 +360,7 @@ object TBASOpcodes {
      */
     fun LOADPTR(register: Register, addr: Int) {
         try {
-            vm.writereg(register, java.lang.Double.longBitsToDouble(addr.toLong()))
+            vm.writereg(register, addr.toDouble())
             if (addr == -1) {
                 vm.writebreg(register, 0b10.toByte())
             } else {
@@ -592,7 +605,10 @@ object TBASOpcodes {
             "UPTIME" to 80.toByte(),
 
             "JFW" to 81.toByte(),
-            "JBW" to 82.toByte()
+            "JBW" to 82.toByte(),
+
+            "POKEINT" to 83.toByte(),
+            "PEEKINT" to 84.toByte()
 
     )
 
@@ -699,6 +715,9 @@ object TBASOpcodes {
     val JFW = 81.toByte()
     val JBW = 82.toByte()
 
+    val POKEINT = 83.toByte()
+    val PEEKINT = 84.toByte()
+
     val opcodesListInverse = HashMap<Byte, String>()
     init {
         opcodesList.keys.forEach { opcodesListInverse.put(opcodesList[it]!!, it) }
@@ -793,7 +812,7 @@ object TBASOpcodes {
             "MEMCPY" to fun(_) { MEMCPY() },
             "MEMCPYPERI" to fun(_) { MEMCPYPERI() },
 
-            "POKEPERI" to fun(_) { POKEPERI () },
+            "POKEPERI" to fun(_) { POKEPERI() },
             "PEEKPERI" to fun(_) { PEEKPERI() },
 
             "MEM" to fun(_) { MEM() },
@@ -805,7 +824,10 @@ object TBASOpcodes {
             "UPTIME" to fun(_) { UPTIME() },
 
             "JFW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) },
-            "JBW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) }
+            "JBW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) },
+
+            "POKEINT" to fun(_) { POKEINT() },
+            "PEEKINT" to fun(_) { PEEKINT() }
 
 
     )

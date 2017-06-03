@@ -42,8 +42,15 @@ import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
  * - STRING
  * - NUMBER
  * - INT
+ * - BYTES (byte literals, along with pointer label -- pointer label ONLY!)
  *
  * You use your label in code by '@label_name', just like line labels.
+ *
+ *
+ * ### Label
+ * Predefined labels:
+ * - r1..r8
+ * - m1..m4
  *
  *
  * Created by minjaesong on 2017-05-28.
@@ -58,6 +65,7 @@ object TBASOpcodeAssembler {
     private val labelDefinitionMarker = ':'
     private val lineEndMarker = ';'
     private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
+    private val matchInteger = Regex("""[0-9]+""")
 
     private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
 
@@ -67,7 +75,6 @@ object TBASOpcodeAssembler {
 
 
     private fun debug(any: Any?) { if (true) { println(any) } }
-
 
     var flagSpecifyJMP = false
 
@@ -95,7 +102,7 @@ object TBASOpcodeAssembler {
 
 
         // pass 1: pre-scan for labels
-        debug("== Pass 1 ==\n")
+        debug("\n\n== Pass 1 ==\n\n")
         var virtualPC = VM.interruptCount * 4
         userProgram
                 .replace(comments, "")
@@ -113,7 +120,7 @@ object TBASOpcodeAssembler {
             else if (!line.startsWith(labelMarker)) {
 
                 debug("[TBASASM] line: [$line]")
-                words.forEach { debug("  $it") }
+                //words.forEach { debug("  $it") }
 
 
                 val cmd = words[0].toUpperCase()
@@ -165,6 +172,21 @@ object TBASOpcodeAssembler {
 
                             int.toLittle().forEach { virtualPC += 1 }
                         }
+                        "BYTES" -> {
+                            (2..words.lastIndex).forEach {
+                                if (words[it].matches(matchInteger) && words[it].toInt() in 0..255) { // byte literal
+                                    //debug("--> Byte literal payload: ${words[it].toInt()}")
+                                    virtualPC += 1
+                                }
+                                else if (words[it].startsWith(labelMarker)) {
+                                    //debug("--> Byte literal payload (label): ${words[it]}")
+                                    virtualPC += SIZEOF_POINTER
+                                }
+                                else {
+                                    throw IllegalArgumentException("Illegal byte literal ${words[it]}")
+                                }
+                            }
+                        }
                         else -> throw IllegalArgumentException("Unsupported data type: [$type] (or you missed a semicolon?)")
                     }
 
@@ -188,7 +210,7 @@ object TBASOpcodeAssembler {
                         if (argumentInfo.isNotEmpty()) {
                             argumentInfo.forEachIndexed { index, it ->
 
-                                debug("[TBASASM] argsInfo index: $index, size: $it")
+                                //debug("[TBASASM] argsInfo index: $index, size: $it")
 
                                 try {
                                     when (it) {
@@ -211,9 +233,9 @@ object TBASOpcodeAssembler {
 
                                                 val strArg = line.substring(strStart, strEnd)
 
-                                                debug("--> strArg: $strArg")
+                                                //debug("--> strArg: $strArg")
 
-                                                strArg.toCString().forEach { virtualPC += 1 }
+                                                virtualPC += strArg.toCString().size
                                                 // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
                                             }
                                         }
@@ -238,7 +260,7 @@ object TBASOpcodeAssembler {
 
 
         // pass 2: program
-        debug("== Pass 2 ==\n")
+        debug("\n\n== Pass 2 ==\n\n")
         userProgram
                 .replace(comments, "")
                 .replace(blankLines, "")
@@ -307,6 +329,23 @@ object TBASOpcodeAssembler {
 
                             int.toLittle().forEach { ret.add(it) }
                         }
+                        "BYTES" -> {
+                            (2..words.lastIndex).forEach {
+                                if (words[it].matches(matchInteger) && words[it].toInt() in 0..255) { // byte literal
+                                    debug("--> Byte literal payload: ${words[it].toInt()}")
+                                    ret.add(words[it].toInt().toByte())
+                                }
+                                else if (words[it].startsWith(labelMarker)) {
+                                    debug("--> Byte literal payload (label): ${words[it]}")
+                                    getLabel(words[it]).toLittle().forEach {
+                                        ret.add(it)
+                                    }
+                                }
+                                else {
+                                    throw IllegalArgumentException("Illegal byte literal ${words[it]}")
+                                }
+                            }
+                        }
                         else -> throw IllegalArgumentException("Unsupported data type: [$type] (or you missed a semicolon?)")
                     }
 
@@ -345,7 +384,7 @@ object TBASOpcodeAssembler {
                                         }
                                         TBASOpcodes.SIZEOF_NUMBER -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
-                                                TODO("label that points to Number")
+                                                TODO("label that points to Number (${words[index + 1]})")
                                             }
                                             else {
                                                 words[index + 1].toDouble().toLittle().forEach {

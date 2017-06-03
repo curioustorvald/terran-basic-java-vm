@@ -11,7 +11,7 @@ fun main(args: Array<String>) {
 
 class Executable {
 
-    val vm = VM(256, tbasic_remove_string_dupes = true)
+    val vm = VM(2.KB(), tbasic_remove_string_dupes = true)
 
 
     /*val rudimentaryHello = TBASOpcodeAssembler("""# Hello world on TBASASM using in-line strings
@@ -34,7 +34,7 @@ printstr;
     PRINTSTR;
 """)*/
 
-    val testLoop = TBASOpcodeAssembler("""# Power of twos
+    /*val testLoop = TBASOpcodeAssembler("""# Power of twos
 .data;
 
 string theend, You are terminated
@@ -70,12 +70,54 @@ loadstrinline 1,#
 printstr;       #
 mov 4, 1;       # END append \n
 return;
+""")*/
+
+    val BIOS_POST = TBASOpcodeAssembler("""# Power On Self Test
+#.func;
+
+
+
+.code;
+# set interrupt vector table
+loadnum 2, 8;
+loadptr 1, @oom_handler;
+pokeint;
+
+
+# proceed to memory test
+loadnum 2, 0;
+loadnum 5, 0;
+
+:get_mem_size;
+inc2;                         #
+peek;                         # test memory
+jmp @get_mem_size;
+
+
+:memory_check_end;
+mov 2, 1;                     #
+printnum;                     # print out current memSize
+
+loadnum 1, 32;                #
+putchar;                      # print out a space
+
+loadstrinline 1, bytes OK     #
+;                             #
+printstr;                     # " bytes OK \n"
+
+halt;
+
+
+# oom interrupt handler
+:oom_handler;
+jmp @memory_check_end;
+
 """)
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
-        vm.loadProgram(testLoop)
+        vm.loadProgram(BIOS_POST)
         (0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
 
         vm.execute()
