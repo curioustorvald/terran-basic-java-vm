@@ -21,6 +21,7 @@ typealias Number = Double
  * Created by minjaesong on 2017-05-09.
  */
 class VM(memSize: Int,
+         val BIOS: VMBIOS,
          private val stackSize: Int = 2500,
          val stdout: OutputStream = System.out,
          val stdin: InputStream = System.`in`,
@@ -568,7 +569,8 @@ class VM(memSize: Int,
     companion object {
         val charset = Charsets.UTF_8
 
-        val interruptCount = 8
+        val interruptCount = 16
+        
         val INT_DIV_BY_ZERO = 0
         val INT_ILLEGAL_OP = 1
         val INT_OUT_OF_MEMORY = 2
@@ -587,25 +589,6 @@ class VM(memSize: Int,
     fun interruptStackOverflow() { pc = memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt() }
     fun interruptMathError() { pc = memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt() }
     fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
-
-
-    val BIOS = object : VMPeripheralHardware {
-        override fun call(arg: Int) {
-            when (arg) {
-                // memory check
-                // @return memory size in Number, saved to r1
-                0 -> {
-                    r1 = memory.size.toDouble()
-                }
-                // find boot device and load boot script to memory, move PC
-                // @return modified memory
-                1 -> {
-
-                }
-                else -> interruptIllegalOp()
-            }
-        }
-    }
 }
 
 fun Int.KB() = this shl 10

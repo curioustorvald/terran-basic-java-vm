@@ -11,7 +11,7 @@ fun main(args: Array<String>) {
 
 class Executable {
 
-    val vm = VM(2.KB(), tbasic_remove_string_dupes = true)
+    val vm = VM(2.KB(), BIOS = VMBIOS(), tbasic_remove_string_dupes = true)
 
 
     /*val rudimentaryHello = TBASOpcodeAssembler("""# Hello world on TBASASM using in-line strings
