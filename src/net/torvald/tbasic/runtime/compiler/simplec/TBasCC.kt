@@ -2,6 +2,7 @@ package net.torvald.tbasic.runtime.compiler.simplec
 
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.collections.HashSet
 
 /**
  * A compiler for SimpleC language that compiles into TBASOpcode.
@@ -25,11 +26,22 @@ object TBasCC {
 
     private val genericTokenSeparator = Regex("""[ \t]+""")
 
+    private val nullchar = 0.toChar()
+
     private val infiniteLoops = arrayListOf<Regex>(
             Regex("""while\(true\)"""),
             Regex("""while\([1-9][0-9]*\)"""),
             Regex("""for\(;;\)""")
     )
+
+    private val regexBooleanWhole = Regex("""^(true|false|TRUE|FALSE)$""")
+    private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+)$""")
+    private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
+    private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""")
+    private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+[Ff]?|[0-9]+[Ff])$""")
+    private val regexIntWhole = Regex("""^([0-9_]+)$""")
+
+    private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
 
     private val keywords = hashSetOf(
             // classic C
@@ -67,8 +79,21 @@ object TBasCC {
     )
 
 
+    fun sizeofPrimitive(type: String) = when (type) {
+        "char" -> 1
+        "short" -> 2
+        "int" -> 4
+        "long" -> 8
+        "float" -> 8 // in SimpleC, float is same as double
+        "double" -> 8
+        "boolean" -> 1
+        "void" -> 1 // GCC feature
+        else -> throw IllegalArgumentException("Unknown primitive type: $type")
+    }
+
+
     operator fun invoke(program: String) {
-        val tree = tokenise(program)
+        val tree = tokenise(preprocess(program))
     }
 
 
@@ -78,16 +103,23 @@ object TBasCC {
     private val funcNames = HashSet<String>()
     private val funcDict = ArrayList<CFunction>()
 
+    private val includesUser = HashSet<String>()
+    private val includesLib = HashSet<String>()
 
-    /* Test program
+    private fun preprocess(program: String): String {
+        program.lines().forEach {
+            if (it.startsWith('#')) {
+                val tokens = it.split(genericTokenSeparator)
+                val cmd = tokens[0]
 
-void main() {
-    fprintf(stdout, "Hello, world!\n");
-}
-
-     */
-    /** No preprocessor should exist at this stage! */
-    private fun tokenise(program: String): SyntaxTreeNode {
+                if (!preprocessorKeywords.contains(cmd)) {
+                    throw UndefinedStatement("Preprocessor macro $cmd is not supported.")
+                }
+                else {
+                    TODO()
+                }
+            }
+        }
 
         var program = program
                 .replace(Regex("""[\s]*//[^\n]*"""), "") // line comment killer
@@ -101,13 +133,18 @@ void main() {
                 .replace(Regex("""[\s]*,[\s]*"""), ",") // whitespace around ,
                 .replace(Regex("""[\s]*->[\s]*"""), "->") // whitespace around ->
 
-
         infiniteLoops.forEach { // replace classic infinite loops
             program = program.replace(it, "forever")
         }
 
         //println(program)
 
+
+        return program
+    }
+
+    /** No preprocessor should exist at this stage! */
+    private fun tokenise(program: String): SyntaxTreeNode {
 
         ///////////////////////////////////
         // STEP 0. Divide things cleanly //
@@ -192,18 +229,14 @@ void main() {
             if (depth > currentDepth) throw SyntaxError("Unexpected code block")
             if (depth < currentDepth) middleNodes.pop()
 
-            val asFuncDef = asFuncDef(line)
-            val asFuncCall = asFuncCall(line)
+            val treeNode = asTreeNode(line, line)
 
-            if (asFuncDef != null) {
-                getCurrentNode().addStatement(asFuncDef)
-                pushNode(asFuncDef) // go one level deeper
+            if (treeNode.expressionType == ExpressionType.FUNCTION_DEF) {
+                getCurrentNode().addStatement(treeNode)
+                pushNode(treeNode) // go one level deeper
             }
-            else if (asFuncCall != null) {
-                getCurrentNode().addStatement(asFuncCall)
-            }
-            else if (false) {
-
+            else {
+                getCurrentNode().addStatement(treeNode)
             }
         }
 
@@ -244,10 +277,13 @@ void main() {
             }
     }
 
-    fun asFuncDef(line: String): SyntaxTreeNode? {
-        // [optional_annotation]   type   name(type   argname,type   argname)
 
+
+    fun asTreeNode(parentLine: String, line: String): SyntaxTreeNode {
         val whereToCutForFuncType = line.indexOf('(')
+
+        // splitted line; will be used by many lines of code
+        val lineSplit = line.split(genericTokenSeparator)
 
 
         // get return type
@@ -257,109 +293,237 @@ void main() {
         val slices_funcType = line.slice(0..whereToCutForFuncType).split(genericTokenSeparator)
 
 
-        if (slices_funcType.size < 2) return null
+        ////////////////////////////
+        // as Function Definition //
+        ////////////////////////////
+        if (slices_funcType.size >= 2 && line.endsWith(')')) {
+            val actualFuncType = slices_funcType[slices_funcType.lastIndex - 1]
+            val returnType = resolveTypeString(actualFuncType)
 
-        val actualFuncType = slices_funcType[slices_funcType.lastIndex - 1]
-        val returnType = resolveTypeString(actualFuncType)
+            val funcName = slices_funcType.last().dropLast(1)
 
-        val funcName = slices_funcType.last().dropLast(1)
-
-        val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName)
-
-
-        // get arguments
-        val lastParen = line.lastIndexOf(')')
-        if (lastParen < 0) throw IllegalTokenException("at line $line -- ')' expected")
-        // "int arg1,boolean arg2,double arg3"
-        val argumentsDef = line.slice(whereToCutForFuncType + 1..lastParen - 1).split(',')
-
-        argumentsDef.forEach { iit ->
-            val it = iit.replace(Regex("""[ \t]*\*[\t]*"""), " * ") // separate pointer marker
-
-            val argTokens = it.split(genericTokenSeparator) // {"type", ("*",) "name"}
-
-            // function prototype
-            if (argTokens.size == 1 || (argTokens.size == 2 && argTokens[1] == "*")) {
-                funcDefNode.addArgument(SyntaxTreeNode(
-                        ExpressionType.FUNC_ARGUMENT_DEF,
-                        resolveTypeString(argTokens[0], argTokens.size == 2),
-                        null
-                ))
-            }
-            // the "right" way (with double-scan ofc)
-            else {
-                funcDefNode.addArgument(SyntaxTreeNode(
-                        ExpressionType.FUNC_ARGUMENT_DEF,
-                        resolveTypeString(argTokens[0], argTokens.size == 3),
-                        argTokens.last()
-                ))
-            }
-        }
-
-        return funcDefNode
-    }
-
-    /** TODO currently function calls/equations INSIDE of argument is not supported (needs recursion) */
-    fun asFuncCall(line: String): SyntaxTreeNode? {
-        // name(   arg   ,   arg   ,   "lol, wut"   )
-
-        val whereToCutForFuncType = line.indexOf('(')
+            val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName)
 
 
-        // get function name
-        // search for line "name("
-        // function name is always have '(' appended
-        // beware of multiple-spaces-as-separators and tab-separators!
-        val slices_funcType = line.slice(0..whereToCutForFuncType).split(genericTokenSeparator)
+            // get arguments
+            // "int arg1,boolean arg2,double arg3"
+            val argumentsDef = line.slice(whereToCutForFuncType + 1..line.lastIndex - 1).split(',')
 
-        if (slices_funcType.size != 1) return null
-        val funcName = slices_funcType.last().dropLast(1)
+            argumentsDef.forEach { argDefRaw ->
+                val argDef = argDefRaw.replace(Regex("""[ \t]*\*[\t]*"""), " * ") // separate pointer marker
 
+                val argTokens = argDef.split(genericTokenSeparator) // {"type", ("*",) "name"}
 
-        // get arguments
-        val lastParen = line.lastIndexOf(')')
-        if (lastParen < 0) throw IllegalTokenException("at line $line -- ')' expected")
-        val argsLine = line.slice(whereToCutForFuncType + 1..lastParen - 1)
-
-        val args = ArrayList<String>()
-
-        val sb = StringBuilder()
-        var isString = false
-        argsLine.forEachIndexed { index, it ->
-            if (index > 0 && it == '"' && argsLine[index - 1] != '\\') {
-                // pop strings
-                if (isString) {
-                    args.add(sb.toString())
-                    sb.setLength(0)
+                // function prototype
+                if (argTokens.size == 1 || (argTokens.size == 2 && argTokens[1] == "*")) {
+                    funcDefNode.addArgument(SyntaxTreeNode(
+                            ExpressionType.FUNC_ARGUMENT_DEF,
+                            resolveTypeString(argTokens[0], argTokens.size == 2),
+                            null
+                    ))
                 }
+                // the "right" way (with double-scan ofc)
+                else {
+                    funcDefNode.addArgument(SyntaxTreeNode(
+                            ExpressionType.FUNC_ARGUMENT_DEF,
+                            resolveTypeString(argTokens[0], argTokens.size == 3),
+                            argTokens.last()
+                    ))
+                }
+            }
 
-                isString = !isString
-            }
-            else if (!isString && (it == ',') && sb.isNotEmpty()) {
-                args.add(sb.toString())
-                sb.setLength(0)
-            }
-            else {
-                sb.append(it)
-            }
+            return funcDefNode
         }
+        //////////////////////
+        // as Function Call // (also works as keyworded code block (e.g. if, for, while))
+        //////////////////////
+        else if (slices_funcType.size == 1 && line.endsWith(')')) {
+            val funcName = slices_funcType.last().dropLast(1)
 
 
-        val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName)
+            // get arguments
+            val argsLine = line.slice(whereToCutForFuncType + 1..line.lastIndex - 1)
+
+            val args = ArrayList<String>()
+
+            val sb = StringBuilder()
+            var isString = false
+            var parenDepth = 0
+            argsLine.forEachIndexed { index, char ->
+                // error catching
+                if (parenDepth < 0) {
+                    throw SyntaxError("at line $line -- misplaced ')'")
+                }
+                // normal stuffs
+                else if (char == '(') {
+                    parenDepth += 1
+                    sb.append(char)
+                }
+                else if (char == ')') {
+                    parenDepth -= 1
+                    sb.append(char)
+                }
+                // --> quotes
+                else if (parenDepth == 0 && char == '"' &&
+                        (index == 0 || (index > 0 && argsLine[index - 1] != '\\')) // \" is not counted
+                             ) {
+                    // pop strings
+                    if (isString) {
+                        args.add('"' + sb.toString()) // "string_contents (" appended as String marker)
+                        sb.setLength(0)
+                    }
+
+                    isString = !isString
+                }
+                else if (!isString && parenDepth == 0 && (char == ',' || index == argsLine.lastIndex)) {
+                    // deal with final paren
+                    if (char == ')') { parenDepth -= 1 }
+                    else if (char == '(') { parenDepth += 1 } // just in case...
 
 
-        // set all the arguments right
-        // TODO currently function calls/equations INSIDE of argument is not supported (needs recursion)
-        args.forEach {
-            val argNodeLeaf = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, null, null)
-            argNodeLeaf.literalValue = it // TODO it is string
-            funcCallNode.addArgument(argNodeLeaf)
+                    if (index == argsLine.lastIndex) { sb.append(char) }
+
+                    if (sb.isNotEmpty()) {
+                        args.add(sb.toString())
+                        sb.setLength(0)
+                    }
+                }
+                else {
+                    sb.append(char)
+                }
+            }
+
+            if (parenDepth > 0) {
+                throw SyntaxError("at line $line -- unclosed '('")
+            }
+
+
+            val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName)
+
+            println("!!argsLine $argsLine")
+            args.forEach { println("!!args: $it") }
+            println("==========================")
+
+            // set all the arguments right
+            args.forEach {
+                val argNodeLeaf = asTreeNode(parentLine, it)
+                funcCallNode.addArgument(argNodeLeaf)
+            }
+
+
+            return funcCallNode
         }
+        ////////////////////////
+        // as Var Call / etc. //
+        ////////////////////////
+        else {
+            // filter illegal lines (absurd keyword usage)
+            if (codeBlockKeywords.contains(line) || funcAnnotations.contains(line)) {
+                throw IllegalTokenException("in line $line -- Unexpected token: $line")
+            }
 
+            ///////////////////////
+            // Bunch of literals //
+            ///////////////////////
 
-        return funcCallNode
+            // String literals
+            if (line.startsWith('"')) {
+                val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
+                leafNode.literalValue = (line.substring(1) + nullchar)
+                return leafNode
+            }
+            // boolean literals
+            else if (line.matches(regexBooleanWhole)) {
+                val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null)
+                leafNode.literalValue = (line == "true" || line == "TRUE")
+                return leafNode
+            }
+            // hexadecimal literals
+            else if (line.matches(regexHexWhole)) {
+                val isLong = line.endsWith('L', true)
+                val leafNode = SyntaxTreeNode(
+                        ExpressionType.LITERAL_LEAF,
+                        if (isLong) ReturnType.LONG else ReturnType.INT,
+                        null
+                )
+                leafNode.literalValue = if (isLong)
+                    line.slice(2..line.lastIndex - 1).toLong(16)
+                else
+                    line.slice(2..line.lastIndex).toInt(16)
+
+                return leafNode
+            }
+            // octal literals
+            else if (line.matches(regexOctWhole)) {
+                val isLong = line.endsWith('L', true)
+                val leafNode = SyntaxTreeNode(
+                        ExpressionType.LITERAL_LEAF,
+                        if (isLong) ReturnType.LONG else ReturnType.INT,
+                        null
+                )
+                leafNode.literalValue = if (isLong)
+                    line.slice(1..line.lastIndex - 1).toLong(8)
+                else
+                    line.slice(1..line.lastIndex).toInt(8)
+
+                return leafNode
+            }
+            // binary literals
+            else if (line.matches(regexBinWhole)) {
+                val isLong = line.endsWith('L', true)
+                val leafNode = SyntaxTreeNode(
+                        ExpressionType.LITERAL_LEAF,
+                        if (isLong) ReturnType.LONG else ReturnType.INT,
+                        null
+                )
+                leafNode.literalValue = if (isLong)
+                    line.slice(2..line.lastIndex - 1).toLong(2)
+                else
+                    line.slice(2..line.lastIndex).toInt(2)
+
+                return leafNode
+            }
+            // floating point literals
+            else if (line.matches(regexFPWhole)) {
+                val leafNode = SyntaxTreeNode(
+                        ExpressionType.LITERAL_LEAF,
+                        if (line.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
+                        null
+                )
+                leafNode.literalValue = if (line.endsWith('F', true))
+                    line.slice(0..line.lastIndex - 1).toFloat()
+                else
+                    line.toDouble()
+
+                return leafNode
+            }
+            // int literals
+            else if (line.matches(regexIntWhole)) {
+                val isLong = line.endsWith('L', true)
+                val leafNode = SyntaxTreeNode(
+                        ExpressionType.LITERAL_LEAF,
+                        if (isLong) ReturnType.LONG else ReturnType.INT,
+                        null
+                )
+                leafNode.literalValue = if (isLong)
+                    line.slice(0..line.lastIndex - 1).toLong()
+                else
+                    line.toInt()
+
+                return leafNode
+            }
+
+            ///////////////
+            // variables //
+            ///////////////
+            else if (line.matches(regexVarNameWhole)) {
+                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, line)
+                return leafNode
+            }
+
+            TODO()
+        }
     }
-
 
 
 
@@ -368,12 +532,12 @@ void main() {
 
     class SyntaxTreeNode(
             val expressionType: ExpressionType,
-            val returnType: ReturnType?,
+            val returnType: ReturnType?, // STATEMENT, LITERAL_LEAF: valid ReturnType; VAREABLE_LEAF: always null
             val name: String?,
             val isRoot: Boolean = false
     ) {
 
-        var literalValue: Any? = null // for LITERALs only
+        var literalValue: Any? = null // for LITERALs only | if returnType is Struct, it should hold the struct
 
         val arguments = ArrayList<SyntaxTreeNode>() // for FUNCTION, CODE_BLOCK
         val statements = ArrayList<SyntaxTreeNode>()
@@ -393,32 +557,29 @@ void main() {
         override fun toString() = toStringRepresentation(0)
 
         private fun toStringRepresentation(depth: Int): String {
-            val header = if (isRoot) "⧫AST (name: $name)" else "AST (name: $name)"
+            val header = "│ ".repeat(depth) + if (isRoot) "⧫AST (name: $name)" else "AST$depth (name: $name)"
             val lines = arrayListOf(
                     header,
-                    "│ ExprType : $expressionType",
-                    "│ Ret Type : $returnType",
-                    "│ Literal  : $literalValue",
-                    "│ isRoot ?? $isRoot",
-                    "│ isLeaf ?? $isLeaf"
+                    "│ ".repeat(depth+1) + "ExprType : $expressionType",
+                    "│ ".repeat(depth+1) + "Ret Type : $returnType",
+                    "│ ".repeat(depth+1) + "Literal  : $literalValue",
+                    "│ ".repeat(depth+1) + "isRoot ?? $isRoot",
+                    "│ ".repeat(depth+1) + "isLeaf ?? $isLeaf"
             )
 
             if (!isLeaf) {
-                lines.add("│ # of statements: ${statements.size}")
+                lines.add("│ ".repeat(depth+1) + "# of arguments: ${arguments.size}")
                 arguments.forEach { lines.add(it.toStringRepresentation(depth + 1)) }
-                lines.add("│ # of statements: ${statements.size}")
+                lines.add("│ ".repeat(depth+1) + "# of statements: ${statements.size}")
                 statements.forEach { lines.add(it.toStringRepresentation(depth + 1)) }
             }
 
-            lines.add("╘" + "═".repeat(header.length - 1))
+            lines.add("│ ".repeat(depth) + "╘" + "═".repeat(header.length - 1 - 2*depth))
 
             val sb = StringBuilder()
-            lines.forEachIndexed { index, it ->
-                repeat(depth) { sb.append("│ ") }
-                sb.append(it)
-                if (index < lines.lastIndex) {
-                    sb.append("\n")
-                }
+            lines.forEachIndexed { index, line ->
+                sb.append(line)
+                if (index < lines.lastIndex) { sb.append("\n") }
             }
 
             return sb.toString()
@@ -437,11 +598,46 @@ void main() {
         VOID_PTR, BOOL_PTR, CHAR_PTR, SHORT_PTR, INT_PTR, LONG_PTR, FLOAT_PTR, DOUBLE_PTR, STRUCT_PTR
     }
 
-    class CStruct(val name: String) {
-        data class CStructTypeNamePair(val type: ReturnType, val name: String)
-        val members = ArrayList<CStructTypeNamePair>()
-        fun addMember(type: ReturnType, name: String) {
-            members.add(CStructTypeNamePair(type, name))
+    abstract class CData(val name: String) {
+        abstract fun sizeOf(): Int
+    }
+
+    class CStruct(name: String, val identifier: String): CData(name) {
+        val members = ArrayList<CData>()
+
+        fun addMember(member: CData) {
+            members.add(member)
+        }
+
+        override fun sizeOf(): Int {
+            return members.map { it.sizeOf() }.sum()
+        }
+
+        override fun toString(): String {
+            val sb = StringBuilder()
+            sb.append("Struct $name: ")
+            members.forEachIndexed { index, cData ->
+                if (cData is CPrimitive) {
+                    sb.append(cData.type)
+                    sb.append(' ')
+                    sb.append(cData.name)
+                }
+                else if (cData is CStruct) {
+                    sb.append(cData.identifier)
+                    sb.append(' ')
+                    sb.append(cData.name)
+                }
+                else throw IllegalArgumentException("Unknown CData extension: ${cData.javaClass.simpleName}")
+            }
+            return sb.toString()
+        }
+    }
+
+    class CPrimitive(name: String, val type: ReturnType, val value: Any): CData(name) {
+        override fun sizeOf(): Int {
+            var typestr = type.toString().toLowerCase()
+            if (typestr.endsWith("_ptr")) typestr = typestr.drop(4)
+            return sizeofPrimitive(typestr)
         }
     }
 
@@ -449,6 +645,10 @@ void main() {
         abstract fun generateOpcode(vararg args: Any)
     }
 
+
     open class SyntaxError(msg: String? = null) : Exception(msg)
     class IllegalTokenException(msg: String? = null) : SyntaxError(msg)
+    class UnresolvedReference(msg: String? = null) : SyntaxError(msg)
+    class UndefinedStatement(msg: String? = null) : SyntaxError(msg)
+    class PreprocessorErrorMessage(msg: String) : SyntaxError(msg)
 }

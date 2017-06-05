@@ -22,7 +22,7 @@ object TBasicInterpreter {
         val tokens = ArrayList<String>()
 
         var lineCtr = 0
-        var lineCtrMax = line.length - 1
+        var lineCtrMax = line.lastIndex
         val tokenBuffer = StringBuffer()
         var isQuote = false
 
@@ -44,10 +44,14 @@ object TBasicInterpreter {
                     tokenBuffer.append(char)
                 }
                 else {
-                    if (tokenSeparators.contains(char) && tokenBuffer.isNotEmpty()) {
-                        tokens.add(tokenBuffer.toString())
-                        tokenBuffer.setLength(0)
-                        lineCtr++
+                    if ((tokenSeparators.contains(char) || lineCtr == lineCtrMax)) {
+                        if (lineCtr == line.lastIndex) { tokenBuffer.append(char) }
+
+                        if (tokenBuffer.isNotEmpty()) {
+                            tokens.add(tokenBuffer.toString())
+                            tokenBuffer.setLength(0)
+                            lineCtr++
+                        }
                     }
                     else {
                         tokenBuffer.append(char)

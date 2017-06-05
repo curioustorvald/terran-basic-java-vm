@@ -3,11 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="7d458e43-04df-482b-879c-88336e290950" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" />
     </list>
     <ignored path="$PROJECT_DIR$/out/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -21,13 +19,47 @@
     <window id="1">
       <content type="file-editors">
         <state>
-          <leaf>
-            <file leaf-file-name="Executable.kt" pinned="false" current-in-tab="true">
+          <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+            <file leaf-file-name="Executable.kt" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="1400">
-                    <caret line="100" column="7" lean-forward="false" selection-start-line="100" selection-start-column="7" selection-end-line="100" selection-end-column="7" />
+                  <state relative-caret-position="1386">
+                    <caret line="99" column="6" lean-forward="false" selection-start-line="99" selection-start-column="6" selection-end-line="99" selection-end-column="6" />
+                    <folding>
+                      <marker date="1496562050686" expanded="true" signature="1356:1687" ph="&quot;&quot;&quot; ## Power On Self Test ...&quot;&quot;&quot;" />
+                    </folding>
+                  </state>
+                </provider>
+              </entry>
+            </file>
+            <file leaf-file-name="VMBIOS.kt" pinned="false" current-in-tab="false">
+              <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMBIOS.kt">
+                <provider selected="true" editor-type-id="text-editor">
+                  <state relative-caret-position="364">
+                    <caret line="26" column="0" lean-forward="false" selection-start-line="26" selection-start-column="0" selection-end-line="26" selection-end-column="0" />
                     <folding />
+                  </state>
+                </provider>
+              </entry>
+            </file>
+            <file leaf-file-name="Test.kt" pinned="false" current-in-tab="true">
+              <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt">
+                <provider selected="true" editor-type-id="text-editor">
+                  <state relative-caret-position="462">
+                    <caret line="33" column="4" lean-forward="false" selection-start-line="33" selection-start-column="4" selection-end-line="33" selection-end-column="4" />
+                    <folding />
+                  </state>
+                </provider>
+              </entry>
+            </file>
+            <file leaf-file-name="TBasCC.kt" pinned="false" current-in-tab="false">
+              <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt">
+                <provider selected="true" editor-type-id="text-editor">
+                  <state relative-caret-position="1343">
+                    <caret line="630" column="13" lean-forward="false" selection-start-line="630" selection-start-column="13" selection-end-line="630" selection-end-column="13" />
+                    <folding>
+                      <element signature="e#53#141#0" expanded="true" />
+                    </folding>
                   </state>
                 </provider>
               </entry>
@@ -35,7 +67,7 @@
             <file leaf-file-name="TBASOpcodeAssembler.kt" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="1108">
+                  <state relative-caret-position="755">
                     <caret line="373" column="77" lean-forward="false" selection-start-line="373" selection-start-column="77" selection-end-line="373" selection-end-column="77" />
                     <folding>
                       <element signature="e#36#126#0" expanded="true" />
@@ -47,7 +79,7 @@
             <file leaf-file-name="TBASOpcodes.kt" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="1637">
+                  <state relative-caret-position="1721">
                     <caret line="866" column="58" lean-forward="false" selection-start-line="866" selection-start-column="58" selection-end-line="866" selection-end-column="58" />
                     <folding>
                       <element signature="e#28#94#0" expanded="true" />
@@ -68,19 +100,6 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="README.md" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/README.md">
-          <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-            <state split_layout="SPLIT">
-              <first_editor relative-caret-position="0">
-                <caret line="0" column="50" lean-forward="false" selection-start-line="0" selection-start-column="50" selection-end-line="0" selection-end-column="50" />
-                <folding />
-              </first_editor>
-              <second_editor />
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="VMPeripheralWrapper.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt">
           <provider selected="true" editor-type-id="text-editor">
@@ -94,10 +113,10 @@
       <file leaf-file-name="Executable.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="728">
-              <caret line="64" column="0" lean-forward="false" selection-start-line="64" selection-start-column="0" selection-end-line="64" selection-end-column="0" />
+            <state relative-caret-position="406">
+              <caret line="29" column="31" lean-forward="false" selection-start-line="29" selection-start-column="31" selection-end-line="29" selection-end-column="31" />
               <folding>
-                <marker date="1496482448569" expanded="true" signature="1339:1670" ph="&quot;&quot;&quot; ## Power On Self Test ...&quot;&quot;&quot;" />
+                <marker date="1496562050686" expanded="true" signature="1356:1687" ph="&quot;&quot;&quot; ## Power On Self Test ...&quot;&quot;&quot;" />
               </folding>
             </state>
           </provider>
@@ -106,8 +125,8 @@
       <file leaf-file-name="VM.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="266">
-              <caret line="549" column="0" lean-forward="true" selection-start-line="549" selection-start-column="0" selection-end-line="549" selection-end-column="0" />
+            <state relative-caret-position="7826">
+              <caret line="590" column="95" lean-forward="false" selection-start-line="590" selection-start-column="95" selection-end-line="590" selection-end-column="95" />
               <folding>
                 <element signature="e#36#227#0" expanded="true" />
                 <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
@@ -132,7 +151,7 @@
       <file leaf-file-name="TBASOpcodes.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="557">
+            <state relative-caret-position="14">
               <caret line="182" column="0" lean-forward="false" selection-start-line="182" selection-start-column="0" selection-end-line="182" selection-end-column="0" />
               <folding>
                 <element signature="e#28#94#0" expanded="true" />
@@ -142,10 +161,10 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="TBASOpcodeAssembler.kt" pinned="false" current-in-tab="true">
+      <file leaf-file-name="TBASOpcodeAssembler.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="655">
+            <state relative-caret-position="3822">
               <caret line="273" column="33" lean-forward="false" selection-start-line="273" selection-start-column="33" selection-end-line="273" selection-end-column="33" />
               <folding>
                 <element signature="e#36#126#0" expanded="true" />
@@ -164,27 +183,45 @@
           </provider>
         </entry>
       </file>
+      <file leaf-file-name="TBasicInterpreter.kt" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="336">
+              <caret line="24" column="39" lean-forward="false" selection-start-line="24" selection-start-column="39" selection-end-line="24" selection-end-column="39" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="TBasCC.kt" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="745">
+              <caret line="367" column="103" lean-forward="false" selection-start-line="367" selection-start-column="103" selection-end-line="367" selection-end-column="103" />
+              <folding>
+                <element signature="e#53#141#0" expanded="true" />
+                <element signature="n#!!block;n#CStruct#0;n#!!block;n#TBasCC#0" expanded="false" />
+                <element signature="n#!!block;n#CFunction#0;n#!!block;n#TBasCC#0" expanded="false" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
     </leaf>
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Enum" />
-        <option value="Kotlin Object" />
+        <option value="Kotlin Interface" />
         <option value="Kotlin Class" />
         <option value="Kotlin File" />
-        <option value="Kotlin Interface" />
+        <option value="Kotlin Object" />
       </list>
     </option>
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>LOADNUM</find>
-      <find>toUint</find>
-      <find>loadnum num</find>
-      <find>LOADSTR</find>
-      <find>LOADSTRINLINE</find>
-      <find>fun reset</find>
       <find>fun JMP</find>
       <find>= vm.pc</find>
       <find>termina</find>
@@ -209,12 +246,20 @@
       <find>.drop</find>
       <find>peripherals</find>
       <find>.toByte</find>
+      <find>[ \t\r\n]</find>
+      <find>[\s]</find>
+      <find>[ \t\r\n\f]</find>
+      <find>arg</find>
+      <find>sb.isNotE</find>
+      <find>!!args</find>
     </findStrings>
     <replaceStrings>
       <replace>readAsDouble()</replace>
       <replace>LOADMNUM</replace>
       <replace>delimiter</replace>
       <replace>virtualPC += 1</replace>
+      <replace>[ \t\r\n\f]</replace>
+      <replace>[\s]</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -243,11 +288,18 @@
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralDelegate.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralHardware.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMBIOS.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/TBasicCCompiler.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/c99/TBasicCCompiler.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasicCCompiler.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt" />
       </list>
     </option>
   </component>
@@ -280,6 +332,7 @@
     <panes>
       <pane id="Scratches" />
       <pane id="PackagesPane" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -332,9 +385,34 @@
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="TBASRT" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="TBASRT" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="tbasic" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="runtime" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="simplec" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -342,10 +420,11 @@
     <property name="last_opened_file_path" value="$USER_HOME$/Dropbox/Private/Projects/TerranBasic" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="aspect.path.notification.shown" value="true" />
-    <property name="settings.editor.selected.configurable" value="preferences.sourceCode.Lua" />
+    <property name="settings.editor.selected.configurable" value="preferences.sourceCode.Kotlin" />
   </component>
   <component name="RecentsManager">
     <key name="MoveKotlinTopLevelDeclarationsDialog.RECENTS_KEY">
+      <recent name="net.torvald.tbasic.runtime.compiler.c99" />
       <recent name="net.torvald.tbasic" />
     </key>
   </component>
@@ -361,10 +440,23 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Kotlin.net.torvald.tbasic.ExecutableKt">
+  <component name="RunManager" selected="Kotlin.net.torvald.tbasic.TestKt">
     <configuration default="false" name="net.torvald.tbasic.ExecutableKt" type="JetRunConfigurationType" factoryName="Kotlin" temporary="true" nameIsGenerated="true">
       <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
       <option name="MAIN_CLASS_NAME" value="net.torvald.tbasic.ExecutableKt" />
+      <option name="VM_PARAMETERS" />
+      <option name="PROGRAM_PARAMETERS" />
+      <option name="WORKING_DIRECTORY" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
+      <option name="ALTERNATIVE_JRE_PATH" />
+      <option name="PASS_PARENT_ENVS" value="true" />
+      <module name="TBASRT" />
+      <envs />
+      <method />
+    </configuration>
+    <configuration default="false" name="net.torvald.tbasic.TestKt" type="JetRunConfigurationType" factoryName="Kotlin" temporary="true" nameIsGenerated="true">
+      <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
+      <option name="MAIN_CLASS_NAME" value="net.torvald.tbasic.TestKt" />
       <option name="VM_PARAMETERS" />
       <option name="PROGRAM_PARAMETERS" />
       <option name="WORKING_DIRECTORY" />
@@ -720,12 +812,14 @@
     <configuration default="true" type="osgi.bnd.run" factoryName="Test Launcher (JUnit)">
       <method />
     </configuration>
-    <list size="1">
+    <list size="2">
       <item index="0" class="java.lang.String" itemvalue="Kotlin.net.torvald.tbasic.ExecutableKt" />
+      <item index="1" class="java.lang.String" itemvalue="Kotlin.net.torvald.tbasic.TestKt" />
     </list>
     <recent_temporary>
-      <list size="1">
-        <item index="0" class="java.lang.String" itemvalue="Kotlin.net.torvald.tbasic.ExecutableKt" />
+      <list size="2">
+        <item index="0" class="java.lang.String" itemvalue="Kotlin.net.torvald.tbasic.TestKt" />
+        <item index="1" class="java.lang.String" itemvalue="Kotlin.net.torvald.tbasic.ExecutableKt" />
       </list>
     </recent_temporary>
   </component>
@@ -776,12 +870,14 @@
       <workItem from="1496240554280" duration="153000" />
       <workItem from="1496298705162" duration="2953000" />
       <workItem from="1496378535100" duration="617000" />
-      <workItem from="1496418922792" duration="10176000" />
+      <workItem from="1496418922792" duration="11339000" />
+      <workItem from="1496490951469" duration="3449000" />
+      <workItem from="1496561114060" duration="41382000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="136069000" />
+    <option name="totallyTimeSpent" value="182063000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-7" y="0" width="1214" height="1887" extended-state="0" />
@@ -793,13 +889,14 @@
       <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.19669327" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25541618" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.20103987" sideWeight="0.49488056" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.19410746" sideWeight="0.49488056" order="0" side_tool="false" content_ui="combo" />
       <window_info id="LuaJ" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Database" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3289624" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="UI Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
@@ -810,7 +907,6 @@
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3289624" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -830,61 +926,6 @@
     <option name="FILTER_TARGETS" value="false" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="910">
-          <caret line="65" column="44" lean-forward="true" selection-start-line="65" selection-start-column="44" selection-end-line="65" selection-end-column="44" />
-          <folding>
-            <element signature="e#28#94#0" expanded="true" />
-            <marker date="1496481409558" expanded="true" signature="6860:6917" ph="{...}" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/README.md">
-      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-        <state split_layout="SPLIT">
-          <first_editor relative-caret-position="0">
-            <caret line="0" column="50" lean-forward="false" selection-start-line="0" selection-start-column="50" selection-end-line="0" selection-end-column="50" />
-            <folding />
-          </first_editor>
-          <second_editor />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1078">
-          <caret line="159" column="29" lean-forward="true" selection-start-line="159" selection-start-column="29" selection-end-line="159" selection-end-column="29" />
-          <folding>
-            <element signature="e#36#227#0" expanded="true" />
-            <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
-            <element signature="n#!!block;n#Stack#0;n#!!block;n#VM#0" expanded="false" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASValue.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="896">
-          <caret line="64" column="1" lean-forward="false" selection-start-line="64" selection-start-column="1" selection-end-line="64" selection-end-column="1" />
-          <folding>
-            <element signature="e#28#83#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="350">
-          <caret line="25" column="0" lean-forward="true" selection-start-line="25" selection-start-column="0" selection-end-line="25" selection-end-column="0" />
-          <folding>
-            <element signature="e#28#94#0" expanded="true" />
-            <marker date="1496481409558" expanded="true" signature="6860:6917" ph="{...}" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/README.md">
       <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
         <state split_layout="SPLIT">
@@ -1210,7 +1251,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="70">
           <caret line="5" column="0" lean-forward="false" selection-start-line="5" selection-start-column="0" selection-end-line="5" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -1229,7 +1269,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-728">
           <caret line="5" column="19" lean-forward="false" selection-start-line="5" selection-start-column="19" selection-end-line="5" selection-end-column="19" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -1237,6 +1276,43 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="70">
           <caret line="5" column="14" lean-forward="false" selection-start-line="5" selection-start-column="14" selection-end-line="5" selection-end-column="14" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralHardware.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="98">
+          <caret line="7" column="46" lean-forward="false" selection-start-line="7" selection-start-column="46" selection-end-line="7" selection-end-column="46" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7826">
+          <caret line="590" column="95" lean-forward="false" selection-start-line="590" selection-start-column="95" selection-end-line="590" selection-end-column="95" />
+          <folding>
+            <element signature="e#36#227#0" expanded="true" />
+            <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
+            <element signature="n#!!block;n#Stack#0;n#!!block;n#VM#0" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="406">
+          <caret line="29" column="31" lean-forward="false" selection-start-line="29" selection-start-column="31" selection-end-line="29" selection-end-column="31" />
+          <folding>
+            <marker date="1496562050686" expanded="true" signature="1356:1687" ph="&quot;&quot;&quot; ## Power On Self Test ...&quot;&quot;&quot;" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="266">
+          <caret line="19" column="0" lean-forward="false" selection-start-line="19" selection-start-column="0" selection-end-line="19" selection-end-column="0" />
           <folding />
         </state>
       </provider>
@@ -1251,37 +1327,33 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralWrapper.kt">
+    <entry file="jar://C:/Program Files/Java/jdk1.8.0_131/src.zip!/com/sun/org/apache/xalan/internal/xsltc/compiler/SyntaxTreeNode.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="266">
-          <caret line="19" column="0" lean-forward="false" selection-start-line="19" selection-start-column="0" selection-end-line="19" selection-end-column="0" />
+        <state relative-caret-position="210">
+          <caret line="60" column="22" lean-forward="false" selection-start-line="60" selection-start-column="22" selection-end-line="60" selection-end-column="22" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VM.kt">
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMBIOS.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="266">
-          <caret line="549" column="0" lean-forward="true" selection-start-line="549" selection-start-column="0" selection-end-line="549" selection-end-column="0" />
-          <folding>
-            <element signature="e#36#227#0" expanded="true" />
-            <element signature="n#!!block;n#IntStack#0;n#!!block;n#VM#0" expanded="false" />
-            <element signature="n#!!block;n#Stack#0;n#!!block;n#VM#0" expanded="false" />
-          </folding>
+        <state relative-caret-position="364">
+          <caret line="26" column="0" lean-forward="false" selection-start-line="26" selection-start-column="0" selection-end-line="26" selection-end-column="0" />
+          <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/VMPeripheralHardware.kt">
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="98">
-          <caret line="7" column="46" lean-forward="false" selection-start-line="7" selection-start-column="46" selection-end-line="7" selection-end-column="46" />
+        <state relative-caret-position="336">
+          <caret line="24" column="39" lean-forward="false" selection-start-line="24" selection-start-column="39" selection-end-line="24" selection-end-column="39" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="557">
+        <state relative-caret-position="14">
           <caret line="182" column="0" lean-forward="false" selection-start-line="182" selection-start-column="0" selection-end-line="182" selection-end-column="0" />
           <folding>
             <element signature="e#28#94#0" expanded="true" />
@@ -1290,22 +1362,32 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Executable.kt">
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="728">
-          <caret line="64" column="0" lean-forward="false" selection-start-line="64" selection-start-column="0" selection-end-line="64" selection-end-column="0" />
+        <state relative-caret-position="3822">
+          <caret line="273" column="33" lean-forward="false" selection-start-line="273" selection-start-column="33" selection-end-line="273" selection-end-column="33" />
           <folding>
-            <marker date="1496482448569" expanded="true" signature="1339:1670" ph="&quot;&quot;&quot; ## Power On Self Test ...&quot;&quot;&quot;" />
+            <element signature="e#36#126#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="655">
-          <caret line="273" column="33" lean-forward="false" selection-start-line="273" selection-start-column="33" selection-end-line="273" selection-end-column="33" />
+        <state relative-caret-position="462">
+          <caret line="33" column="4" lean-forward="false" selection-start-line="33" selection-start-column="4" selection-end-line="33" selection-end-column="4" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="745">
+          <caret line="367" column="103" lean-forward="false" selection-start-line="367" selection-start-column="103" selection-end-line="367" selection-end-column="103" />
           <folding>
-            <element signature="e#36#126#0" expanded="true" />
+            <element signature="e#53#141#0" expanded="true" />
+            <element signature="n#!!block;n#CStruct#0;n#!!block;n#TBasCC#0" expanded="false" />
+            <element signature="n#!!block;n#CFunction#0;n#!!block;n#TBasCC#0" expanded="false" />
           </folding>
         </state>
       </provider>

@@ -28,10 +28,14 @@ int main    () {
 
     }*/
 
-    val node = TBasCC.asFuncDef("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
-    println(node)
+    //val node = TBasCC.asTreeNode("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
+    //println(node)
 
-    val node2 = TBasCC.asFuncCall("""fprintf(stdout,"\"Hello, world!\"\n")""")
+    val line = """fprintf(call("aAa",getch(),42f),"\"Hello, world!\"\n")"""
+    val node2 = TBasCC.asTreeNode(line, line)
     println(node2)
+
+    //val node3 = TBasCC.asTreeNode("""if(true,false,"quote,wut")""")
+    //print(node3)
 }
 
