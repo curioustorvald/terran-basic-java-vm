@@ -31,7 +31,8 @@ int main    () {
     //val node = TBasCC.asTreeNode("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
     //println(node)
 
-    val line = """fprintf(call("aAa",getch(),42f),"\"Hello, world!\"\n")"""
+    //val line = """return dup(foo("bar",0x24),null)"""
+    val line = """int foo"""
     val node2 = TBasCC.asTreeNode(line, line)
     println(node2)
 

@@ -2,9 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7d458e43-04df-482b-879c-88336e290950" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" afterPath="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" />
     </list>
     <ignored path="$PROJECT_DIR$/out/" />
@@ -42,21 +40,11 @@
                 </provider>
               </entry>
             </file>
-            <file leaf-file-name="Test.kt" pinned="false" current-in-tab="true">
-              <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt">
-                <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="462">
-                    <caret line="33" column="4" lean-forward="false" selection-start-line="33" selection-start-column="4" selection-end-line="33" selection-end-column="4" />
-                    <folding />
-                  </state>
-                </provider>
-              </entry>
-            </file>
-            <file leaf-file-name="TBasCC.kt" pinned="false" current-in-tab="false">
+            <file leaf-file-name="TBasCC.kt" pinned="false" current-in-tab="true">
               <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="1343">
-                    <caret line="630" column="13" lean-forward="false" selection-start-line="630" selection-start-column="13" selection-end-line="630" selection-end-column="13" />
+                  <state relative-caret-position="237">
+                    <caret line="596" column="51" lean-forward="true" selection-start-line="596" selection-start-column="51" selection-end-line="596" selection-end-column="51" />
                     <folding>
                       <element signature="e#53#141#0" expanded="true" />
                     </folding>
@@ -183,6 +171,16 @@
           </provider>
         </entry>
       </file>
+      <file leaf-file-name="Test.kt" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="476">
+              <caret line="34" column="25" lean-forward="false" selection-start-line="34" selection-start-column="25" selection-end-line="34" selection-end-column="25" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
       <file leaf-file-name="TBasicInterpreter.kt" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt">
           <provider selected="true" editor-type-id="text-editor">
@@ -196,8 +194,8 @@
       <file leaf-file-name="TBasCC.kt" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="745">
-              <caret line="367" column="103" lean-forward="false" selection-start-line="367" selection-start-column="103" selection-end-line="367" selection-end-column="103" />
+            <state relative-caret-position="350">
+              <caret line="705" column="66" lean-forward="true" selection-start-line="705" selection-start-column="66" selection-end-line="705" selection-end-column="66" />
               <folding>
                 <element signature="e#53#141#0" expanded="true" />
                 <element signature="n#!!block;n#CStruct#0;n#!!block;n#TBasCC#0" expanded="false" />
@@ -222,12 +220,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>fun JMP</find>
-      <find>= vm.pc</find>
-      <find>termina</find>
-      <find>virtualPC.inc()</find>
-      <find>PEEK</find>
-      <find>loadstring</find>
       <find>putch</find>
       <find>getLabel</find>
       <find>poke</find>
@@ -252,6 +244,12 @@
       <find>arg</find>
       <find>sb.isNotE</find>
       <find>!!args</find>
+      <find>args</find>
+      <find>TRUE</find>
+      <find>C99</find>
+      <find>ReturnType.VOID</find>
+      <find>SyntaxTreeNode(</find>
+      <find>argsLine</find>
     </findStrings>
     <replaceStrings>
       <replace>readAsDouble()</replace>
@@ -298,8 +296,8 @@
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/c99/TBasicCCompiler.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasicCCompiler.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBasicInterpreter.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt" />
       </list>
     </option>
   </component>
@@ -872,12 +870,12 @@
       <workItem from="1496378535100" duration="617000" />
       <workItem from="1496418922792" duration="11339000" />
       <workItem from="1496490951469" duration="3449000" />
-      <workItem from="1496561114060" duration="41382000" />
+      <workItem from="1496561114060" duration="56885000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="182063000" />
+    <option name="totallyTimeSpent" value="197566000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-7" y="0" width="1214" height="1887" extended-state="0" />
@@ -889,7 +887,7 @@
       <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25541618" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.22805017" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
@@ -1351,17 +1349,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="14">
-          <caret line="182" column="0" lean-forward="false" selection-start-line="182" selection-start-column="0" selection-end-line="182" selection-end-column="0" />
-          <folding>
-            <element signature="e#28#94#0" expanded="true" />
-            <marker date="1496481409558" expanded="true" signature="6860:6917" ph="{...}" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/TBASOpcodeAssembler.kt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3822">
@@ -1374,16 +1361,27 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/Test.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="462">
-          <caret line="33" column="4" lean-forward="false" selection-start-line="33" selection-start-column="4" selection-end-line="33" selection-end-column="4" />
+        <state relative-caret-position="476">
+          <caret line="34" column="25" lean-forward="false" selection-start-line="34" selection-start-column="25" selection-end-line="34" selection-end-column="25" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/TBASOpcodes.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="14">
+          <caret line="182" column="0" lean-forward="false" selection-start-line="182" selection-start-column="0" selection-end-line="182" selection-end-column="0" />
+          <folding>
+            <element signature="e#28#94#0" expanded="true" />
+            <marker date="1496481409558" expanded="true" signature="6860:6917" ph="{...}" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/TBasCC.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="745">
-          <caret line="367" column="103" lean-forward="false" selection-start-line="367" selection-start-column="103" selection-end-line="367" selection-end-column="103" />
+        <state relative-caret-position="350">
+          <caret line="705" column="66" lean-forward="true" selection-start-line="705" selection-start-column="66" selection-end-line="705" selection-end-column="66" />
           <folding>
             <element signature="e#53#141#0" expanded="true" />
             <element signature="n#!!block;n#CStruct#0;n#!!block;n#TBasCC#0" expanded="false" />

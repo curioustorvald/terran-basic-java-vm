@@ -14,6 +14,10 @@ import kotlin.collections.HashSet
  * - counted simple loop (without loop counter ref) using ```repeat``` block
  *
  *
+ * ## Important Changes from C
+ *
+ * - All function definition must specify return type, even if the type is ```void```.
+ *
  * Created by minjaesong on 2017-06-04.
  */
 object TBasCC {
@@ -30,11 +34,11 @@ object TBasCC {
 
     private val infiniteLoops = arrayListOf<Regex>(
             Regex("""while\(true\)"""),
-            Regex("""while\([1-9][0-9]*\)"""),
+            Regex("""while\((0[xX]|0[bB])?[1-9][0-9]*\)|while\((0[xX]|0[bB])?0+[1-9]+\)"""),
             Regex("""for\(;;\)""")
     )
 
-    private val regexBooleanWhole = Regex("""^(true|false|TRUE|FALSE)$""")
+    private val regexBooleanWhole = Regex("""^(true|false)$""")
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+)$""")
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""")
@@ -53,16 +57,49 @@ object TBasCC {
             // SimpleC blocks
             "forever","repeat"
 
-            // SimpleC dropped keywords (keywords that won't do anything/behave differently than C99, etc.):
-            //  - auto, register, signed, unsigned, volatile: not implemented
+            // SimpleC dropped keywords (keywords that won't do anything/behave differently than C95, etc.):
+            //  - auto, register, signed, unsigned, volatile: not implemented; WILL THROW ERROR
             //  - float: will act same as double
-            //  - extern: everthing is global, anyway
+            //  - extern: everthing is global, anyway; WILL THROW ERROR
 
             // SimpleC exclusive keywords:
             //  - boolean, true, false: boolean algebra
     )
-    private val operatorsWhole = hashSetOf(
-            "sizeof","!","=","==","<",">","+","-","*","/","%" //...
+    private val operatorsHierarchyInternal = arrayOf( // opirator precedence in internal format (#_nameinlowercase)
+            // most important
+            hashSetOf("#_postinc","#_postdec","[", "]",".","->"),
+            hashSetOf("#_preinc","#_postinc","#_unaryplus","#_unaryminus","!", "~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(boolean *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(boolean)"),
+            hashSetOf("*","/","%"),
+            hashSetOf("+","-"),
+            hashSetOf("<<",">>"),
+            hashSetOf("<","<=",">",">="),
+            hashSetOf("==","!="),
+            hashSetOf("&"),
+            hashSetOf("^"),
+            hashSetOf("|"),
+            hashSetOf("&&"),
+            hashSetOf("||"),
+            hashSetOf("?",":"),
+            hashSetOf("=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|="),
+            hashSetOf(",")
+            // least important
+    )
+    private val operatorsHierarchyRTL = arrayOf(
+            false,
+            true,
+            false,false,false,false,false,false,false,false,false,false,
+            true,true,
+            false
+    )
+    private val operatorLiterals = hashSetOf( // contains symbols with no order
+            "(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(boolean *)","(void *)",
+            "(char)","(short)","(int)","(long)","(float)","(double)","(boolean)",
+            "++","--","[","]",".","->","+","-","!","~","*","&","sizeof","/","%","<<",">>","<","<=",">",">=","==","!=",
+            "^","|","&&","||","?",":","=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|=",","
+    )
+    private val operatorSanitiseList = arrayOf( // order is important!
+            "++","--","[","]","->","<<=",">>=","/","%","<<",">>","<=",">=","==","!=","+=","-=","*=","/=","%=","&=","^=","|=",
+            "^","&&","||","&","|","?",":","=","sizeof","+","-","!","~","*","<",">" // NOTE: '.' and ',' won't get whitespace
     )
     private val funcAnnotations = hashSetOf(
             "auto", // does nothing; useless even in C (it's derived from B language, actually)
@@ -71,11 +108,33 @@ object TBasCC {
     private val funcTypes = hashSetOf(
             "char", "short", "int", "long", "float", "double", "boolean", "void"
     )
+    private val varAnnotations = hashSetOf(
+            "auto", // does nothing; useless even in C (it's derived from B language, actually)
+            "extern", // not used in SimpleC
+            "const",
+            "register" // not used in SimpleC
+    )
+    private val varTypes = hashSetOf(
+            "struct", "char", "short", "int", "long", "float", "double", "boolean"
+    )
+    private val validFuncPreword = (funcAnnotations + funcTypes).toHashSet()
+    private val validVariablePreword = (varAnnotations + varTypes).toHashSet()
     private val codeBlockKeywords = hashSetOf(
             "do", "else", "enum", "for", "if", "struct", "switch", "union", "while", "forever", "repeat"
     )
+    private val functionalKeywordsWithOneArg = hashSetOf(
+            "goto", "return"
+    )
+    private val functionalKeywordsNoArg = hashSetOf(
+            "break", "continue",
+            "return" // return nothing
+    )
     private val preprocessorKeywords = hashSetOf(
             "#include","#ifndef","#ifdef","#define","#if","#else","#elif","#endif","#undef","#pragma"
+    )
+
+    private val builtinFunctions = hashSetOf(
+            "assignvar", "plusassignvar"
     )
 
 
@@ -121,17 +180,35 @@ object TBasCC {
             }
         }
 
+
+        // ADD whitespaces //
+        // make sure operators HAVE a whitespace around (eventually, just between) them
         var program = program
+        operatorSanitiseList.forEach {
+            // I know it's stupid but at least I don't have to deal with the complexity
+            val regexHeadTail = """[\s]*"""
+            val regexBody = it.map { """\$it""" }.reduce { acc, s -> acc + s }
+            val regex = Regex("$regexHeadTail$regexBody$regexHeadTail")
+
+            program = program.replace(regex, " $it ")
+        } // NOTE : whitespaces added for [ and ] will be removed again by 'KILL whitespaces' below
+
+
+        // KILL whitespaces //
+        program = program
                 .replace(Regex("""[\s]*//[^\n]*"""), "") // line comment killer
                 .replace(Regex("""[\s]*/\**\*/[\s]*"""), "") // comment blocks killer
-                .replace(Regex("""[\s]*;[\s]*"""), ";") // whitespace around ;
-                .replace(Regex("""[\s]*:[\s]*"""), ":") // whitespace around label marker
-                .replace(Regex("""[\s]*\{[\s]*"""), "{") // whitespace around {
-                .replace(Regex("""[\s]*\}[\s]*"""), "}") // whitespace around }
-                .replace(Regex("""[\s]*\([\s]*"""), "(") // whitespace around (
-                .replace(Regex("""[\s]*\)[\s]*"""), ")") // whitespace around )
-                .replace(Regex("""[\s]*,[\s]*"""), ",") // whitespace around ,
-                .replace(Regex("""[\s]*->[\s]*"""), "->") // whitespace around ->
+                .replace(Regex("""[\s]*;[\s]*"""), ";") // kill whitespace around ;
+                //.replace(Regex("""[\s]*:[\s]*"""), ":") // kill whitespace around label marker  COMMENTED: ternary op
+                .replace(Regex("""[\s]*\{[\s]*"""), "{") // kill whitespace around {
+                .replace(Regex("""[\s]*\}[\s]*"""), "}") // kill whitespace around }
+                .replace(Regex("""[\s]*\([\s]*"""), "(") // kill whitespace around (
+                .replace(Regex("""[\s]*\)[\s]*"""), ")") // kill whitespace around )
+                .replace(Regex("""[\s]*\[[\s]*"""), "[") // kill whitespace around [
+                .replace(Regex("""[\s]*\][\s]*"""), "]") // kill whitespace around ]
+                .replace(Regex("""[\s]*,[\s]*"""), ",") // kill whitespace around ,
+
+
 
         infiniteLoops.forEach { // replace classic infinite loops
             program = program.replace(it, "forever")
@@ -214,10 +291,10 @@ object TBasCC {
         // STEP n. Create a tree //
         ///////////////////////////
 
-        val ASThead = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
+        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
         val middleNodes = Stack<SyntaxTreeNode>()
         var currentDepth = 0
-        middleNodes.push(ASThead)
+        middleNodes.push(ASTroot)
 
         fun getCurrentNode() = middleNodes.peek()
         fun pushNode(node: SyntaxTreeNode) {
@@ -280,6 +357,15 @@ object TBasCC {
 
 
     fun asTreeNode(parentLine: String, line: String): SyntaxTreeNode {
+        fun splitContainsValidVariablePreword(split: List<String>): Int {
+            var ret = -1
+            for (stage in 0..minOf(3, split.lastIndex)) {
+                if (validVariablePreword.contains(split[stage])) ret += 1
+            }
+            return ret
+        }
+
+
         val whereToCutForFuncType = line.indexOf('(')
 
         // splitted line; will be used by many lines of code
@@ -293,10 +379,13 @@ object TBasCC {
         val slices_funcType = line.slice(0..whereToCutForFuncType).split(genericTokenSeparator)
 
 
+        // contradiction: auto AND extern
+
+
         ////////////////////////////
         // as Function Definition //
         ////////////////////////////
-        if (slices_funcType.size >= 2 && line.endsWith(')')) {
+        if (slices_funcType.size >= 2 && line.endsWith(')') && validFuncPreword.contains(slices_funcType[0])) {
             val actualFuncType = slices_funcType[slices_funcType.lastIndex - 1]
             val returnType = resolveTypeString(actualFuncType)
 
@@ -400,7 +489,7 @@ object TBasCC {
 
             val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName)
 
-            println("!!argsLine $argsLine")
+            println("!!argsLine: $argsLine")
             args.forEach { println("!!args: $it") }
             println("==========================")
 
@@ -426,7 +515,7 @@ object TBasCC {
             // Bunch of literals //
             ///////////////////////
 
-            // String literals
+            // filtered String literals
             if (line.startsWith('"')) {
                 val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
                 leafNode.literalValue = (line.substring(1) + nullchar)
@@ -435,7 +524,7 @@ object TBasCC {
             // boolean literals
             else if (line.matches(regexBooleanWhole)) {
                 val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null)
-                leafNode.literalValue = (line == "true" || line == "TRUE")
+                leafNode.literalValue = line == "true"
                 return leafNode
             }
             // hexadecimal literals
@@ -513,12 +602,75 @@ object TBasCC {
                 return leafNode
             }
 
-            ///////////////
-            // variables //
-            ///////////////
+            //////////////////////////////////////
+            // variable literal (VARIABLE_LEAF) // usually function call arguments
+            //////////////////////////////////////
             else if (line.matches(regexVarNameWhole)) {
                 val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, line)
                 return leafNode
+            }
+
+            /////////////////////////////////////////////////
+            // return something; goto somewhere (keywords) //
+            /////////////////////////////////////////////////
+            else if (lineSplit.size == 2 && functionalKeywordsWithOneArg.contains(lineSplit[0])) {
+                if (lineSplit[0] == "goto") {
+                    val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, "goto")
+                    val gotoLabel = SyntaxTreeNode(ExpressionType.GOTO_LABEL_LEAF, null, null)
+                    gotoLabel.literalValue = lineSplit[1]
+
+                    node.addArgument(gotoLabel)
+                    return node
+                }
+                else {
+                    val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, lineSplit[0])
+                    node.addArgument(asTreeNode(parentLine, lineSplit[1]))
+                    return node
+                }
+            }
+
+            //////////////////////////
+            // variable declaration //
+            //////////////////////////
+            // extern auto struct STRUCTID foobarbaz
+            // extern auto int foobarlulz
+            else if (splitContainsValidVariablePreword(lineSplit) != -1) {
+                val prewordIndex = splitContainsValidVariablePreword(lineSplit)
+                val realType = lineSplit[prewordIndex]
+
+                try {
+                    var structID: String? = null
+                    val varname: String
+                    val hasAssignment: Boolean
+
+                    if (realType == "struct") {
+                        structID = lineSplit[prewordIndex + 1]
+                        varname = lineSplit[prewordIndex + 2]
+                        hasAssignment = lineSplit.lastIndex > prewordIndex + 2
+                    }
+                    else {
+                        varname = lineSplit[prewordIndex + 1]
+                        hasAssignment = lineSplit.lastIndex > prewordIndex + 1
+                    }
+
+                    // deal with assignment
+                    if (hasAssignment) {
+                        TODO("variable declaration and assign")
+                    }
+                    else {
+                        if (structID != null) {
+                            TODO("Struct variable def")
+                        }
+                        else {
+                            val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), null)
+                            leafNode.addArgument(varname.toRawTreeNode())
+                            return leafNode
+                        }
+                    }
+                }
+                catch (syntaxFuck: ArrayIndexOutOfBoundsException) {
+                    throw SyntaxError("at line $parentLine -- missing statement(s)")
+                }
             }
 
             TODO()
@@ -551,7 +703,7 @@ object TBasCC {
 
 
         val isLeaf: Boolean
-            get() = expressionType == ExpressionType.LITERAL_LEAF || expressionType == ExpressionType.VARIABLE_LEAF ||
+            get() = expressionType.toString().endsWith("_LEAF") ||
                     (arguments.isEmpty() && statements.isEmpty())
 
         override fun toString() = toStringRepresentation(0)
@@ -561,10 +713,10 @@ object TBasCC {
             val lines = arrayListOf(
                     header,
                     "│ ".repeat(depth+1) + "ExprType : $expressionType",
-                    "│ ".repeat(depth+1) + "Ret Type : $returnType",
-                    "│ ".repeat(depth+1) + "Literal  : $literalValue",
-                    "│ ".repeat(depth+1) + "isRoot ?? $isRoot",
-                    "│ ".repeat(depth+1) + "isLeaf ?? $isLeaf"
+                    "│ ".repeat(depth+1) + "RetnType : $returnType",
+                    "│ ".repeat(depth+1) + "LiteralV : [$literalValue]",
+                    "│ ".repeat(depth+1) + "isRoot ? $isRoot",
+                    "│ ".repeat(depth+1) + "isLeaf ? $isLeaf"
             )
 
             if (!isLeaf) {
@@ -586,12 +738,31 @@ object TBasCC {
         }
     }
 
+    private fun String.toRawTreeNode(): SyntaxTreeNode {
+        val node = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
+        node.literalValue = this
+        return node
+    }
+
     enum class ExpressionType {
         FUNCTION_DEF, FUNC_ARGUMENT_DEF, // expect Arguments and Statements
-        FUNCTION_CALL, CODE_BLOCK, // expect Arguments and Statements
+
+        VARIABLE_DEF, // see OPERATOR_CALL
+
+        FUNCTION_CALL, // expect Arguments and Statements
+        CODE_BLOCK, // special case of function call; expect Arguments and Statements
+        OPERATOR_CALL, // special case of function call; name: operator symbol/converted literal (e.g. #_plusassign)
+        // the case of VARIABLE DEF //
+        // returnType: variable type; name: "="; TODO add description for STRUCT
+        // arg0: name of the variable (String)
+        // arg1: (optional) assigned value, either LITERAL or FUNCTION_CALL or another OPERATOR CALL
+        // arg2: (if STRUCT) struct identifier (String)
+
         STATEMENT, // equations that needs to be eval'd; has returnType of null?; things like "(3 + 4) * 12" are leaves; "(i + 1) % 16" is not (it calls variable 'i', which _is_ a leaf)
+
         LITERAL_LEAF, // literals, also act as a leaf of the tree; has returnType of null
-        VARIABLE_LEAF // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
+        VARIABLE_LEAF, // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
+        GOTO_LABEL_LEAF // self-explanatory
     }
     enum class ReturnType {
         VOID, BOOL, CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, STRUCT,
