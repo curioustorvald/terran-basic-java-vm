@@ -1,6 +1,7 @@
 package net.torvald.tbasic
 
 import net.torvald.tbasic.runtime.compiler.simplec.TBasCC
+import java.util.*
 
 /**
  * Created by minjaesong on 2017-06-04.
@@ -8,12 +9,12 @@ import net.torvald.tbasic.runtime.compiler.simplec.TBasCC
 
 fun main(args: Array<String>) {
     val prg = """
-double globalnum = 42.0;
+double globalnum = 1<<10;
 
 void testfn (int index, boolean isSomething , double someNumber);
 
 int main    () {
-    if (true) {
+    if(true) {
         boolean s = true;
     }
 
@@ -21,22 +22,46 @@ int main    () {
     return 0;
 }
 """
-    /*try {
+    try {
         TBasCC(prg)
     }
     catch (gottaCatchEmAll: Exception) {
 
-    }*/
+    }
 
     //val node = TBasCC.asTreeNode("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
     //println(node)
 
     //val line = """return dup(foo("bar",0x24),null)"""
-    val line = """int foo"""
-    val node2 = TBasCC.asTreeNode(line, line)
-    println(node2)
+    //val line = """int foo"""
+    //val node2 = TBasCC.asTreeNode(line, line)
+    //println(node2)
 
-    //val node3 = TBasCC.asTreeNode("""if(true,false,"quote,wut")""")
-    //print(node3)
+
+
+
+    /*val equations = """int harambe = burr - argone * - argtwo + 42"""
+    val eqNorm = """assignint(harambe,+(-(burr,*(argone,unaryminus(argtwo))),42))"""
+    //println(TBasCC.preprocess(equations))
+    val atre = """int printf(...)"""
+    val node2 = TBasCC.asTreeNode(atre, atre)
+    println(node2)*/
+
+
+
+
+
+
+
+    fun test(line: String) {
+        // sanities further
+        var line = line.replace(Regex("""[\s]*=[\s]*"""), " = ")
+
+        // turn infix notation into prefix
+        val operatorStack = Stack<String>()
+        val operandStack = Stack<Any>()
+
+
+    }
 }
 

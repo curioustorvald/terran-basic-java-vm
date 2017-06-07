@@ -7,16 +7,20 @@ import kotlin.collections.HashSet
 /**
  * A compiler for SimpleC language that compiles into TBASOpcode.
  *
+ * # About SimpleC Language
+ *
  * ## New Features
  *
- * - new data type ```boolean```
- * - infinite loop using ```forever``` block. You can still use ```for (;;)```, ```while (true)``` or ```while (1)```
- * - counted simple loop (without loop counter ref) using ```repeat``` block
+ * - New data type ```boolean```
+ * - Infinite loop using ```forever``` block. You can still use ```for (;;)```, ```while (true)``` or ```while (1)```
+ * - Counted simple loop (without loop counter ref) using ```repeat``` block
  *
  *
  * ## Important Changes from C
  *
  * - All function definition must specify return type, even if the type is ```void```.
+ * - Unary pre- and post- increments/decrements are considered _evil_ and thus prohibited.
+ * - Unsigned types are also considered _evil_ and thus prohibited.
  *
  * Created by minjaesong on 2017-06-04.
  */
@@ -33,10 +37,9 @@ object TBasCC {
     private val nullchar = 0.toChar()
 
     private val infiniteLoops = arrayListOf<Regex>(
-            Regex("""while\(true\)"""),
-            Regex("""while\((0[xX]|0[bB])?[1-9][0-9]*\)|while\((0[xX]|0[bB])?0+[1-9]+\)"""),
-            Regex("""for\(;;\)""")
-    )
+            Regex("""while\(true\)"""), // whitespaces are filtered on preprocess
+            Regex("""for\([\s]*;[\s]*;[\s]*\)""")
+    ) // more types of infinite loops are must be dealt with (e.g. while (0xFFFFFFFF < 0x7FFFFFFF))
 
     private val regexBooleanWhole = Regex("""^(true|false)$""")
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+)$""")
@@ -47,6 +50,27 @@ object TBasCC {
 
     private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
 
+    private val regexWhitespaceNoSP = Regex("""[\t\r\n\v\f]""")
+    private val regexIndents = Regex("""^ +|^\t+|(?<=\n) +|(?<=\n)\t+""")
+
+    private val digraphs = hashMapOf(
+            "<:" to '[',
+            ":>" to ']',
+            "<%" to '{',
+            "%>" to '}',
+            "%:" to '#'
+    )
+    private val trigraphs = hashMapOf(
+            "??=" to "#",
+            "??/" to "'",
+            "??'" to "^",
+            "??(" to "[",
+            "??)" to "]",
+            "??!" to "|",
+            "??<" to "{",
+            "??>" to "}",
+            "??-" to "~"
+    )
     private val keywords = hashSetOf(
             // classic C
             "auto","break","case","char","const","continue","default","do","double","else","enum","extern","float",
@@ -54,7 +78,7 @@ object TBasCC {
             "typedef","union","unsigned","void","volatile","while",
             // SimpleC boolean
             "boolean","true","false",
-            // SimpleC blocks
+            // SimpleC code blocks
             "forever","repeat"
 
             // SimpleC dropped keywords (keywords that won't do anything/behave differently than C95, etc.):
@@ -92,14 +116,23 @@ object TBasCC {
             false
     )
     private val operatorLiterals = hashSetOf( // contains symbols with no order
-            "(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(boolean *)","(void *)",
+            "(char*)","(short*)","(int*)","(long*)","(float*)","(double*)","(boolean*)","(void*)",
             "(char)","(short)","(int)","(long)","(float)","(double)","(boolean)",
             "++","--","[","]",".","->","+","-","!","~","*","&","sizeof","/","%","<<",">>","<","<=",">",">=","==","!=",
             "^","|","&&","||","?",":","=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|=",","
     )
     private val operatorSanitiseList = arrayOf( // order is important!
-            "++","--","[","]","->","<<=",">>=","/","%","<<",">>","<=",">=","==","!=","+=","-=","*=","/=","%=","&=","^=","|=",
-            "^","&&","||","&","|","?",":","=","sizeof","+","-","!","~","*","<",">" // NOTE: '.' and ',' won't get whitespace
+            "<<=",">>=","\\+\\+","--","\\[","\\]","->","/","%","<<",">>","<=",">=","==","!=","\\+=","-=","\\*=","/=","%=","&=","\\^=","\\|=",
+            "\\^","&&","\\|\\|","&","\\|","\\?",":","=","sizeof","\\+","-","!","~","\\*","<",">" // NOTE: '.' and ',' won't get whitespace
+    )
+    private val splittableTokens = arrayOf( // order is important!
+            "<<=",">>=",
+            "++","--","&&","||","<<",">>","->","<=",">=","==","!=","+=","-=","*=","/=","%=","&=","^=","|=",
+            "<",">","^","|","?",":","=",",",".","+","-","!","~","*","&","/","%","(",")",
+            " "
+    )
+    private val evilOperators = hashSetOf(
+            "++","--"
     )
     private val funcAnnotations = hashSetOf(
             "auto", // does nothing; useless even in C (it's derived from B language, actually)
@@ -132,7 +165,19 @@ object TBasCC {
     private val preprocessorKeywords = hashSetOf(
             "#include","#ifndef","#ifdef","#define","#if","#else","#elif","#endif","#undef","#pragma"
     )
-
+    private val escapeSequences = hashMapOf<String, Char>(
+            """\a""" to 0x07.toChar(), // Alert (Beep, Bell)
+            """\b""" to 0x08.toChar(), // Backspace
+            """\f""" to 0x0C.toChar(), // Formfeed
+            """\n""" to 0x0A.toChar(), // Newline (Line Feed)
+            """\r""" to 0x0D.toChar(), // Carriage Return
+            """\t""" to 0x09.toChar(), // Horizontal Tab
+            """\v""" to 0x0B.toChar(), // Vertical Tab
+            """\\""" to 0x5C.toChar(), // Backslash
+            """\'""" to 0x27.toChar(), // Single quotation mark
+            """\"""" to 0x22.toChar(), // Double quotation mark
+            """\?""" to 0x3F.toChar()  // uestion mark (used to avoid trigraphs)
+    )
     private val builtinFunctions = hashSetOf(
             "assignvar", "plusassignvar"
     )
@@ -150,9 +195,17 @@ object TBasCC {
         else -> throw IllegalArgumentException("Unknown primitive type: $type")
     }
 
+    // compiler options
+    private var useDigraph = false
+    private var useTrigraph = false
 
-    operator fun invoke(program: String) {
+    operator fun invoke(program: String, useDigraph: Boolean = false, useTrigraph: Boolean = false) {
+        this.useDigraph = useDigraph
+        this.useTrigraph = useTrigraph
+
+
         val tree = tokenise(preprocess(program))
+        TODO()
     }
 
 
@@ -165,7 +218,18 @@ object TBasCC {
     private val includesUser = HashSet<String>()
     private val includesLib = HashSet<String>()
 
-    private fun preprocess(program: String): String {
+    fun preprocess(program: String): String {
+        var program = program
+                //.replace(regexIndents, "") // must come before regexWhitespaceNoSP
+                //.replace(regexWhitespaceNoSP, "")
+
+        if (useTrigraph) {
+            trigraphs.forEach { from, to ->
+                program = program.replace(from, to)
+            }
+        }
+
+
         program.lines().forEach {
             if (it.startsWith('#')) {
                 val tokens = it.split(genericTokenSeparator)
@@ -181,40 +245,42 @@ object TBasCC {
         }
 
 
-        // ADD whitespaces //
-        // make sure operators HAVE a whitespace around (eventually, just between) them
-        var program = program
-        operatorSanitiseList.forEach {
-            // I know it's stupid but at least I don't have to deal with the complexity
-            val regexHeadTail = """[\s]*"""
-            val regexBody = it.map { """\$it""" }.reduce { acc, s -> acc + s }
-            val regex = Regex("$regexHeadTail$regexBody$regexHeadTail")
 
-            program = program.replace(regex, " $it ")
-        } // NOTE : whitespaces added for [ and ] will be removed again by 'KILL whitespaces' below
-
-
-        // KILL whitespaces //
-        program = program
-                .replace(Regex("""[\s]*//[^\n]*"""), "") // line comment killer
-                .replace(Regex("""[\s]*/\**\*/[\s]*"""), "") // comment blocks killer
-                .replace(Regex("""[\s]*;[\s]*"""), ";") // kill whitespace around ;
-                //.replace(Regex("""[\s]*:[\s]*"""), ":") // kill whitespace around label marker  COMMENTED: ternary op
-                .replace(Regex("""[\s]*\{[\s]*"""), "{") // kill whitespace around {
-                .replace(Regex("""[\s]*\}[\s]*"""), "}") // kill whitespace around }
-                .replace(Regex("""[\s]*\([\s]*"""), "(") // kill whitespace around (
-                .replace(Regex("""[\s]*\)[\s]*"""), ")") // kill whitespace around )
-                .replace(Regex("""[\s]*\[[\s]*"""), "[") // kill whitespace around [
-                .replace(Regex("""[\s]*\][\s]*"""), "]") // kill whitespace around ]
-                .replace(Regex("""[\s]*,[\s]*"""), ",") // kill whitespace around ,
-
-
-
-        infiniteLoops.forEach { // replace classic infinite loops
-            program = program.replace(it, "forever")
-        }
-
-        //println(program)
+        //  // ADD whitespaces //
+        //  // make sure operators HAVE a whitespace around (eventually, just between) them
+        //  var program = program
+        //  operatorSanitiseList.forEach {
+        //      // I know it's stupid but at least I don't have to deal with the complexity
+        //      val regexHeadTail = """[\s]*"""
+        //      val regexBody = it
+        //      val regex = Regex("$regexHeadTail$regexBody$regexHeadTail")
+//
+        //      program = program.replace(regex, " $it ")
+        //  } // NOTE : whitespaces added for [ and ] will be removed again by 'KILL whitespaces' below
+//
+//
+        //  // KILL whitespaces //
+        //  // FIXME TODO strings that matches these conditions are reck'd
+        //  program = program
+        //          .replace(Regex("""[\s]*//[^\n]*"""), "") // line comment killer
+        //          .replace(Regex("""[\s]*/\**\*/[\s]*"""), "") // comment blocks killer
+        //          .replace(Regex("""[\s]*;[\s]*"""), ";") // kill whitespace around ;
+        //          //.replace(Regex("""[\s]*:[\s]*"""), ":") // kill whitespace around label marker  COMMENTED: ternary op
+        //          .replace(Regex("""[\s]*\{[\s]*"""), "{") // kill whitespace around {
+        //          .replace(Regex("""[\s]*\}[\s]*"""), "}") // kill whitespace around }
+        //          .replace(Regex("""[\s]*\([\s]*"""), "(") // kill whitespace around (
+        //          .replace(Regex("""[\s]*\)[\s]*"""), ")") // kill whitespace around )
+        //          .replace(Regex("""[\s]*\[[\s]*"""), "[") // kill whitespace around [
+        //          .replace(Regex("""[\s]*\][\s]*"""), "]") // kill whitespace around ]
+        //          .replace(Regex("""[\s]*,[\s]*"""), ",") // kill whitespace around ,
+//
+//
+//
+        //  infiniteLoops.forEach { // replace classic infinite loops
+        //      program = program.replace(it, "forever")
+        //  }
+//
+        //  //println(program)
 
 
         return program
@@ -222,49 +288,155 @@ object TBasCC {
 
     /** No preprocessor should exist at this stage! */
     private fun tokenise(program: String): SyntaxTreeNode {
-
         ///////////////////////////////////
         // STEP 0. Divide things cleanly //
         ///////////////////////////////////
+        // a.k.a. tokenise properly e.g. {extern int foo ( int initSize , SomeStruct strut , )} or {int foo = getch ( ) * ( ( num1 + num3 % 16 ) - 1 )}
 
         val lineStructures = ArrayList<LineStructure>()
+        var currentProgramLineNumber = 1
+        var currentLine = LineStructure(currentProgramLineNumber, 0, ArrayList<String>())
 
 
+        // put things to lineStructure, kill any whitespace
         val sb = StringBuilder()
         var charCtr = 0
         var structureDepth = 0
-        fun flushToLineStructure() {
+        fun splitAndMoveAlong() {
             if (sb.isNotEmpty()) {
-                lineStructures.add(LineStructure(structureDepth, sb.toString()))
+                currentLine.tokens.add(sb.toString())
                 sb.setLength(0)
             }
         }
+        fun gotoNewline() {
+            if (currentLine.tokens.isNotEmpty()) {
+                lineStructures.add(currentLine)
+                sb.setLength(0)
+                currentLine = LineStructure(currentProgramLineNumber, structureDepth, ArrayList<String>())
+            }
+        }
         var forStatementEngaged = false // to filter FOR range semicolon from statement-end semicolon
+        var isLiteralMode = false // ""  ''
+        var isCharLiteral = false
         while (charCtr < program.length) {
-            val char = program[charCtr]
+            var char = program[charCtr]
+            var lookahead4 = program.substring(charCtr, minOf(charCtr + 4, program.length)) // charOfIndex {0, 1, 2, 3}
+            var lookahead3 = program.substring(charCtr, minOf(charCtr + 3, program.length)) // charOfIndex {0, 1, 2}
+            var lookahead2 = program.substring(charCtr, minOf(charCtr + 2, program.length)) // charOfIndex {0, 1}
+            var lookbehind2 = program.substring(maxOf(charCtr - 1, 0), charCtr + 1) // charOfIndex {-1, 0}
 
 
-            if (char == structOpen) {
-                flushToLineStructure()
-                structureDepth += 1
+            // count up line num
+            if (char == '\n' && !isCharLiteral && !isLiteralMode) {
+                currentProgramLineNumber += 1
+                currentLine.lineNum = currentProgramLineNumber
             }
-            else if (char == structClose) {
-                flushToLineStructure()
-                structureDepth -= 1
+            else if (char == '\n' && isLiteralMode) {
+                throw SyntaxError("at line $currentProgramLineNumber -- line break used inside of string literal")
             }
-            else if (char == ')' && forStatementEngaged) {
-                forStatementEngaged = false
-                TODO()
+            else if (char.toString().matches(regexWhitespaceNoSP)) {
+                // do nothing
             }
-            else if (charCtr < program.length - 3 && program.slice(charCtr..charCtr + 3) == "for(") {
-                forStatementEngaged = true
-                TODO()
+            else if (!isLiteralMode && !isCharLiteral) {
+                // replace digraphs
+                if (useDigraph && digraphs.containsKey(lookahead2)) { // replace digraphs
+                    char = program[charCtr]
+                    lookahead4 = char + lookahead4.substring(0..lookahead4.lastIndex)
+                    lookahead3 = char + lookahead3.substring(0..lookahead3.lastIndex)
+                    lookahead2 = char + lookahead2.substring(0..lookahead2.lastIndex)
+                    lookbehind2 = lookbehind2.substring(0..lookahead2.lastIndex - 1) + char
+                    charCtr++
+                }
+
+
+                // do the real jobs
+                if (char == structOpen) {
+                    splitAndMoveAlong()
+                    gotoNewline()
+                    structureDepth += 1
+                }
+                else if (char == structClose) {
+                    splitAndMoveAlong()
+                    gotoNewline()
+                    structureDepth -= 1
+                }
+                // double quotes
+                else if (char == '"' && lookbehind2[0] != '\\') {
+                    isLiteralMode = !isLiteralMode
+                    sb.append(char)
+                }
+                // char literal
+                else if (!isCharLiteral && char == '\'' && lookbehind2[0] != '\'') {
+                    if ((lookahead4[1] == '\\' && lookahead4[3] != '\'') || (lookahead4[1] != '\\' && lookahead4[2] != '\''))
+                        throw SyntaxError("Illegal usage of char literal")
+                    isCharLiteral = !isCharLiteral
+                }
+                else if (char == ')' && forStatementEngaged) {
+                    forStatementEngaged = false
+                    TODO()
+                }
+                else if (lookahead3 == "for") {
+                    if (forStatementEngaged) throw SyntaxError("keyword 'for' used inside of 'for' statement")
+                    forStatementEngaged = true
+                    TODO()
+                }
+                else if (!forStatementEngaged && char == ';') {
+                    splitAndMoveAlong()
+                    gotoNewline()
+                }
+                else {
+                    if (splittableTokens.contains(lookahead3)) { // three-char operator
+                        splitAndMoveAlong() // split previously accumulated word
+
+                        sb.append(lookahead3)
+                        splitAndMoveAlong()
+                        charCtr += 2
+                    }
+                    else if (splittableTokens.contains(lookahead2)) { // two-char operator
+                        splitAndMoveAlong() // split previously accumulated word
+
+                        if (evilOperators.contains(lookahead2)) {
+                            throw IllegalTokenException("at line $currentProgramLineNumber -- evil operator '$lookahead2'")
+                        }
+                        sb.append(lookahead2)
+                        splitAndMoveAlong()
+                        charCtr += 1
+                    }
+                    else if (splittableTokens.contains(char.toString())) { // operator and ' '
+                        if (char != ' ') {
+                            splitAndMoveAlong() // split previously accumulated word
+
+                            println("splittable token: $char, on line $currentProgramLineNumber")
+                            sb.append(char)
+                            splitAndMoveAlong()
+                        }
+                        else { // space detected, split only
+                            splitAndMoveAlong()
+                        }
+                    }
+                    else {
+                      sb.append(char)
+                    }
+                }
             }
-            else if (!forStatementEngaged && char == ';') {
-                flushToLineStructure()
+            else if (isCharLiteral && !isLiteralMode) {
+                if (char == '\\') { // escape sequence of char literal
+                    sb.append(escapeSequences[lookahead2]!!.toInt())
+                    charCtr++
+                }
+                else {
+                    sb.append(char.toInt())
+                }
+            }
+            else if (isLiteralMode && !isCharLiteral) {
+                if (char == '"' && lookbehind2[0] != '\\') {
+                    isLiteralMode = !isLiteralMode
+                }
+
+                sb.append(char)
             }
             else {
-                sb.append(char)
+                TODO("isLiteral && isCharLiteral")
             }
 
 
@@ -275,23 +447,18 @@ object TBasCC {
 
         // test print
         lineStructures.forEach {
-            repeat(it.depth) {
-                print(">\t")
-            }
-            println(it.line)
+            println("l${it.lineNum} ${">\t".repeat(it.depth)}${it.tokens}")
         }
 
-        //throw Exception()
 
-
-
+        throw Exception()
 
 
         ///////////////////////////
-        // STEP n. Create a tree //
+        // STEP 1. Create a tree //
         ///////////////////////////
 
-        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
+        /*val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
         val middleNodes = Stack<SyntaxTreeNode>()
         var currentDepth = 0
         middleNodes.push(ASTroot)
@@ -302,11 +469,11 @@ object TBasCC {
             currentDepth += 1
         }
 
-        lineStructures.forEach { val (depth, line) = it
+        lineStructures.forEach { val (lineNum, depth, tokens) = it
             if (depth > currentDepth) throw SyntaxError("Unexpected code block")
             if (depth < currentDepth) middleNodes.pop()
 
-            val treeNode = asTreeNode(line, line)
+            val treeNode = asTreeNode(lineNum, tokens)
 
             if (treeNode.expressionType == ExpressionType.FUNCTION_DEF) {
                 getCurrentNode().addStatement(treeNode)
@@ -319,7 +486,7 @@ object TBasCC {
 
 
 
-        throw Exception()
+        throw Exception()*/
     }
 
 
@@ -356,7 +523,7 @@ object TBasCC {
 
 
 
-    fun asTreeNode(parentLine: String, line: String): SyntaxTreeNode {
+    /*fun asTreeNode(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
         fun splitContainsValidVariablePreword(split: List<String>): Int {
             var ret = -1
             for (stage in 0..minOf(3, split.lastIndex)) {
@@ -366,17 +533,16 @@ object TBasCC {
         }
 
 
-        val whereToCutForFuncType = line.indexOf('(')
 
-        // splitted line; will be used by many lines of code
-        val lineSplit = line.split(genericTokenSeparator)
+        // TODO rework this
 
 
         // get return type
-        // search for line "[optional-annotation]  type  name("
-        // function name is always have '(' appended
+        // search for line "[optional-annotation]  type  name  [optional empty list elem]"
         // beware of multiple-spaces-as-separators and tab-separators!
-        val slices_funcType = line.slice(0..whereToCutForFuncType).split(genericTokenSeparator)
+        var slices_funcType = line.substring(0, whereToCutForFuncType).split(genericTokenSeparator)
+        // kill appendix
+        if (slices_funcType.last().isBlank()) slices_funcType = slices_funcType.dropLast(1)
 
 
         // contradiction: auto AND extern
@@ -404,7 +570,7 @@ object TBasCC {
                 val argTokens = argDef.split(genericTokenSeparator) // {"type", ("*",) "name"}
 
                 // function prototype
-                if (argTokens.size == 1 || (argTokens.size == 2 && argTokens[1] == "*")) {
+                if (argTokens.size == 1 && argTokens[0] != "..." || (argTokens.size == 2 && argTokens[1] == "*")) {
                     funcDefNode.addArgument(SyntaxTreeNode(
                             ExpressionType.FUNC_ARGUMENT_DEF,
                             resolveTypeString(argTokens[0], argTokens.size == 2),
@@ -415,7 +581,10 @@ object TBasCC {
                 else {
                     funcDefNode.addArgument(SyntaxTreeNode(
                             ExpressionType.FUNC_ARGUMENT_DEF,
-                            resolveTypeString(argTokens[0], argTokens.size == 3),
+                            if (argTokens[0] == "...")
+                                ReturnType.VARARG
+                            else
+                                resolveTypeString(argTokens[0], argTokens.size == 3),
                             argTokens.last()
                     ))
                 }
@@ -464,21 +633,28 @@ object TBasCC {
 
                     isString = !isString
                 }
-                else if (!isString && parenDepth == 0 && (char == ',' || index == argsLine.lastIndex)) {
-                    // deal with final paren
-                    if (char == ')') { parenDepth -= 1 }
-                    else if (char == '(') { parenDepth += 1 } // just in case...
-
-
-                    if (index == argsLine.lastIndex) { sb.append(char) }
-
+                else if (!isString && parenDepth == 0 && char == ',') {
                     if (sb.isNotEmpty()) {
                         args.add(sb.toString())
                         sb.setLength(0)
                     }
+                    // else, ignore
                 }
                 else {
-                    sb.append(char)
+                    if (isString || (!isString && char != ' ')) {
+                        sb.append(char)
+                    }
+                    // else, ignore
+                }
+
+
+                if (index == argsLine.lastIndex && !isString && sb.isNotEmpty()) {
+                    // deal with final paren
+                    if (char == ')') { parenDepth -= 1 }
+                    else if (char == '(') { parenDepth += 1 } // just in case...
+
+                    args.add(sb.toString())
+                    sb.setLength(0)
                 }
             }
 
@@ -610,77 +786,89 @@ object TBasCC {
                 return leafNode
             }
 
-            /////////////////////////////////////////////////
-            // return something; goto somewhere (keywords) //
-            /////////////////////////////////////////////////
-            else if (lineSplit.size == 2 && functionalKeywordsWithOneArg.contains(lineSplit[0])) {
-                if (lineSplit[0] == "goto") {
-                    val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, "goto")
-                    val gotoLabel = SyntaxTreeNode(ExpressionType.GOTO_LABEL_LEAF, null, null)
-                    gotoLabel.literalValue = lineSplit[1]
+            else {
 
-                    node.addArgument(gotoLabel)
-                    return node
-                }
-                else {
-                    val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, lineSplit[0])
-                    node.addArgument(asTreeNode(parentLine, lineSplit[1]))
-                    return node
-                }
-            }
 
-            //////////////////////////
-            // variable declaration //
-            //////////////////////////
-            // extern auto struct STRUCTID foobarbaz
-            // extern auto int foobarlulz
-            else if (splitContainsValidVariablePreword(lineSplit) != -1) {
-                val prewordIndex = splitContainsValidVariablePreword(lineSplit)
-                val realType = lineSplit[prewordIndex]
 
-                try {
-                    var structID: String? = null
-                    val varname: String
-                    val hasAssignment: Boolean
+                /////////////////////////////////////////////////
+                // return something; goto somewhere (keywords) //
+                /////////////////////////////////////////////////
+                if (lineSplit.size == 2 && functionalKeywordsWithOneArg.contains(lineSplit[0])) {
+                    if (lineSplit[0] == "goto") {
+                        val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, "goto")
+                        val gotoLabel = SyntaxTreeNode(ExpressionType.GOTO_LABEL_LEAF, null, null)
+                        gotoLabel.literalValue = lineSplit[1]
 
-                    if (realType == "struct") {
-                        structID = lineSplit[prewordIndex + 1]
-                        varname = lineSplit[prewordIndex + 2]
-                        hasAssignment = lineSplit.lastIndex > prewordIndex + 2
+                        node.addArgument(gotoLabel)
+                        return node
                     }
                     else {
-                        varname = lineSplit[prewordIndex + 1]
-                        hasAssignment = lineSplit.lastIndex > prewordIndex + 1
+                        val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, lineSplit[0])
+                        node.addArgument(asTreeNode(parentLine, lineSplit[1]))
+                        return node
                     }
+                }
 
-                    // deal with assignment
-                    if (hasAssignment) {
-                        TODO("variable declaration and assign")
-                    }
-                    else {
-                        if (structID != null) {
-                            TODO("Struct variable def")
+                //////////////////////////
+                // variable declaration //
+                //////////////////////////
+                // extern auto struct STRUCTID foobarbaz
+                // extern auto int foobarlulz
+                else if (splitContainsValidVariablePreword(lineSplit) != -1) {
+                    val prewordIndex = splitContainsValidVariablePreword(lineSplit)
+                    val realType = lineSplit[prewordIndex]
+
+                    try {
+                        var structID: String? = null
+                        val varname: String
+                        val hasAssignment: Boolean
+
+                        if (realType == "struct") {
+                            structID = lineSplit[prewordIndex + 1]
+                            varname = lineSplit[prewordIndex + 2]
+                            hasAssignment = lineSplit.lastIndex > prewordIndex + 2
                         }
                         else {
-                            val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), null)
-                            leafNode.addArgument(varname.toRawTreeNode())
-                            return leafNode
+                            varname = lineSplit[prewordIndex + 1]
+                            hasAssignment = lineSplit.lastIndex > prewordIndex + 1
+                        }
+
+                        // deal with assignment
+                        if (hasAssignment) {
+                            TODO("variable declaration and assign")
+                        }
+                        else {
+                            if (structID != null) {
+                                TODO("Struct variable def")
+                            }
+                            else {
+                                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), null)
+                                leafNode.addArgument(varname.toRawTreeNode())
+                                return leafNode
+                            }
                         }
                     }
+                    catch (syntaxFuck: ArrayIndexOutOfBoundsException) {
+                        throw SyntaxError("at line $parentLine -- missing statement(s)")
+                    }
                 }
-                catch (syntaxFuck: ArrayIndexOutOfBoundsException) {
-                    throw SyntaxError("at line $parentLine -- missing statement(s)")
+                else {
+                    // turn infix notation into prefix
+                    val operatorStack = Stack<String>()
+                    val nodeStack = Stack<Any>()
+
+
+                    TODO()
                 }
             }
 
-            TODO()
         }
-    }
+    } */
 
 
 
 
-    private data class LineStructure(val depth: Int, val line: String)
+    private data class LineStructure(var lineNum: Int, val depth: Int, val tokens: MutableList<String>)
 
     class SyntaxTreeNode(
             val expressionType: ExpressionType,
@@ -751,14 +939,14 @@ object TBasCC {
 
         FUNCTION_CALL, // expect Arguments and Statements
         CODE_BLOCK, // special case of function call; expect Arguments and Statements
-        OPERATOR_CALL, // special case of function call; name: operator symbol/converted literal (e.g. #_plusassign)
+        OPERATOR_CALL, // special case of function call; name: operator symbol/converted literal (e.g. ->  #_plusassign  (listed in operatorsHierarchyInternal))
         // the case of VARIABLE DEF //
         // returnType: variable type; name: "="; TODO add description for STRUCT
         // arg0: name of the variable (String)
         // arg1: (optional) assigned value, either LITERAL or FUNCTION_CALL or another OPERATOR CALL
         // arg2: (if STRUCT) struct identifier (String)
 
-        STATEMENT, // equations that needs to be eval'd; has returnType of null?; things like "(3 + 4) * 12" are leaves; "(i + 1) % 16" is not (it calls variable 'i', which _is_ a leaf)
+        //STATEMENT, // equations that needs to be eval'd; has returnType of null?; things like "(3 + 4) * 12" are leaves; "(i + 1) % 16" is not (it calls variable 'i', which _is_ a leaf)
 
         LITERAL_LEAF, // literals, also act as a leaf of the tree; has returnType of null
         VARIABLE_LEAF, // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
@@ -766,7 +954,9 @@ object TBasCC {
     }
     enum class ReturnType {
         VOID, BOOL, CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, STRUCT,
-        VOID_PTR, BOOL_PTR, CHAR_PTR, SHORT_PTR, INT_PTR, LONG_PTR, FLOAT_PTR, DOUBLE_PTR, STRUCT_PTR
+        VOID_PTR, BOOL_PTR, CHAR_PTR, SHORT_PTR, INT_PTR, LONG_PTR, FLOAT_PTR, DOUBLE_PTR, STRUCT_PTR,
+
+        VARARG
     }
 
     abstract class CData(val name: String) {
