@@ -9,9 +9,11 @@ import java.util.*
 
 fun main(args: Array<String>) {
     val prg = """
-double globalnum = 1<<10;
+int globalnum = 1<<10;
+double floatnum = 3.14342f;
+double scientificfloat = 1.e-2;
 
-void testfn (int index, boolean isSomething , double someNumber);
+extern void testfuncdef (int *index, boolean* isSomething , double * someNumber, ...);
 
 int main    () {
     if(true) {

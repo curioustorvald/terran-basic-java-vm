@@ -7,7 +7,15 @@ import kotlin.collections.HashSet
 /**
  * A compiler for SimpleC language that compiles into TBASOpcode.
  *
- * # About SimpleC Language
+ * # Disclaimer
+ *
+ * 0. This compiler, BY NO MEANS, guarantees to implement standard C language; c'mon, $100+ for a standard document?
+ * 1. I suck at code and test. Please report bugs!
+ * 2. Please move along with my terrible sense of humour.
+ *
+ * # About SimpleC
+ *
+ * SimpleC is an simplified version of C. It adapts Java's philosophy that thinks unsigned math is meth (I'm anti-drug btw).
  *
  * ## New Features
  *
@@ -19,8 +27,16 @@ import kotlin.collections.HashSet
  * ## Important Changes from C
  *
  * - All function definition must specify return type, even if the type is ```void```.
+ * - ```float``` is same as ```double```.
  * - Unary pre- and post- increments/decrements are considered _evil_ and thus prohibited.
  * - Unsigned types are also considered _evil_ and thus prohibited.
+ * - Everything except function's local variable is ```extern```, any usage of the keyword will throw error.
+ * - Function cannot have non-local variable defined inside, as ```static``` keyword is illegal.
+ * - And thus, following keywords will throw error:
+ *      - auto, register, volatile (not supported)
+ *      - signed, unsigned (prohibited)
+ *      - static (no global inside function)
+ *      - extern (everything is global)
  *
  * Created by minjaesong on 2017-06-04.
  */
@@ -42,10 +58,10 @@ object TBasCC {
     ) // more types of infinite loops are must be dealt with (e.g. while (0xFFFFFFFF < 0x7FFFFFFF))
 
     private val regexBooleanWhole = Regex("""^(true|false)$""")
-    private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+)$""")
+    private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""")
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""")
-    private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+[Ff]?|[0-9]+[Ff])$""")
+    private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""")
     private val regexIntWhole = Regex("""^([0-9_]+)$""")
 
     private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
@@ -82,7 +98,7 @@ object TBasCC {
             "forever","repeat"
 
             // SimpleC dropped keywords (keywords that won't do anything/behave differently than C95, etc.):
-            //  - auto, register, signed, unsigned, volatile: not implemented; WILL THROW ERROR
+            //  - auto, register, signed, unsigned, volatile, static: not implemented; WILL THROW ERROR
             //  - float: will act same as double
             //  - extern: everthing is global, anyway; WILL THROW ERROR
 
@@ -119,18 +135,15 @@ object TBasCC {
             "(char*)","(short*)","(int*)","(long*)","(float*)","(double*)","(boolean*)","(void*)",
             "(char)","(short)","(int)","(long)","(float)","(double)","(boolean)",
             "++","--","[","]",".","->","+","-","!","~","*","&","sizeof","/","%","<<",">>","<","<=",">",">=","==","!=",
-            "^","|","&&","||","?",":","=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|=",","
-    )
-    private val operatorSanitiseList = arrayOf( // order is important!
-            "<<=",">>=","\\+\\+","--","\\[","\\]","->","/","%","<<",">>","<=",">=","==","!=","\\+=","-=","\\*=","/=","%=","&=","\\^=","\\|=",
-            "\\^","&&","\\|\\|","&","\\|","\\?",":","=","sizeof","\\+","-","!","~","\\*","<",">" // NOTE: '.' and ',' won't get whitespace
+            "^","|","&&","||","?",":","=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|=",",","..."
     )
     private val splittableTokens = arrayOf( // order is important!
-            "<<=",">>=",
+            "<<=",">>=","...",
             "++","--","&&","||","<<",">>","->","<=",">=","==","!=","+=","-=","*=","/=","%=","&=","^=","|=",
             "<",">","^","|","?",":","=",",",".","+","-","!","~","*","&","/","%","(",")",
             " "
     )
+    private val argumentDefBadTokens = splittableTokens.toMutableList().minus(",").minus("*").minus("...").toHashSet()
     private val evilOperators = hashSetOf(
             "++","--"
     )
@@ -288,6 +301,8 @@ object TBasCC {
 
     /** No preprocessor should exist at this stage! */
     private fun tokenise(program: String): SyntaxTreeNode {
+        fun debug1(any: Any) { if (false) println(any) }
+
         ///////////////////////////////////
         // STEP 0. Divide things cleanly //
         ///////////////////////////////////
@@ -403,10 +418,53 @@ object TBasCC {
                         charCtr += 1
                     }
                     else if (splittableTokens.contains(char.toString())) { // operator and ' '
-                        if (char != ' ') {
+                        if (char == '.') { // struct reference or decimal point, depending on the context
+                            // it's decimal if:
+                            // .[number]
+                            // \.e[+-]?[0-9]+   (exponent)
+                            // [number].[ fF]?
+                            // spaces around decimal points are NOT ALLOWED
+                            if (lookahead2.matches(Regex("""\.[0-9]""")) or
+                                    lookahead4.matches(Regex("""\.e[+-]?[0-9]+""")) or
+                                    (lookbehind2.matches(Regex("""[0-9]+\.""")) and lookahead2.matches(Regex("""\.[ Ff,)]""")))
+                            ) {
+                                // get match length
+                                var charHolder: Char
+                                var travelBack = 0
+                                do {
+                                    travelBack += 1
+                                    charHolder = program[charCtr - travelBack]
+                                } while (charHolder in '0'..'9')
+
+                                var travelForth = 0
+                                do {
+                                    travelForth += 1
+                                    charHolder = program[charCtr + travelBack]
+                                } while (charHolder in '0'..'9' || charHolder.toString().matches(Regex("""[-+eEfF]""")))
+
+
+                                val numberWord = program.substring(charCtr - travelBack + 1..charCtr + travelForth - 1)
+
+
+                                debug1("[TBasCC.tokenise] decimal number token: $numberWord, on line $currentProgramLineNumber")
+                                sb.append(numberWord)
+                                splitAndMoveAlong()
+
+
+                                charCtr += travelForth
+                            }
+                            else { // reference call
+                                splitAndMoveAlong() // split previously accumulated word
+
+                                debug1("[TBasCC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
+                                sb.append(char)
+                                splitAndMoveAlong()
+                            }
+                        }
+                        else if (char != ' ') {
                             splitAndMoveAlong() // split previously accumulated word
 
-                            println("splittable token: $char, on line $currentProgramLineNumber")
+                            debug1("[TBasCC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
                             sb.append(char)
                             splitAndMoveAlong()
                         }
@@ -503,7 +561,7 @@ object TBasCC {
     ///////////////////////////////////////////////////
 
     fun resolveTypeString(type: String, isPointer: Boolean = false): ReturnType {
-        val isPointer = type.endsWith('*') or isPointer
+        val isPointer = type.endsWith('*') or type.endsWith("_ptr") or isPointer
 
         return if (structNames.contains(type))
             if (isPointer) ReturnType.STRUCT_PTR else ReturnType.STRUCT
@@ -523,7 +581,7 @@ object TBasCC {
 
 
 
-    /*fun asTreeNode(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
+    fun asTreeNode(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
         fun splitContainsValidVariablePreword(split: List<String>): Int {
             var ret = -1
             for (stage in 0..minOf(3, split.lastIndex)) {
@@ -533,145 +591,103 @@ object TBasCC {
         }
 
 
-
-        // TODO rework this
-
-
-        // get return type
-        // search for line "[optional-annotation]  type  name  [optional empty list elem]"
-        // beware of multiple-spaces-as-separators and tab-separators!
-        var slices_funcType = line.substring(0, whereToCutForFuncType).split(genericTokenSeparator)
-        // kill appendix
-        if (slices_funcType.last().isBlank()) slices_funcType = slices_funcType.dropLast(1)
-
-
         // contradiction: auto AND extern
+
+        val firstLeftParenIndex = tokens.indexOf("(")
+        val lastRightParenIndex = tokens.lastIndexOf(")")
+        val functionCallTokens: List<String>? = if (firstLeftParenIndex == -1) null else tokens.subList(0, firstLeftParenIndex)
+        val functionCallTokensContainsTokens = if (functionCallTokens == null) false else
+            (functionCallTokens.map { if (splittableTokens.contains(it)) 1 else 0 }.sum() > 0)
+        // if TRUE, it's not a function call/def (e.g. foobar = funccall ( arg arg arg )
 
 
         ////////////////////////////
         // as Function Definition //
         ////////////////////////////
-        if (slices_funcType.size >= 2 && line.endsWith(')') && validFuncPreword.contains(slices_funcType[0])) {
-            val actualFuncType = slices_funcType[slices_funcType.lastIndex - 1]
+        if (!functionCallTokensContainsTokens && functionCallTokens != null && functionCallTokens.size >= 2 && functionCallTokens.size <= 4) { // e.g. int main , StructName fooo , extern void doSomething , extern unsigned StructName uwwse
+            val actualFuncType = functionCallTokens[functionCallTokens.lastIndex - 1]
             val returnType = resolveTypeString(actualFuncType)
+            val funcName = functionCallTokens.last()
 
-            val funcName = slices_funcType.last().dropLast(1)
+            // get arguments
+            // int  *  index  ,  boolean  *  *  isSomething  ,  double  someNumber  , ...
+            val argumentsDef = tokens.subList(firstLeftParenIndex + 1, lastRightParenIndex)
+            val argTypeNamePair = ArrayList<Pair<ReturnType, String?>>()
+
+            // chew it down to more understandable format
+            var typeHolder: ReturnType? = null
+            var nameHolder: String? = null
+            argumentsDef.forEach { token ->
+                if (argumentDefBadTokens.contains(token)) {
+                    throw IllegalTokenException("at line $lineNumber -- illegal token '$token' used on function argument definition")
+                }
+
+
+                if (token == ",") {
+                    if (typeHolder == null) throw SyntaxError("at line $lineNumber -- type not specified")
+                    argTypeNamePair.add(Pair(typeHolder!!, nameHolder))
+                    typeHolder = null
+                    nameHolder = null
+                }
+                else if (token == "*") {
+                    if (typeHolder == null) throw SyntaxError("at line $lineNumber -- type not specified")
+                    typeHolder = resolveTypeString(typeHolder.toString().toLowerCase(), true)
+                }
+                else if (typeHolder == null) {
+                    typeHolder = resolveTypeString(token)
+                }
+                else if (typeHolder != null) {
+                    nameHolder = token
+                }
+                else {
+                    throw InternalError("uncaught shit right there")
+                }
+            }
+
 
             val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName)
 
-
-            // get arguments
-            // "int arg1,boolean arg2,double arg3"
-            val argumentsDef = line.slice(whereToCutForFuncType + 1..line.lastIndex - 1).split(',')
-
-            argumentsDef.forEach { argDefRaw ->
-                val argDef = argDefRaw.replace(Regex("""[ \t]*\*[\t]*"""), " * ") // separate pointer marker
-
-                val argTokens = argDef.split(genericTokenSeparator) // {"type", ("*",) "name"}
-
-                // function prototype
-                if (argTokens.size == 1 && argTokens[0] != "..." || (argTokens.size == 2 && argTokens[1] == "*")) {
-                    funcDefNode.addArgument(SyntaxTreeNode(
-                            ExpressionType.FUNC_ARGUMENT_DEF,
-                            resolveTypeString(argTokens[0], argTokens.size == 2),
-                            null
-                    ))
-                }
-                // the "right" way (with double-scan ofc)
-                else {
-                    funcDefNode.addArgument(SyntaxTreeNode(
-                            ExpressionType.FUNC_ARGUMENT_DEF,
-                            if (argTokens[0] == "...")
-                                ReturnType.VARARG
-                            else
-                                resolveTypeString(argTokens[0], argTokens.size == 3),
-                            argTokens.last()
-                    ))
-                }
+            argTypeNamePair.forEach { val (type, name) = it
+                val funcDefArgNode = SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, type, name)
+                funcDefNode.addArgument(funcDefArgNode)
             }
+
 
             return funcDefNode
         }
         //////////////////////
         // as Function Call // (also works as keyworded code block (e.g. if, for, while))
         //////////////////////
-        else if (slices_funcType.size == 1 && line.endsWith(')')) {
-            val funcName = slices_funcType.last().dropLast(1)
-
+        else if (!functionCallTokensContainsTokens && functionCallTokens != null && functionCallTokens.size == 1) { // e.g. main ( , fooo ( , doSomething (
+            val funcName = functionCallTokens.last()
 
             // get arguments
-            val argsLine = line.slice(whereToCutForFuncType + 1..line.lastIndex - 1)
+            // complex_statements , ( value = funccall ( arg ) ) , "string,arg" , 42f
+            val argumentsDef = tokens.subList(firstLeftParenIndex + 1, lastRightParenIndex)
 
-            val args = ArrayList<String>()
-
-            val sb = StringBuilder()
-            var isString = false
-            var parenDepth = 0
-            argsLine.forEachIndexed { index, char ->
-                // error catching
-                if (parenDepth < 0) {
-                    throw SyntaxError("at line $line -- misplaced ')'")
-                }
-                // normal stuffs
-                else if (char == '(') {
-                    parenDepth += 1
-                    sb.append(char)
-                }
-                else if (char == ')') {
-                    parenDepth -= 1
-                    sb.append(char)
-                }
-                // --> quotes
-                else if (parenDepth == 0 && char == '"' &&
-                        (index == 0 || (index > 0 && argsLine[index - 1] != '\\')) // \" is not counted
-                             ) {
-                    // pop strings
-                    if (isString) {
-                        args.add('"' + sb.toString()) // "string_contents (" appended as String marker)
-                        sb.setLength(0)
+            // split into tokens list, splitted by ','
+            val functionCallArguments = ArrayList<ArrayList<String>>()
+            var tokensHolder = ArrayList<String>()
+            argumentsDef.forEach {
+                if (it == ",") {
+                    if (tokensHolder.isEmpty()) {
+                        throw SyntaxError("at line $lineNumber -- misplaced comma")
                     }
-
-                    isString = !isString
-                }
-                else if (!isString && parenDepth == 0 && char == ',') {
-                    if (sb.isNotEmpty()) {
-                        args.add(sb.toString())
-                        sb.setLength(0)
+                    else {
+                        functionCallArguments.add(tokensHolder)
+                        tokensHolder = ArrayList<String>() // can't reuse; must make new one
                     }
-                    // else, ignore
                 }
                 else {
-                    if (isString || (!isString && char != ' ')) {
-                        sb.append(char)
-                    }
-                    // else, ignore
+                    tokensHolder.add(it)
                 }
-
-
-                if (index == argsLine.lastIndex && !isString && sb.isNotEmpty()) {
-                    // deal with final paren
-                    if (char == ')') { parenDepth -= 1 }
-                    else if (char == '(') { parenDepth += 1 } // just in case...
-
-                    args.add(sb.toString())
-                    sb.setLength(0)
-                }
-            }
-
-            if (parenDepth > 0) {
-                throw SyntaxError("at line $line -- unclosed '('")
             }
 
 
             val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName)
 
-            println("!!argsLine: $argsLine")
-            args.forEach { println("!!args: $it") }
-            println("==========================")
-
-            // set all the arguments right
-            args.forEach {
-                val argNodeLeaf = asTreeNode(parentLine, it)
+            functionCallArguments.forEach {
+                val argNodeLeaf = asTreeNode(lineNumber, it)
                 funcCallNode.addArgument(argNodeLeaf)
             }
 
@@ -683,112 +699,113 @@ object TBasCC {
         ////////////////////////
         else {
             // filter illegal lines (absurd keyword usage)
-            if (codeBlockKeywords.contains(line) || funcAnnotations.contains(line)) {
-                throw IllegalTokenException("in line $line -- Unexpected token: $line")
+            tokens.forEach {
+                if (codeBlockKeywords.contains(it) || funcAnnotations.contains(it)) {
+                    throw IllegalTokenException("in line $lineNumber -- Unexpected token: $it")
+                }
             }
 
             ///////////////////////
             // Bunch of literals //
             ///////////////////////
+            if (tokens.size == 1) {
+                val word = tokens[0]
 
-            // filtered String literals
-            if (line.startsWith('"')) {
-                val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
-                leafNode.literalValue = (line.substring(1) + nullchar)
-                return leafNode
-            }
-            // boolean literals
-            else if (line.matches(regexBooleanWhole)) {
-                val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null)
-                leafNode.literalValue = line == "true"
-                return leafNode
-            }
-            // hexadecimal literals
-            else if (line.matches(regexHexWhole)) {
-                val isLong = line.endsWith('L', true)
-                val leafNode = SyntaxTreeNode(
-                        ExpressionType.LITERAL_LEAF,
-                        if (isLong) ReturnType.LONG else ReturnType.INT,
-                        null
-                )
-                leafNode.literalValue = if (isLong)
-                    line.slice(2..line.lastIndex - 1).toLong(16)
-                else
-                    line.slice(2..line.lastIndex).toInt(16)
+                // filtered String literals
+                if (word.startsWith('"') && word.endsWith('"')) {
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
+                    leafNode.literalValue = tokens[0].substring(1, tokens[0].lastIndex - 1) + nullchar
+                    return leafNode
+                }
+                // boolean literals
+                else if (word.matches(regexBooleanWhole)) {
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null)
+                    leafNode.literalValue = word == "true"
+                    return leafNode
+                }
+                // hexadecimal literals
+                else if (word.matches(regexHexWhole)) {
+                    val isLong = word.endsWith('L', true)
+                    val leafNode = SyntaxTreeNode(
+                            ExpressionType.LITERAL_LEAF,
+                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            null
+                    )
+                    leafNode.literalValue = if (isLong)
+                        word.slice(2..word.lastIndex - 1).toLong(16)
+                    else
+                        word.slice(2..word.lastIndex).toInt(16)
 
-                return leafNode
-            }
-            // octal literals
-            else if (line.matches(regexOctWhole)) {
-                val isLong = line.endsWith('L', true)
-                val leafNode = SyntaxTreeNode(
-                        ExpressionType.LITERAL_LEAF,
-                        if (isLong) ReturnType.LONG else ReturnType.INT,
-                        null
-                )
-                leafNode.literalValue = if (isLong)
-                    line.slice(1..line.lastIndex - 1).toLong(8)
-                else
-                    line.slice(1..line.lastIndex).toInt(8)
+                    return leafNode
+                }
+                // octal literals
+                else if (word.matches(regexOctWhole)) {
+                    val isLong = word.endsWith('L', true)
+                    val leafNode = SyntaxTreeNode(
+                            ExpressionType.LITERAL_LEAF,
+                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            null
+                    )
+                    leafNode.literalValue = if (isLong)
+                        word.slice(1..word.lastIndex - 1).toLong(8)
+                    else
+                        word.slice(1..word.lastIndex).toInt(8)
 
-                return leafNode
-            }
-            // binary literals
-            else if (line.matches(regexBinWhole)) {
-                val isLong = line.endsWith('L', true)
-                val leafNode = SyntaxTreeNode(
-                        ExpressionType.LITERAL_LEAF,
-                        if (isLong) ReturnType.LONG else ReturnType.INT,
-                        null
-                )
-                leafNode.literalValue = if (isLong)
-                    line.slice(2..line.lastIndex - 1).toLong(2)
-                else
-                    line.slice(2..line.lastIndex).toInt(2)
+                    return leafNode
+                }
+                // binary literals
+                else if (word.matches(regexBinWhole)) {
+                    val isLong = word.endsWith('L', true)
+                    val leafNode = SyntaxTreeNode(
+                            ExpressionType.LITERAL_LEAF,
+                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            null
+                    )
+                    leafNode.literalValue = if (isLong)
+                        word.slice(2..word.lastIndex - 1).toLong(2)
+                    else
+                        word.slice(2..word.lastIndex).toInt(2)
 
-                return leafNode
-            }
-            // floating point literals
-            else if (line.matches(regexFPWhole)) {
-                val leafNode = SyntaxTreeNode(
-                        ExpressionType.LITERAL_LEAF,
-                        if (line.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
-                        null
-                )
-                leafNode.literalValue = if (line.endsWith('F', true))
-                    line.slice(0..line.lastIndex - 1).toFloat()
-                else
-                    line.toDouble()
+                    return leafNode
+                }
+                // floating point literals
+                else if (word.matches(regexFPWhole)) {
+                    val leafNode = SyntaxTreeNode(
+                            ExpressionType.LITERAL_LEAF,
+                            if (word.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
+                            null
+                    )
+                    leafNode.literalValue = if (word.endsWith('F', true))
+                        word.slice(0..word.lastIndex - 1).toFloat()
+                    else
+                        word.toDouble()
 
-                return leafNode
-            }
-            // int literals
-            else if (line.matches(regexIntWhole)) {
-                val isLong = line.endsWith('L', true)
-                val leafNode = SyntaxTreeNode(
-                        ExpressionType.LITERAL_LEAF,
-                        if (isLong) ReturnType.LONG else ReturnType.INT,
-                        null
-                )
-                leafNode.literalValue = if (isLong)
-                    line.slice(0..line.lastIndex - 1).toLong()
-                else
-                    line.toInt()
+                    return leafNode
+                }
+                // int literals
+                else if (word.matches(regexIntWhole)) {
+                    val isLong = word.endsWith('L', true)
+                    val leafNode = SyntaxTreeNode(
+                            ExpressionType.LITERAL_LEAF,
+                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            null
+                    )
+                    leafNode.literalValue = if (isLong)
+                        word.slice(0..word.lastIndex - 1).toLong()
+                    else
+                        word.toInt()
 
-                return leafNode
+                    return leafNode
+                }
+                //////////////////////////////////////
+                // variable literal (VARIABLE_LEAF) // usually function call arguments
+                //////////////////////////////////////
+                else if (word.matches(regexVarNameWhole)) {
+                    val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, word)
+                    return leafNode
+                }
             }
-
-            //////////////////////////////////////
-            // variable literal (VARIABLE_LEAF) // usually function call arguments
-            //////////////////////////////////////
-            else if (line.matches(regexVarNameWhole)) {
-                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, line)
-                return leafNode
-            }
-
             else {
-
-
 
                 /////////////////////////////////////////////////
                 // return something; goto somewhere (keywords) //
@@ -804,7 +821,7 @@ object TBasCC {
                     }
                     else {
                         val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, lineSplit[0])
-                        node.addArgument(asTreeNode(parentLine, lineSplit[1]))
+                        node.addArgument(asTreeNode(lineNumber, lineSplit[1]))
                         return node
                     }
                 }
@@ -849,7 +866,7 @@ object TBasCC {
                         }
                     }
                     catch (syntaxFuck: ArrayIndexOutOfBoundsException) {
-                        throw SyntaxError("at line $parentLine -- missing statement(s)")
+                        throw SyntaxError("at line $lineNumber -- missing statement(s)")
                     }
                 }
                 else {
@@ -860,10 +877,11 @@ object TBasCC {
 
                     TODO()
                 }
-            }
+            } // end if (tokens.size == 1)
 
+            TODO()
         }
-    } */
+    }
 
 
 
