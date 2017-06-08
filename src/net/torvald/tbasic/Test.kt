@@ -24,12 +24,12 @@ int main    () {
     return 0;
 }
 """
-    try {
+    /*try {
         TBasCC(prg)
     }
     catch (gottaCatchEmAll: Exception) {
 
-    }
+    }*/
 
     //val node = TBasCC.asTreeNode("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
     //println(node)
@@ -51,6 +51,17 @@ int main    () {
 
 
 
+
+    val line = """println(300_000);
+extern structfoo foobarfuncname();
+extern auto int k = getch() & 0b0100_0000;"""
+    val lineStructures = TBasCC.tokenise(line)
+    println("arts")
+    lineStructures.forEach {
+        println("tokens: ${it.tokens}")
+        val node = TBasCC.asTreeNode(it.lineNum, it.tokens)
+        println(node)
+    }
 
 
 

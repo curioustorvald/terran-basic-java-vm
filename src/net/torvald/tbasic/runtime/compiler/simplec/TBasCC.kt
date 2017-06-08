@@ -15,12 +15,12 @@ import kotlin.collections.HashSet
  *
  * # About SimpleC
  *
- * SimpleC is an simplified version of C. It adapts Java's philosophy that thinks unsigned math is meth (I'm anti-drug btw).
+ * SimpleC is an simplified version of C. It adapts Java's philosophy that thinks unsigned math is crystal meth.
  *
  * ## New Features
  *
- * - New data type ```boolean```
- * - Infinite loop using ```forever``` block. You can still use ```for (;;)```, ```while (true)``` or ```while (1)```
+ * - New data type ```bool```
+ * - Infinite loop using ```forever``` block. You can still use ```for (;;)```, ```while (true)```
  * - Counted simple loop (without loop counter ref) using ```repeat``` block
  *
  *
@@ -37,6 +37,8 @@ import kotlin.collections.HashSet
  *      - signed, unsigned (prohibited)
  *      - static (no global inside function)
  *      - extern (everything is global)
+ * - Assignment does not return shit.
+ *
  *
  * Created by minjaesong on 2017-06-04.
  */
@@ -62,7 +64,7 @@ object TBasCC {
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""")
     private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""")
-    private val regexIntWhole = Regex("""^([0-9_]+)$""")
+    private val regexIntWhole = Regex("""^([0-9_]+[Ll]?)$""")
 
     private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
 
@@ -92,8 +94,8 @@ object TBasCC {
             "auto","break","case","char","const","continue","default","do","double","else","enum","extern","float",
             "for","goto","if","int","long","register","return","short","signed","static","struct","switch",//"sizeof" // is an operator
             "typedef","union","unsigned","void","volatile","while",
-            // SimpleC boolean
-            "boolean","true","false",
+            // SimpleC bool
+            "bool","true","false",
             // SimpleC code blocks
             "forever","repeat"
 
@@ -103,12 +105,12 @@ object TBasCC {
             //  - extern: everthing is global, anyway; WILL THROW ERROR
 
             // SimpleC exclusive keywords:
-            //  - boolean, true, false: boolean algebra
+            //  - bool, true, false: bool algebra
     )
     private val operatorsHierarchyInternal = arrayOf( // opirator precedence in internal format (#_nameinlowercase)
             // most important
             hashSetOf("#_postinc","#_postdec","[", "]",".","->"),
-            hashSetOf("#_preinc","#_postinc","#_unaryplus","#_unaryminus","!", "~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(boolean *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(boolean)"),
+            hashSetOf("#_preinc","#_postinc","#_unaryplus","#_unaryminus","!", "~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
             hashSetOf("*","/","%"),
             hashSetOf("+","-"),
             hashSetOf("<<",">>"),
@@ -132,8 +134,8 @@ object TBasCC {
             false
     )
     private val operatorLiterals = hashSetOf( // contains symbols with no order
-            "(char*)","(short*)","(int*)","(long*)","(float*)","(double*)","(boolean*)","(void*)",
-            "(char)","(short)","(int)","(long)","(float)","(double)","(boolean)",
+            "(char*)","(short*)","(int*)","(long*)","(float*)","(double*)","(bool*)","(void*)",
+            "(char)","(short)","(int)","(long)","(float)","(double)","(bool)",
             "++","--","[","]",".","->","+","-","!","~","*","&","sizeof","/","%","<<",">>","<","<=",">",">=","==","!=",
             "^","|","&&","||","?",":","=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|=",",","..."
     )
@@ -152,7 +154,7 @@ object TBasCC {
             "extern" // not used in SimpleC
     )
     private val funcTypes = hashSetOf(
-            "char", "short", "int", "long", "float", "double", "boolean", "void"
+            "char", "short", "int", "long", "float", "double", "bool", "void"
     )
     private val varAnnotations = hashSetOf(
             "auto", // does nothing; useless even in C (it's derived from B language, actually)
@@ -161,7 +163,7 @@ object TBasCC {
             "register" // not used in SimpleC
     )
     private val varTypes = hashSetOf(
-            "struct", "char", "short", "int", "long", "float", "double", "boolean"
+            "struct", "char", "short", "int", "long", "float", "double", "bool"
     )
     private val validFuncPreword = (funcAnnotations + funcTypes).toHashSet()
     private val validVariablePreword = (varAnnotations + varTypes).toHashSet()
@@ -203,7 +205,7 @@ object TBasCC {
         "long" -> 8
         "float" -> 8 // in SimpleC, float is same as double
         "double" -> 8
-        "boolean" -> 1
+        "bool" -> 1
         "void" -> 1 // GCC feature
         else -> throw IllegalArgumentException("Unknown primitive type: $type")
     }
@@ -300,7 +302,7 @@ object TBasCC {
     }
 
     /** No preprocessor should exist at this stage! */
-    private fun tokenise(program: String): SyntaxTreeNode {
+    fun tokenise(program: String): ArrayList<LineStructure> {
         fun debug1(any: Any) { if (false) println(any) }
 
         ///////////////////////////////////
@@ -430,28 +432,24 @@ object TBasCC {
                             ) {
                                 // get match length
                                 var charHolder: Char
-                                var travelBack = 0
-                                do {
-                                    travelBack += 1
-                                    charHolder = program[charCtr - travelBack]
-                                } while (charHolder in '0'..'9')
+                                // we don't need travel back because 'else' clause on the far bottom have been already putting numbers into the stringBuilder
 
                                 var travelForth = 0
                                 do {
                                     travelForth += 1
-                                    charHolder = program[charCtr + travelBack]
+                                    charHolder = program[charCtr + travelForth]
                                 } while (charHolder in '0'..'9' || charHolder.toString().matches(Regex("""[-+eEfF]""")))
 
 
-                                val numberWord = program.substring(charCtr - travelBack + 1..charCtr + travelForth - 1)
+                                val numberWord = program.substring(charCtr..charCtr + travelForth - 1)
 
 
-                                debug1("[TBasCC.tokenise] decimal number token: $numberWord, on line $currentProgramLineNumber")
+                                debug1("[TBasCC.tokenise] decimal number token: $sb$numberWord, on line $currentProgramLineNumber")
                                 sb.append(numberWord)
                                 splitAndMoveAlong()
 
 
-                                charCtr += travelForth
+                                charCtr += travelForth - 1
                             }
                             else { // reference call
                                 splitAndMoveAlong() // split previously accumulated word
@@ -502,21 +500,16 @@ object TBasCC {
         }
 
 
-
-        // test print
-        lineStructures.forEach {
-            println("l${it.lineNum} ${">\t".repeat(it.depth)}${it.tokens}")
-        }
+        return lineStructures
+    }
 
 
-        throw Exception()
-
-
+    fun buildTree(lineStructures: List<LineStructure>): SyntaxTreeNode {
         ///////////////////////////
         // STEP 1. Create a tree //
         ///////////////////////////
 
-        /*val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
+        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
         val middleNodes = Stack<SyntaxTreeNode>()
         var currentDepth = 0
         middleNodes.push(ASTroot)
@@ -543,8 +536,7 @@ object TBasCC {
         }
 
 
-
-        throw Exception()*/
+        throw Exception()
     }
 
 
@@ -563,20 +555,17 @@ object TBasCC {
     fun resolveTypeString(type: String, isPointer: Boolean = false): ReturnType {
         val isPointer = type.endsWith('*') or type.endsWith("_ptr") or isPointer
 
-        return if (structNames.contains(type))
-            if (isPointer) ReturnType.STRUCT_PTR else ReturnType.STRUCT
-        else
-            when (type) {
-                "void"    -> if (isPointer) ReturnType.VOID_PTR else ReturnType.VOID
-                "char"    -> if (isPointer) ReturnType.CHAR_PTR else ReturnType.CHAR
-                "short"   -> if (isPointer) ReturnType.SHORT_PTR else ReturnType.SHORT
-                "int"     -> if (isPointer) ReturnType.INT_PTR else ReturnType.INT
-                "long"    -> if (isPointer) ReturnType.LONG_PTR else ReturnType.LONG
-                "float"   -> if (isPointer) ReturnType.FLOAT_PTR else ReturnType.FLOAT
-                "double"  -> if (isPointer) ReturnType.DOUBLE_PTR else ReturnType.DOUBLE
-                "boolean" -> if (isPointer) ReturnType.BOOL_PTR else ReturnType.BOOL
-                else -> throw IllegalTokenException("Unknown return type: $type")
-            }
+        return when (type) {
+            "void" -> if (isPointer) ReturnType.VOID_PTR else ReturnType.VOID
+            "char" -> if (isPointer) ReturnType.CHAR_PTR else ReturnType.CHAR
+            "short" -> if (isPointer) ReturnType.SHORT_PTR else ReturnType.SHORT
+            "int" -> if (isPointer) ReturnType.INT_PTR else ReturnType.INT
+            "long" -> if (isPointer) ReturnType.LONG_PTR else ReturnType.LONG
+            "float" -> if (isPointer) ReturnType.FLOAT_PTR else ReturnType.FLOAT
+            "double" -> if (isPointer) ReturnType.DOUBLE_PTR else ReturnType.DOUBLE
+            "bool" -> if (isPointer) ReturnType.BOOL_PTR else ReturnType.BOOL
+            else -> if (isPointer) ReturnType.STRUCT_PTR else ReturnType.STRUCT
+        }
     }
 
 
@@ -589,6 +578,9 @@ object TBasCC {
             }
             return ret
         }
+        fun debug1(any: Any?) { if (true) println(any) }
+
+
 
 
         // contradiction: auto AND extern
@@ -610,9 +602,14 @@ object TBasCC {
             val funcName = functionCallTokens.last()
 
             // get arguments
-            // int  *  index  ,  boolean  *  *  isSomething  ,  double  someNumber  , ...
+            // int  *  index  ,  bool  *  *  isSomething  ,  double  someNumber  , ...
             val argumentsDef = tokens.subList(firstLeftParenIndex + 1, lastRightParenIndex)
             val argTypeNamePair = ArrayList<Pair<ReturnType, String?>>()
+
+
+            debug1("!! func def args")
+            debug1("!! <- $argumentsDef")
+
 
             // chew it down to more understandable format
             var typeHolder: ReturnType? = null
@@ -645,6 +642,10 @@ object TBasCC {
             }
 
 
+            debug1("!! -> $argTypeNamePair")
+            debug1("================================")
+
+
             val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName)
 
             argTypeNamePair.forEach { val (type, name) = it
@@ -665,11 +666,21 @@ object TBasCC {
             // complex_statements , ( value = funccall ( arg ) ) , "string,arg" , 42f
             val argumentsDef = tokens.subList(firstLeftParenIndex + 1, lastRightParenIndex)
 
+
+            debug1("!! func call args")
+            debug1("!! <- $argumentsDef")
+
+
             // split into tokens list, splitted by ','
-            val functionCallArguments = ArrayList<ArrayList<String>>()
+            val functionCallArguments = ArrayList<ArrayList<String>>() // double array is intended (e.g. [["tsrasrat"], ["42"], [callff, (, "wut", )]] for input ("tsrasrat", "42", callff("wut"))
             var tokensHolder = ArrayList<String>()
-            argumentsDef.forEach {
-                if (it == ",") {
+            argumentsDef.forEachIndexed { index, token ->
+                if (index == argumentsDef.lastIndex) {
+                    tokensHolder.add(token)
+                    functionCallArguments.add(tokensHolder)
+                    tokensHolder = ArrayList<String>() // can't reuse; must make new one
+                }
+                else if (token == ",") {
                     if (tokensHolder.isEmpty()) {
                         throw SyntaxError("at line $lineNumber -- misplaced comma")
                     }
@@ -679,9 +690,13 @@ object TBasCC {
                     }
                 }
                 else {
-                    tokensHolder.add(it)
+                    tokensHolder.add(token)
                 }
             }
+
+
+            debug1("!! -> $functionCallArguments")
+            debug1("================================")
 
 
             val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName)
@@ -700,7 +715,7 @@ object TBasCC {
         else {
             // filter illegal lines (absurd keyword usage)
             tokens.forEach {
-                if (codeBlockKeywords.contains(it) || funcAnnotations.contains(it)) {
+                if (codeBlockKeywords.contains(it)) {
                     throw IllegalTokenException("in line $lineNumber -- Unexpected token: $it")
                 }
             }
@@ -711,13 +726,18 @@ object TBasCC {
             if (tokens.size == 1) {
                 val word = tokens[0]
 
+
+                debug1("!! literal, token: [$word]")
+                //debug1("================================")
+
+
                 // filtered String literals
                 if (word.startsWith('"') && word.endsWith('"')) {
                     val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
-                    leafNode.literalValue = tokens[0].substring(1, tokens[0].lastIndex - 1) + nullchar
+                    leafNode.literalValue = tokens[0].substring(1, tokens[0].lastIndex) + nullchar
                     return leafNode
                 }
-                // boolean literals
+                // bool literals
                 else if (word.matches(regexBooleanWhole)) {
                     val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null)
                     leafNode.literalValue = word == "true"
@@ -731,10 +751,15 @@ object TBasCC {
                             if (isLong) ReturnType.LONG else ReturnType.INT,
                             null
                     )
-                    leafNode.literalValue = if (isLong)
-                        word.slice(2..word.lastIndex - 1).toLong(16)
-                    else
-                        word.slice(2..word.lastIndex).toInt(16)
+                    try {
+                        leafNode.literalValue = if (isLong)
+                            word.replace(Regex("""[^0-9A-Fa-f]"""), "").toLong(16)
+                        else
+                            word.replace(Regex("""[^0-9A-Fa-f]"""), "").toInt(16)
+                    }
+                    catch (e: NumberFormatException) {
+                        throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
+                    }
 
                     return leafNode
                 }
@@ -746,10 +771,15 @@ object TBasCC {
                             if (isLong) ReturnType.LONG else ReturnType.INT,
                             null
                     )
-                    leafNode.literalValue = if (isLong)
-                        word.slice(1..word.lastIndex - 1).toLong(8)
-                    else
-                        word.slice(1..word.lastIndex).toInt(8)
+                    try {
+                        leafNode.literalValue = if (isLong)
+                            word.replace(Regex("""[^0-7]"""), "").toLong(8)
+                        else
+                            word.replace(Regex("""[^0-7]"""), "").toInt(8)
+                    }
+                    catch (e: NumberFormatException) {
+                        throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
+                    }
 
                     return leafNode
                 }
@@ -761,24 +791,15 @@ object TBasCC {
                             if (isLong) ReturnType.LONG else ReturnType.INT,
                             null
                     )
-                    leafNode.literalValue = if (isLong)
-                        word.slice(2..word.lastIndex - 1).toLong(2)
-                    else
-                        word.slice(2..word.lastIndex).toInt(2)
-
-                    return leafNode
-                }
-                // floating point literals
-                else if (word.matches(regexFPWhole)) {
-                    val leafNode = SyntaxTreeNode(
-                            ExpressionType.LITERAL_LEAF,
-                            if (word.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
-                            null
-                    )
-                    leafNode.literalValue = if (word.endsWith('F', true))
-                        word.slice(0..word.lastIndex - 1).toFloat()
-                    else
-                        word.toDouble()
+                    try {
+                        leafNode.literalValue = if (isLong)
+                            word.replace(Regex("""[^01]"""), "").toLong(2)
+                        else
+                            word.replace(Regex("""[^01]"""), "").toInt(2)
+                    }
+                    catch (e: NumberFormatException) {
+                        throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
+                    }
 
                     return leafNode
                 }
@@ -790,10 +811,34 @@ object TBasCC {
                             if (isLong) ReturnType.LONG else ReturnType.INT,
                             null
                     )
-                    leafNode.literalValue = if (isLong)
-                        word.slice(0..word.lastIndex - 1).toLong()
-                    else
-                        word.toInt()
+                    try {
+                        leafNode.literalValue = if (isLong)
+                            word.replace(Regex("""[^0-9]"""), "").toLong()
+                        else
+                            word.replace(Regex("""[^0-9]"""), "").toInt()
+                    }
+                    catch (e: NumberFormatException) {
+                        throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
+                    }
+
+                    return leafNode
+                }
+                // floating point literals
+                else if (word.matches(regexFPWhole)) {
+                    val leafNode = SyntaxTreeNode(
+                            ExpressionType.LITERAL_LEAF,
+                            ReturnType.DOUBLE, // DOUBLE used for SimpleC  //if (word.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
+                            null
+                    )
+                    try {
+                        leafNode.literalValue = if (word.endsWith('F', true))
+                            word.slice(0..word.lastIndex - 1).toDouble() // DOUBLE when SimpleC; replace it with 'toFloat()' if you're standard C
+                        else
+                            word.toDouble()
+                    }
+                    catch (e: NumberFormatException) {
+                        throw InternalError("at line $lineNumber, while parsing the word [$word] as Double")
+                    }
 
                     return leafNode
                 }
@@ -810,30 +855,26 @@ object TBasCC {
                 /////////////////////////////////////////////////
                 // return something; goto somewhere (keywords) //
                 /////////////////////////////////////////////////
-                if (lineSplit.size == 2 && functionalKeywordsWithOneArg.contains(lineSplit[0])) {
-                    if (lineSplit[0] == "goto") {
-                        val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, "goto")
-                        val gotoLabel = SyntaxTreeNode(ExpressionType.GOTO_LABEL_LEAF, null, null)
-                        gotoLabel.literalValue = lineSplit[1]
-
-                        node.addArgument(gotoLabel)
-                        return node
-                    }
-                    else {
-                        val node = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, lineSplit[0])
-                        node.addArgument(asTreeNode(lineNumber, lineSplit[1]))
-                        return node
-                    }
+                if (tokens[0] == "goto") {
+                    val gotoNode = SyntaxTreeNode(
+                            ExpressionType.FUNCTION_CALL,
+                            null,
+                            "goto"
+                    )
+                    gotoNode.addArgument(tokens[1].toRawTreeNode())
                 }
+                //else if (tokens[0] == "return") {
+
+                //}
 
                 //////////////////////////
                 // variable declaration //
                 //////////////////////////
                 // extern auto struct STRUCTID foobarbaz
                 // extern auto int foobarlulz
-                else if (splitContainsValidVariablePreword(lineSplit) != -1) {
-                    val prewordIndex = splitContainsValidVariablePreword(lineSplit)
-                    val realType = lineSplit[prewordIndex]
+                else if (splitContainsValidVariablePreword(tokens) != -1) {
+                    val prewordIndex = splitContainsValidVariablePreword(tokens)
+                    val realType = tokens[prewordIndex]
 
                     try {
                         var structID: String? = null
@@ -841,13 +882,13 @@ object TBasCC {
                         val hasAssignment: Boolean
 
                         if (realType == "struct") {
-                            structID = lineSplit[prewordIndex + 1]
-                            varname = lineSplit[prewordIndex + 2]
-                            hasAssignment = lineSplit.lastIndex > prewordIndex + 2
+                            structID = tokens[prewordIndex + 1]
+                            varname = tokens[prewordIndex + 2]
+                            hasAssignment = tokens.lastIndex > prewordIndex + 2
                         }
                         else {
-                            varname = lineSplit[prewordIndex + 1]
-                            hasAssignment = lineSplit.lastIndex > prewordIndex + 1
+                            varname = tokens[prewordIndex + 1]
+                            hasAssignment = tokens.lastIndex > prewordIndex + 1
                         }
 
                         // deal with assignment
@@ -859,8 +900,8 @@ object TBasCC {
                                 TODO("Struct variable def")
                             }
                             else {
-                                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), null)
-                                leafNode.addArgument(varname.toRawTreeNode())
+                                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), varname)
+                                //leafNode.addArgument(varname.toRawTreeNode())
                                 return leafNode
                             }
                         }
@@ -877,6 +918,7 @@ object TBasCC {
 
                     TODO()
                 }
+                TODO()
             } // end if (tokens.size == 1)
 
             TODO()
@@ -885,8 +927,7 @@ object TBasCC {
 
 
 
-
-    private data class LineStructure(var lineNum: Int, val depth: Int, val tokens: MutableList<String>)
+    data class LineStructure(var lineNum: Int, val depth: Int, val tokens: MutableList<String>)
 
     class SyntaxTreeNode(
             val expressionType: ExpressionType,
@@ -1025,9 +1066,10 @@ object TBasCC {
     }
 
 
-    open class SyntaxError(msg: String? = null) : Exception(msg)
-    class IllegalTokenException(msg: String? = null) : SyntaxError(msg)
-    class UnresolvedReference(msg: String? = null) : SyntaxError(msg)
-    class UndefinedStatement(msg: String? = null) : SyntaxError(msg)
-    class PreprocessorErrorMessage(msg: String) : SyntaxError(msg)
 }
+
+open class SyntaxError(msg: String? = null) : Exception(msg)
+class IllegalTokenException(msg: String? = null) : SyntaxError(msg)
+class UnresolvedReference(msg: String? = null) : SyntaxError(msg)
+class UndefinedStatement(msg: String? = null) : SyntaxError(msg)
+class PreprocessorErrorMessage(msg: String) : SyntaxError(msg)
