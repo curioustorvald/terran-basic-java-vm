@@ -86,14 +86,14 @@ object TBASOpcodeAssembler {
             throw Error("Labeldef conflict for $name -- old: ${labelTable[name]}, new: $pointer")
         }
         else {
-            if (labelTable[name] == null) debug("->> put label [$name] with pc $pointer")
+            if (labelTable[name] == null) debug("->> put label '$name' with pc $pointer")
             labelTable[name] = pointer
         }
     }
 
     private fun getLabel(marked_labelname: String): Int {
         val name = marked_labelname.toLowerCase()
-        return labelTable[name] ?: throw Error("Label [$name] not defined")
+        return labelTable[name] ?: throw Error("Label '$name' not defined")
     }
 
     operator fun invoke(userProgram: String): ByteArray {
@@ -120,7 +120,7 @@ object TBASOpcodeAssembler {
             }
             else if (!line.startsWith(labelMarker)) {
 
-                debug("[TBASASM] line: [$line]")
+                debug("[TBASASM] line: '$line'")
                 //words.forEach { debug("  $it") }
 
 
@@ -190,7 +190,7 @@ object TBASOpcodeAssembler {
                                 }
                             }
                         }
-                        else -> throw IllegalArgumentException("Unsupported data type: [$type] (or you missed a semicolon?)")
+                        else -> throw IllegalArgumentException("Unsupported data type: '$type' (or you missed a semicolon?)")
                     }
 
                 }
@@ -287,7 +287,7 @@ object TBASOpcodeAssembler {
             }
             else if (!line.startsWith(labelMarker)) {
 
-                debug("[TBASASM] line: [$line]")
+                debug("[TBASASM] line: '$line'")
                 words.forEach { debug("  $it") }
 
 
@@ -324,7 +324,7 @@ object TBASOpcodeAssembler {
                             val strEnd = line.length
                             val data = line.substring(strStart, strEnd)
 
-                            debug("--> String payload: [$data]")
+                            debug("--> String payload: '$data'")
 
                             data.toCString().forEach { ret.add(it) }
                             // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
@@ -332,14 +332,14 @@ object TBASOpcodeAssembler {
                         "NUMBER" -> {
                             val number = words[2].toDouble()
 
-                            debug("--> Number payload: [$number]")
+                            debug("--> Number payload: '$number'")
 
                             number.toLittle().forEach { ret.add(it) }
                         }
                         "INT" -> {
                             val int = words[2].toInt()
 
-                            debug("--> Int payload: [$int]")
+                            debug("--> Int payload: '$int'")
 
                             int.toLittle().forEach { ret.add(it) }
                         }
@@ -360,7 +360,7 @@ object TBASOpcodeAssembler {
                                 }
                             }
                         }
-                        else -> throw IllegalArgumentException("Unsupported data type: [$type] (or you missed a semicolon?)")
+                        else -> throw IllegalArgumentException("Unsupported data type: '$type' (or you missed a semicolon?)")
                     }
 
                 }

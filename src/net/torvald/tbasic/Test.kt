@@ -52,9 +52,8 @@ int main    () {
 
 
 
-    val line = """println(300_000);
-extern structfoo foobarfuncname();
-extern auto int k = getch() & 0b0100_0000;"""
+    //val line = """println( (a - b) / c * (d + e - f / g) );"""
+    val line = """println( (a-b) * c );"""
     val lineStructures = TBasCC.tokenise(line)
     println("arts")
     lineStructures.forEach {

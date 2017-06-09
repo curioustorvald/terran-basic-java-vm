@@ -107,10 +107,15 @@ object TBasCC {
             // SimpleC exclusive keywords:
             //  - bool, true, false: bool algebra
     )
-    private val operatorsHierarchyInternal = arrayOf( // opirator precedence in internal format (#_nameinlowercase)
+    private val unsupportedKeywords = hashSetOf(
+            "auto","register","signed","unsigned","volatile","static",
+            "extern"
+    )
+    private val operatorsHierarchyInternal = arrayOf(
+            // opirator precedence in internal format (#_nameinlowercase)  PUT NO PARENS HERE!   [ ] are allowed? pls chk
             // most important
-            hashSetOf("#_postinc","#_postdec","[", "]",".","->"),
-            hashSetOf("#_preinc","#_postinc","#_unaryplus","#_unaryminus","!", "~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
+            hashSetOf("++","--","[", "]",".","->"),
+            hashSetOf("#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
             hashSetOf("*","/","%"),
             hashSetOf("+","-"),
             hashSetOf("<<",">>"),
@@ -125,6 +130,10 @@ object TBasCC {
             hashSetOf("=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|="),
             hashSetOf(",")
             // least important
+    ).reversedArray() // this makes op with highest precedence have bigger number
+    private val unaryOps = hashSetOf(
+            "++","--",
+            "#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"
     )
     private val operatorsHierarchyRTL = arrayOf(
             false,
@@ -133,12 +142,12 @@ object TBasCC {
             true,true,
             false
     )
-    private val operatorLiterals = hashSetOf( // contains symbols with no order
-            "(char*)","(short*)","(int*)","(long*)","(float*)","(double*)","(bool*)","(void*)",
-            "(char)","(short)","(int)","(long)","(float)","(double)","(bool)",
-            "++","--","[","]",".","->","+","-","!","~","*","&","sizeof","/","%","<<",">>","<","<=",">",">=","==","!=",
-            "^","|","&&","||","?",":","=","+=","-=","*=","/=","%=","<<=",">>=","&=","^=","|=",",","..."
-    )
+    private val operatorsNoOrder = HashSet<String>()
+    init {
+        operatorsHierarchyInternal.forEach { array ->
+            array.forEach { word -> operatorsNoOrder.add(word) }
+        }
+    }
     private val splittableTokens = arrayOf( // order is important!
             "<<=",">>=","...",
             "++","--","&&","||","<<",">>","->","<=",">=","==","!=","+=","-=","*=","/=","%=","&=","^=","|=",
@@ -213,10 +222,18 @@ object TBasCC {
     // compiler options
     private var useDigraph = false
     private var useTrigraph = false
+    private var errorIncompatibles = true
 
-    operator fun invoke(program: String, useDigraph: Boolean = false, useTrigraph: Boolean = false) {
+    operator fun invoke(
+            program: String,
+            // options
+            useDigraph: Boolean = false,
+            useTrigraph: Boolean = false,
+            errorIncompatible: Boolean = true
+    ) {
         this.useDigraph = useDigraph
         this.useTrigraph = useTrigraph
+        this.errorIncompatibles = errorIncompatible
 
 
         val tree = tokenise(preprocess(program))
@@ -321,6 +338,10 @@ object TBasCC {
         var structureDepth = 0
         fun splitAndMoveAlong() {
             if (sb.isNotEmpty()) {
+                if (errorIncompatibles && unsupportedKeywords.contains(sb.toString())) {
+                    throw IllegalTokenException("at line $currentProgramLineNumber with token '$sb'")
+                }
+
                 currentLine.tokens.add(sb.toString())
                 sb.setLength(0)
             }
@@ -509,7 +530,7 @@ object TBasCC {
         // STEP 1. Create a tree //
         ///////////////////////////
 
-        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true)
+        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true, lineNumber = 1)
         val middleNodes = Stack<SyntaxTreeNode>()
         var currentDepth = 0
         middleNodes.push(ASTroot)
@@ -593,6 +614,22 @@ object TBasCC {
         // if TRUE, it's not a function call/def (e.g. foobar = funccall ( arg arg arg )
 
 
+        /////////////////////////////
+        // unwrap (((((parens))))) //
+        /////////////////////////////
+        // FIXME ( asrtra ) + ( feinov ) forms are errenously stripped its paren away
+        /*if (tokens.first() == "(" && tokens.last() == ")") {
+            var wrapSize = 1
+            while (tokens[wrapSize] == "(" && tokens[tokens.lastIndex - wrapSize] == ")") {
+                wrapSize++
+            }
+            return asTreeNode(lineNumber, tokens.subList(wrapSize, tokens.lastIndex - wrapSize + 1))
+        }*/
+
+
+        println("!![asTreeNode]!! input token: $tokens")
+
+
         ////////////////////////////
         // as Function Definition //
         ////////////////////////////
@@ -646,10 +683,13 @@ object TBasCC {
             debug1("================================")
 
 
-            val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName)
+            val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName, lineNumber)
+            if (returnType == ReturnType.STRUCT || returnType == ReturnType.STRUCT_PTR) {
+                funcDefNode.structName = actualFuncType
+            }
 
             argTypeNamePair.forEach { val (type, name) = it
-                val funcDefArgNode = SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, type, name)
+                val funcDefArgNode = SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, type, name, lineNumber)
                 funcDefNode.addArgument(funcDefArgNode)
             }
 
@@ -696,15 +736,19 @@ object TBasCC {
 
 
             debug1("!! -> $functionCallArguments")
-            debug1("================================")
 
 
-            val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName)
+            val funcCallNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, funcName, lineNumber)
 
             functionCallArguments.forEach {
+                debug1("!! forEach $it")
+
                 val argNodeLeaf = asTreeNode(lineNumber, it)
                 funcCallNode.addArgument(argNodeLeaf)
             }
+
+
+            debug1("================================")
 
 
             return funcCallNode
@@ -727,19 +771,19 @@ object TBasCC {
                 val word = tokens[0]
 
 
-                debug1("!! literal, token: [$word]")
+                debug1("!! literal, token: '$word'")
                 //debug1("================================")
 
 
                 // filtered String literals
                 if (word.startsWith('"') && word.endsWith('"')) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null, lineNumber)
                     leafNode.literalValue = tokens[0].substring(1, tokens[0].lastIndex) + nullchar
                     return leafNode
                 }
                 // bool literals
                 else if (word.matches(regexBooleanWhole)) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null)
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null, lineNumber)
                     leafNode.literalValue = word == "true"
                     return leafNode
                 }
@@ -749,7 +793,7 @@ object TBasCC {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             if (isLong) ReturnType.LONG else ReturnType.INT,
-                            null
+                            null, lineNumber
                     )
                     try {
                         leafNode.literalValue = if (isLong)
@@ -769,7 +813,7 @@ object TBasCC {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             if (isLong) ReturnType.LONG else ReturnType.INT,
-                            null
+                            null, lineNumber
                     )
                     try {
                         leafNode.literalValue = if (isLong)
@@ -789,7 +833,7 @@ object TBasCC {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             if (isLong) ReturnType.LONG else ReturnType.INT,
-                            null
+                            null, lineNumber
                     )
                     try {
                         leafNode.literalValue = if (isLong)
@@ -809,7 +853,7 @@ object TBasCC {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             if (isLong) ReturnType.LONG else ReturnType.INT,
-                            null
+                            null, lineNumber
                     )
                     try {
                         leafNode.literalValue = if (isLong)
@@ -828,7 +872,7 @@ object TBasCC {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             ReturnType.DOUBLE, // DOUBLE used for SimpleC  //if (word.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
-                            null
+                            null, lineNumber
                     )
                     try {
                         leafNode.literalValue = if (word.endsWith('F', true))
@@ -837,7 +881,7 @@ object TBasCC {
                             word.toDouble()
                     }
                     catch (e: NumberFormatException) {
-                        throw InternalError("at line $lineNumber, while parsing the word [$word] as Double")
+                        throw InternalError("at line $lineNumber, while parsing '$word' as Double")
                     }
 
                     return leafNode
@@ -846,7 +890,7 @@ object TBasCC {
                 // variable literal (VARIABLE_LEAF) // usually function call arguments
                 //////////////////////////////////////
                 else if (word.matches(regexVarNameWhole)) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, word)
+                    val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, word, lineNumber)
                     return leafNode
                 }
             }
@@ -859,9 +903,10 @@ object TBasCC {
                     val gotoNode = SyntaxTreeNode(
                             ExpressionType.FUNCTION_CALL,
                             null,
-                            "goto"
+                            "goto",
+                            lineNumber
                     )
-                    gotoNode.addArgument(tokens[1].toRawTreeNode())
+                    gotoNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
                 }
                 //else if (tokens[0] == "return") {
 
@@ -894,13 +939,15 @@ object TBasCC {
                         // deal with assignment
                         if (hasAssignment) {
                             TODO("variable declaration and assign")
+                            // use turnInfixTokensIntoTree and inject it to assignment node
+                            val infixNode = turnInfixTokensIntoTree(lineNumber, tokens)
                         }
                         else {
                             if (structID != null) {
                                 TODO("Struct variable def")
                             }
                             else {
-                                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), varname)
+                                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), varname, lineNumber)
                                 //leafNode.addArgument(varname.toRawTreeNode())
                                 return leafNode
                             }
@@ -911,18 +958,129 @@ object TBasCC {
                     }
                 }
                 else {
-                    // turn infix notation into prefix
-                    val operatorStack = Stack<String>()
-                    val nodeStack = Stack<Any>()
+                    println("!! infix in: $tokens")
 
-
-                    TODO()
+                    // infix notation
+                    return turnInfixTokensIntoTree(lineNumber, tokens)
                 }
                 TODO()
             } // end if (tokens.size == 1)
 
+
             TODO()
         }
+    }
+
+
+    fun turnInfixTokensIntoTree(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
+        // based on https://stackoverflow.com/questions/1946896/conversion-from-infix-to-prefix
+
+        fun debug(any: Any) { if (true) println(any) }
+        fun precedenceOf(token: String): Int {
+            if (token == "(" || token == ")") return -1
+
+            operatorsHierarchyInternal.forEachIndexed { index, hashSet ->
+                if (hashSet.contains(token)) return index
+            }
+
+            throw SyntaxError("at $lineNumber -- unknown operator '$token'")
+        }
+
+
+        val tokens = tokens.reversed()
+
+
+        val stack = Stack<String>()
+        val treeArgsStack = Stack<Any>()
+
+        fun addToTree(token: String) {
+            debug("!! adding '$token'")
+
+            fun argsCountOf(operator: String) = if (unaryOps.contains(operator)) 1 else 2
+            fun popAsTree(): SyntaxTreeNode {
+                val rawElem = treeArgsStack.pop()
+
+                if (rawElem is String)
+                    return asTreeNode(lineNumber, listOf(rawElem))
+                else if (rawElem is SyntaxTreeNode)
+                    return rawElem
+                else
+                    throw InternalError("I said you to put String or SyntaxTreeNode only; what's this? ${rawElem.javaClass.simpleName}?")
+            }
+
+
+            if (!operatorsNoOrder.contains(token)) {
+                debug("-> not a operator; pushing to args stack")
+                treeArgsStack.push(token)
+            }
+            else {
+                debug("-> taking ${argsCountOf(token)} value(s) from stack")
+
+                val treeNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, token, lineNumber)
+                repeat(argsCountOf(token)) {
+                    treeNode.addArgument(popAsTree())
+                }
+                treeArgsStack.push(treeNode)
+            }
+        }
+
+
+        debug("reversed tokens: $tokens")
+
+
+        tokens.forEachIndexed { index, rawToken ->
+            // contextually decide what is real token
+            val token =
+                    // if prev token is operator (used '+' as token list is reversed)
+                    if (index == tokens.lastIndex || operatorsNoOrder.contains(tokens[index + 1])) {
+                        if (rawToken == "+") "#_unaryplus"
+                        else if (rawToken == "-") "#_unaryminus"
+                        else if (rawToken == "&") "#_addressof"
+                        else if (rawToken == "*") "#_pointer"
+                        else if (rawToken == "++") "#_preinc"
+                        else if (rawToken == "--") "#_predec"
+                        else rawToken
+                    }
+                    else rawToken
+
+
+            if (token == ")") {
+                stack.push(token)
+            }
+            else if (token == "(") {
+                while (stack.isNotEmpty()) {
+                    val t = stack.pop()
+                    if (t == ")") break
+
+                    addToTree(t)
+                }
+            }
+            else if (!operatorsNoOrder.contains(token)) {
+                addToTree(token)
+            }
+            else {
+                // XXX: associativity should be considered here
+                // https://en.wikipedia.org/wiki/Operator_associativity
+                while (stack.isNotEmpty() && precedenceOf(stack.peek()) > precedenceOf(token)) {
+                    addToTree(stack.pop())
+                }
+                stack.add(token)
+            }
+        }
+
+        while (stack.isNotEmpty()) {
+            addToTree(stack.pop())
+        }
+
+
+        //println(reversedOut.reversed())
+        if (treeArgsStack.size != 1) {
+            throw InternalError("Stack size is wrong -- supposed to be 1, but it's ${treeArgsStack.size}")
+        }
+        println("finalised tree:\n${treeArgsStack.peek()}")
+
+
+        throw Exception()
     }
 
 
@@ -932,11 +1090,13 @@ object TBasCC {
     class SyntaxTreeNode(
             val expressionType: ExpressionType,
             val returnType: ReturnType?, // STATEMENT, LITERAL_LEAF: valid ReturnType; VAREABLE_LEAF: always null
-            val name: String?,
+            var name: String?,
+            val lineNumber: Int, // used to generate error message
             val isRoot: Boolean = false
     ) {
 
-        var literalValue: Any? = null // for LITERALs only | if returnType is Struct, it should hold the struct
+        var literalValue: Any? = null // for LITERALs only
+        var structName: String? = null // for STRUCT return type
 
         val arguments = ArrayList<SyntaxTreeNode>() // for FUNCTION, CODE_BLOCK
         val statements = ArrayList<SyntaxTreeNode>()
@@ -960,8 +1120,10 @@ object TBasCC {
             val lines = arrayListOf(
                     header,
                     "│ ".repeat(depth+1) + "ExprType : $expressionType",
-                    "│ ".repeat(depth+1) + "RetnType : $returnType",
-                    "│ ".repeat(depth+1) + "LiteralV : [$literalValue]",
+                    "│ ".repeat(depth+1) + "RetnType : $returnType" +
+                            if (returnType == ReturnType.STRUCT_PTR || returnType == ReturnType.STRUCT) " '$structName'"
+                            else "",
+                    "│ ".repeat(depth+1) + "LiteralV : '$literalValue'",
                     "│ ".repeat(depth+1) + "isRoot ? $isRoot",
                     "│ ".repeat(depth+1) + "isLeaf ? $isLeaf"
             )
@@ -985,8 +1147,8 @@ object TBasCC {
         }
     }
 
-    private fun String.toRawTreeNode(): SyntaxTreeNode {
-        val node = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null)
+    private fun String.toRawTreeNode(lineNumber: Int): SyntaxTreeNode {
+        val node = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null, lineNumber)
         node.literalValue = this
         return node
     }
