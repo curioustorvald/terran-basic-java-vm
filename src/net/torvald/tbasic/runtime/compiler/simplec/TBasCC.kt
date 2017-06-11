@@ -131,6 +131,7 @@ object TBasCC {
             hashSetOf(",")
             // least important
     ).reversedArray() // this makes op with highest precedence have bigger number
+    // operators must return value when TREE is evaluated -- with NO EXCEPTION; '=' must return value too! (not just because of C standard, but design of #_assignvar)
     private val unaryOps = hashSetOf(
             "++","--",
             "#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"
@@ -203,7 +204,8 @@ object TBasCC {
             """\?""" to 0x3F.toChar()  // uestion mark (used to avoid trigraphs)
     )
     private val builtinFunctions = hashSetOf(
-            "assignvar", "plusassignvar"
+            "#_assignvar", "#_plusassignvar", "#_minusassignvar", // #_assignvar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype, SyntaxTreeNode value)
+            "#_declarevar" // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
     )
 
 
@@ -320,7 +322,7 @@ object TBasCC {
 
     /** No preprocessor should exist at this stage! */
     fun tokenise(program: String): ArrayList<LineStructure> {
-        fun debug1(any: Any) { if (false) println(any) }
+        fun debug1(any: Any) { if (true) println(any) }
 
         ///////////////////////////////////
         // STEP 0. Divide things cleanly //
@@ -342,6 +344,7 @@ object TBasCC {
                     throw IllegalTokenException("at line $currentProgramLineNumber with token '$sb'")
                 }
 
+                currentLine.depth = structureDepth // !important
                 currentLine.tokens.add(sb.toString())
                 sb.setLength(0)
             }
@@ -350,14 +353,17 @@ object TBasCC {
             if (currentLine.tokens.isNotEmpty()) {
                 lineStructures.add(currentLine)
                 sb.setLength(0)
-                currentLine = LineStructure(currentProgramLineNumber, structureDepth, ArrayList<String>())
+                currentLine = LineStructure(currentProgramLineNumber, -1337, ArrayList<String>())
             }
         }
         var forStatementEngaged = false // to filter FOR range semicolon from statement-end semicolon
         var isLiteralMode = false // ""  ''
         var isCharLiteral = false
+        var isLineComment = false
+        var isBlockComment = false
         while (charCtr < program.length) {
             var char = program[charCtr]
+
             var lookahead4 = program.substring(charCtr, minOf(charCtr + 4, program.length)) // charOfIndex {0, 1, 2, 3}
             var lookahead3 = program.substring(charCtr, minOf(charCtr + 3, program.length)) // charOfIndex {0, 1, 2}
             var lookahead2 = program.substring(charCtr, minOf(charCtr + 2, program.length)) // charOfIndex {0, 1}
@@ -368,14 +374,28 @@ object TBasCC {
             if (char == '\n' && !isCharLiteral && !isLiteralMode) {
                 currentProgramLineNumber += 1
                 currentLine.lineNum = currentProgramLineNumber
+
+                if (isLineComment) isLineComment = false
             }
             else if (char == '\n' && isLiteralMode) {
                 throw SyntaxError("at line $currentProgramLineNumber -- line break used inside of string literal")
             }
-            else if (char.toString().matches(regexWhitespaceNoSP)) {
+            else if (lookahead2 == "//" && !isLineComment) {
+                isLineComment = true
+                charCtr += 1
+            }
+            else if (!isBlockComment && lookahead2 == "/*") {
+                isBlockComment = true
+                charCtr += 1
+            }
+            else if (!isBlockComment && lookahead2 == "*/") {
+                isBlockComment = false
+                charCtr += 1
+            }
+            else if (!isLiteralMode && !isCharLiteral && !isBlockComment && !isLineComment && char.toString().matches(regexWhitespaceNoSP)) {
                 // do nothing
             }
-            else if (!isLiteralMode && !isCharLiteral) {
+            else if (!isLiteralMode && !isCharLiteral && !isBlockComment && !isLineComment) {
                 // replace digraphs
                 if (useDigraph && digraphs.containsKey(lookahead2)) { // replace digraphs
                     char = program[charCtr]
@@ -387,16 +407,24 @@ object TBasCC {
                 }
 
 
+                // filter shits
+                if (lookahead2 == "//" || lookahead2 == "/*" || lookahead2 == "*/") {
+                    throw SyntaxError("at line $currentProgramLineNumber -- illegal token '$lookahead2'")
+                }
+
+
                 // do the real jobs
                 if (char == structOpen) {
+                    structureDepth += 1 // must go first
                     splitAndMoveAlong()
                     gotoNewline()
-                    structureDepth += 1
                 }
                 else if (char == structClose) {
+                    debug1("!! met structClose at line $currentProgramLineNumber")
+
+                    structureDepth -= 1 // must go first
                     splitAndMoveAlong()
                     gotoNewline()
-                    structureDepth -= 1
                 }
                 // double quotes
                 else if (char == '"' && lookbehind2[0] != '\\') {
@@ -492,7 +520,7 @@ object TBasCC {
                         }
                     }
                     else {
-                      sb.append(char)
+                        sb.append(char)
                     }
                 }
             }
@@ -513,7 +541,7 @@ object TBasCC {
                 sb.append(char)
             }
             else {
-                TODO("isLiteral && isCharLiteral")
+                // do nothing
             }
 
 
@@ -557,7 +585,7 @@ object TBasCC {
         }
 
 
-        throw Exception()
+        return ASTroot
     }
 
 
@@ -599,7 +627,7 @@ object TBasCC {
             }
             return ret
         }
-        fun debug1(any: Any?) { if (true) println(any) }
+        fun debug1(any: Any?) { if (false) println(any) }
 
 
 
@@ -627,7 +655,7 @@ object TBasCC {
         }*/
 
 
-        println("!![asTreeNode]!! input token: $tokens")
+        debug1("!!##[asTreeNode] input token: $tokens")
 
 
         ////////////////////////////
@@ -922,35 +950,47 @@ object TBasCC {
                     val realType = tokens[prewordIndex]
 
                     try {
-                        var structID: String? = null
-                        val varname: String
                         val hasAssignment: Boolean
 
-                        if (realType == "struct") {
-                            structID = tokens[prewordIndex + 1]
-                            varname = tokens[prewordIndex + 2]
+                        if (realType == "struct")
                             hasAssignment = tokens.lastIndex > prewordIndex + 2
-                        }
-                        else {
-                            varname = tokens[prewordIndex + 1]
+                        else
                             hasAssignment = tokens.lastIndex > prewordIndex + 1
-                        }
+
 
                         // deal with assignment
                         if (hasAssignment) {
-                            TODO("variable declaration and assign")
+                            // TODO support type_ptr_ptr_ptr...
+
                             // use turnInfixTokensIntoTree and inject it to assignment node
-                            val infixNode = turnInfixTokensIntoTree(lineNumber, tokens)
+                            val isPtrType = tokens[1] == "*"
+                            val typeStr = tokens[0] + if (isPtrType) "_ptr" else ""
+
+                            val tokensWithoutType = if (isPtrType)
+                                tokens.subList(2, tokens.size)
+                            else
+                                tokens.subList(1, tokens.size)
+
+                            val infixNode = turnInfixTokensIntoTree(lineNumber, tokensWithoutType)
+
+
+                            //#_assignvar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype, SyntaxTreeNode value)
+
+                            val returnNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.VOID, "#_assignvar", lineNumber)
+                            returnNode.addArgument(tokensWithoutType.first().toRawTreeNode(lineNumber))
+                            returnNode.addArgument(typeStr.toRawTreeNode(lineNumber))
+                            returnNode.addArgument(infixNode)
+
+                            return returnNode
                         }
                         else {
-                            if (structID != null) {
-                                TODO("Struct variable def")
-                            }
-                            else {
-                                val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, resolveTypeString(realType), varname, lineNumber)
-                                //leafNode.addArgument(varname.toRawTreeNode())
-                                return leafNode
-                            }
+                            // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
+
+                            val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, ReturnType.VOID, "#_declarevar", lineNumber)
+                            leafNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
+                            leafNode.addArgument(tokens[0].toRawTreeNode(lineNumber))
+
+                            return leafNode
                         }
                     }
                     catch (syntaxFuck: ArrayIndexOutOfBoundsException) {
@@ -958,7 +998,7 @@ object TBasCC {
                     }
                 }
                 else {
-                    println("!! infix in: $tokens")
+                    debug1("!! infix in: $tokens")
 
                     // infix notation
                     return turnInfixTokensIntoTree(lineNumber, tokens)
@@ -975,7 +1015,9 @@ object TBasCC {
     fun turnInfixTokensIntoTree(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
         // based on https://stackoverflow.com/questions/1946896/conversion-from-infix-to-prefix
 
-        fun debug(any: Any) { if (true) println(any) }
+        fun debug(any: Any) { if (false) println(any) }
+
+
         fun precedenceOf(token: String): Int {
             if (token == "(" || token == ")") return -1
 
@@ -1073,19 +1115,18 @@ object TBasCC {
         }
 
 
-        //println(reversedOut.reversed())
         if (treeArgsStack.size != 1) {
             throw InternalError("Stack size is wrong -- supposed to be 1, but it's ${treeArgsStack.size}")
         }
-        println("finalised tree:\n${treeArgsStack.peek()}")
+        debug("finalised tree:\n${treeArgsStack.peek()}")
 
 
-        throw Exception()
+        return treeArgsStack.peek() as SyntaxTreeNode
     }
 
 
 
-    data class LineStructure(var lineNum: Int, val depth: Int, val tokens: MutableList<String>)
+    data class LineStructure(var lineNum: Int, var depth: Int, val tokens: MutableList<String>)
 
     class SyntaxTreeNode(
             val expressionType: ExpressionType,

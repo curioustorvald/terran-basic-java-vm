@@ -53,27 +53,30 @@ int main    () {
 
 
     //val line = """println( (a - b) / c * (d + e - f / g) );"""
-    val line = """println( (a-b) * c );"""
-    val lineStructures = TBasCC.tokenise(line)
-    println("arts")
-    lineStructures.forEach {
-        println("tokens: ${it.tokens}")
-        val node = TBasCC.asTreeNode(it.lineNum, it.tokens)
-        println(node)
-    }
+    val line = """
+// whatever
+double somevalue = 42 + 3;
+
+int main()
+{
+    printf("Hello, world!\n"); printf("Plant tree!\n");
+}
+
+double endvalue = 1111;
+"""
+    val preprocessedLine = TBasCC.preprocess(line)
+
+    println(preprocessedLine)
+
+    val lineStructures = TBasCC.tokenise(preprocessedLine)
+
+    lineStructures.forEach { println(it) }
+
+    val tree = TBasCC.buildTree(lineStructures)
+
+    println(tree)
 
 
 
-
-    fun test(line: String) {
-        // sanities further
-        var line = line.replace(Regex("""[\s]*=[\s]*"""), " = ")
-
-        // turn infix notation into prefix
-        val operatorStack = Stack<String>()
-        val operandStack = Stack<Any>()
-
-
-    }
 }
 
