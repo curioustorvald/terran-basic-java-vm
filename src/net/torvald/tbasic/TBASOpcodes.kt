@@ -131,7 +131,7 @@ object TBASOpcodes {
      */
     fun PUTCHAR() { vm.stdout.write(vm.r1.toInt()); vm.stdout.flush() }
     /**
-     * print a string. String is prepared to r1 as pointer.
+     * print a string. String should be prepared to r1 as pointer.
      */
     fun PRINTSTR() {
         val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
@@ -147,8 +147,8 @@ object TBASOpcodes {
         }
     }
     fun GETCHAR() { vm.r1 = vm.stdin.read().toDouble() }
-    /** Any pre-existing variable will be overwritten. */
-    fun READSTR(varname: String) {
+    /** vm.r1 <- pointer to the string */
+    fun READSTR() {
         val maxStrLen = 255 // plus null terminator
         val readTerminator = '\n'.toInt().toDouble()
 
@@ -167,8 +167,7 @@ object TBASOpcodes {
         vm.reduceAllocatedBlock(strPtrInitPos..strPtrInitPos + maxStrLen, strPtrInitPos + maxStrLen - strPtr.memAddr)
 
 
-        LOADPTR(strPtr.memAddr, 1)
-        SETVARIABLE(varname)
+        LOADPTR(1, strPtr.memAddr)
     }
 
     /**
@@ -615,7 +614,10 @@ object TBASOpcodes {
             "POKEINT" to 83.toByte(),
             "PEEKINT" to 84.toByte(),
 
-            "CALL" to 85.toByte()
+            "CALL" to 85.toByte(),
+
+            "GETCHAR" to 86.toByte(),
+            "READSTR" to 87.toByte()
 
     )
 
@@ -726,6 +728,9 @@ object TBASOpcodes {
     val PEEKINT = 84.toByte()
 
     val CALL = 85.toByte()
+
+    val GETCHAR = 86.toByte()
+    val READSTR = 87.toByte()
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -838,7 +843,10 @@ object TBASOpcodes {
             "POKEINT" to fun(_) { POKEINT() },
             "PEEKINT" to fun(_) { PEEKINT() },
 
-            "CALL" to fun(args: List<ByteArray>) { CALL(args[0][0], args[1].toLittleInt()) }
+            "CALL" to fun(args: List<ByteArray>) { CALL(args[0][0], args[1].toLittleInt()) },
+
+            "GETCHAR" to fun(_) { GETCHAR() },
+            "READSTR" to fun(_) { READSTR() }
 
 
     )

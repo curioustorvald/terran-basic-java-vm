@@ -84,29 +84,20 @@ loadstrinline 1, bytes OK     #
 printstr;                     # " bytes OK \n"
 """)*/
 
-    val funcSectionTest = TBASOpcodeAssembler("""# func section test
-.func;
-:hai;
-loadptr 1, @message;
+    val funcSectionTest = TBASOpcodeAssembler("""
+loadstrinline 1, > ;
 printstr;
-return;
-
-
-.data;
-string message, Helvetti world!
-;
-
-
-.code;
-gosub @hai;
-
+readstr;
+printstr;
+halt;
 """)
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
         vm.loadProgram(funcSectionTest)
-        (0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
+
+        //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
 
         vm.execute()
         //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
