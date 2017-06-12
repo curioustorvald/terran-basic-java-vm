@@ -16,6 +16,11 @@ typealias Register = Int
  */
 object TBASOpcodes {
 
+    private val DEBUG = false
+
+    private fun dprintln(any: Any?) { if (DEBUG) println(any) }
+    private fun dprint(any: Any?) { if (DEBUG) print(any) }
+    
     val TBASVERSION = 0.4
 
     lateinit var vm: VM
@@ -89,15 +94,14 @@ object TBASOpcodes {
         ptrM_PI.type = VM.Pointer.PointerType.DOUBLE
         ptrM_PI.write(TBASVERSION)
 
-        vm.varTable.clear()
-        vm.varTable.put("M_PI", TBASNumber(ptrM_PI))
-        vm.varTable.put("M_2PI", TBASNumber(ptrM_2PI))
-        vm.varTable.put("M_E", TBASNumber(ptrM_E))
-        vm.varTable.put("M_ROOT2", TBASNumber(ptrM_ROOT2))
-        vm.varTable.put("TRUE", TBASBoolean(ptrTRUE))
-        vm.varTable.put("FALSE", TBASBoolean(ptrFALSE))
-        vm.varTable.put("NIL", TBASNil(ptrNIL))
-        vm.varTable.put("_VERSION", TBASNumber(ptr_VERSION))
+        vm.setvar("M_PI", TBASNumber(ptrM_PI))
+        vm.setvar("M_2PI", TBASNumber(ptrM_2PI))
+        vm.setvar("M_E", TBASNumber(ptrM_E))
+        vm.setvar("M_ROOT2", TBASNumber(ptrM_ROOT2))
+        vm.setvar("TRUE", TBASBoolean(ptrTRUE))
+        vm.setvar("FALSE", TBASBoolean(ptrFALSE))
+        vm.setvar("NIL", TBASNil(ptrNIL))
+        vm.setvar("_VERSION", TBASNumber(ptr_VERSION))
     }
 
 
@@ -131,7 +135,7 @@ object TBASOpcodes {
      */
     fun PUTCHAR() { vm.stdout.write(vm.r1.toInt()); vm.stdout.flush() }
     /**
-     * print a string. String should be prepared to r1 as pointer.
+     * print a string. String should be prepared to r1 as pointer. (r1 will be garbled afterwards!)
      */
     fun PRINTSTR() {
         val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
@@ -145,8 +149,10 @@ object TBASOpcodes {
             PUTCHAR()
             vm.strCntr++
         }
+
+        vm.freeBlock(string)
     }
-    fun GETCHAR() { vm.r1 = vm.stdin.read().toDouble() }
+    fun GETCHAR() { LOADNUM(1, vm.stdin.read().toDouble()) }
     /** vm.r1 <- pointer to the string */
     fun READSTR() {
         val maxStrLen = 255 // plus null terminator
@@ -154,7 +160,7 @@ object TBASOpcodes {
 
         val strPtr = vm.calloc(maxStrLen + 1)
         val strPtrInitPos = strPtr.memAddr
-        vm.r1 = -1.0
+        LOADNUM(1, -1.0)
 
         while (vm.r1 != readTerminator && strPtr.memAddr - strPtrInitPos <= maxStrLen) {
             GETCHAR()
@@ -171,32 +177,15 @@ object TBASOpcodes {
     }
 
     /**
-     * prints out whatever number in r1 register
+     * prints out whatever number in r1 register (r1 will be garbled afterwards!)
      */
     fun PRINTNUM() {
-        val oldnum = vm.r1 // little cheat, but whatever.
-
         var str = vm.r1.toString()
         // filter number string
         if (str.endsWith(".0")) str = str.dropLast(2)
 
 
-        // LOADSTRINLINE
-        try {
-            val strPtr = vm.makeStringDB(str)
-            // LOADPTR
-            vm.writereg(1, strPtr.memAddr.toDouble())
-            if (strPtr.memAddr == -1) {
-                vm.writebreg(1, 0b10.toByte())
-            } else {
-                vm.writebreg(1, 0b11.toByte())
-            }
-        }
-        catch (e: OutOfMemoryError) {
-            e.printStackTrace(System.out)
-            vm.interruptOutOfMem()
-        }
-        // END LOADSTRINLINE
+        LOADSTRINLINE(1, str.toCString())
 
         val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
         vm.strCntr = 0 // string counter
@@ -210,8 +199,6 @@ object TBASOpcodes {
             vm.strCntr++
         }
 
-        vm.r1 = oldnum
-
         vm.freeBlock(string)
     }
 
@@ -222,42 +209,42 @@ object TBASOpcodes {
     /**
      * r1 <- r2 op r3 (no vararg)
      */
-    fun ADD() { vm.r1 = vm.r2 + vm.r3 }
-    fun SUB() { vm.r1 = vm.r2 - vm.r3 }
-    fun MUL() { vm.r1 = vm.r2 * vm.r3 }
-    fun DIV() { vm.r1 = vm.r2 / vm.r3 }
-    fun POW() { vm.r1 = Math.pow(vm.r2, vm.r3) }
-    fun MOD() { vm.r1 = Math.floorMod(vm.r2.toLong(), vm.r3.toLong()).toDouble() } // FMOD
+    fun ADD() { vm.r1 = vm.r2 + vm.r3; vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun SUB() { vm.r1 = vm.r2 - vm.r3; vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun MUL() { vm.r1 = vm.r2 * vm.r3; vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun DIV() { vm.r1 = vm.r2 / vm.r3; vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun POW() { vm.r1 = Math.pow(vm.r2, vm.r3); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun MOD() { vm.r1 = Math.floorMod(vm.r2.toLong(), vm.r3.toLong()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() } // FMOD
 
-    fun SHL()  { vm.r1 = (vm.r2.toInt() shl  vm.r3.toInt()).toDouble() }
-    fun SHR()  { vm.r1 = (vm.r2.toInt() shr  vm.r3.toInt()).toDouble() }
-    fun USHR() { vm.r1 = (vm.r2.toInt() ushr vm.r3.toInt()).toDouble() }
-    fun AND()  { vm.r1 = (vm.r2.toInt() and  vm.r3.toInt()).toDouble() }
-    fun OR()   { vm.r1 = (vm.r2.toInt() or   vm.r3.toInt()).toDouble() }
-    fun XOR()  { vm.r1 = (vm.r2.toInt() xor  vm.r3.toInt()).toDouble() }
+    fun SHL()  { vm.r1 = (vm.r2.toInt() shl  vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun SHR()  { vm.r1 = (vm.r2.toInt() shr  vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun USHR() { vm.r1 = (vm.r2.toInt() ushr vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun AND()  { vm.r1 = (vm.r2.toInt() and  vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun OR()   { vm.r1 = (vm.r2.toInt() or   vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun XOR()  { vm.r1 = (vm.r2.toInt() xor  vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
 
     fun CMP()  { vm.m1 = if (vm.r2 == vm.r3) 0 else if (vm.r2 > vm.r3) 1 else -1 }
 
     /**
      * r1 <- r2 (no vararg)
      */
-    fun ABS()   { vm.r1 = Math.abs  (vm.r2) }
-    fun SIN()   { vm.r1 = Math.sin  (vm.r2) }
-    fun COS()   { vm.r1 = Math.cos  (vm.r2) }
-    fun TAN()   { vm.r1 = Math.tan  (vm.r2) }
-    fun FLOOR() { vm.r1 = Math.floor(vm.r2) }
-    fun CEIL()  { vm.r1 = Math.ceil (vm.r2) }
-    fun ROUND() { vm.r1 = Math.round(vm.r2).toDouble() }
-    fun LOG()   { vm.r1 = Math.log  (vm.r2) }
+    fun ABS()   { vm.r1 = Math.abs  (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun SIN()   { vm.r1 = Math.sin  (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun COS()   { vm.r1 = Math.cos  (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun TAN()   { vm.r1 = Math.tan  (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun FLOOR() { vm.r1 = Math.floor(vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun CEIL()  { vm.r1 = Math.ceil (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun ROUND() { vm.r1 = Math.round(vm.r2).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun LOG()   { vm.r1 = Math.log  (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
     fun INT()   { if (vm.r2 >= 0.0) FLOOR() else CEIL() }
-    fun RND()   { vm.r1 = Math.random() }
-    fun SGN()   { vm.r1 = Math.signum(vm.r2) }
+    fun RND()   { vm.r1 = Math.random(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun SGN()   { vm.r1 = Math.signum(vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
     fun SQRT() { LOADNUM(3, 2.0); POW() }
     fun CBRT() { LOADNUM(3, 3.0); POW() }
     fun INV() { MOV(2, 3); LOADNUM(2, 1.0); DIV() }
     fun RAD() { LOADRAWNUM(3, 0x4081ABE4B73FEFB5L); DIV() } // r1 <- r2 / (180.0 * PI)
 
-    fun NOT() { vm.r1 = vm.r2.toInt().inv().toDouble() }
+    fun NOT() { vm.r1 = vm.r2.toInt().inv().toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
 
     
     fun INC1() { vm.r1 += 1.0 }
@@ -292,23 +279,52 @@ object TBASOpcodes {
 
     /** memory(r2) <- r1 */
     fun POKE() { vm.memory[vm.r2.toInt()] = vm.r1.toByte() }
-    /** r1 <- data in memory addr r2 */
-    fun PEEK() { vm.r1 = vm.memory[vm.r2.toInt()].toUint().toDouble() }
+    /** r1 <- data in memory addr r1 */
+    fun PEEK() {
+        LOADNUM(1, vm.memory[vm.r1.toInt()].toUint().toDouble())
+    }
 
     /** memory(r2) <- r1 */
     fun POKEINT() { vm.r1.toInt().toLittle().forEachIndexed { index, byte -> vm.memory[vm.r2.toInt() + index] = byte } }
-    /** r1 <- data in memory addr r2 */
-    fun PEEKINT() { vm.r1 = byteArrayOf(
-            vm.memory[vm.r2.toInt()],
-            vm.memory[vm.r2.toInt() + 1],
-            vm.memory[vm.r2.toInt() + 2],
-            vm.memory[vm.r2.toInt() + 3]
-    ).toLittleInt().toDouble() }
+    /** r1 <- data in memory addr r1 */
+    fun PEEKINT() {
+        LOADNUM(1, byteArrayOf(
+                vm.memory[vm.r1.toInt()],
+                vm.memory[vm.r1.toInt() + 1],
+                vm.memory[vm.r1.toInt() + 2],
+                vm.memory[vm.r1.toInt() + 3]
+        ).toLittleInt().toDouble())
+    }
+
+    /** memory(r2) <- r1 */
+    fun POKENUM() { vm.r1.toLittle().forEachIndexed { index, byte -> vm.memory[vm.r2.toInt() + index] = byte } }
+    /** r1 <- data in memory addr r1 */
+    fun PEEKNUM() {
+        dprintln("=== peeknum memmap at ${vm.r1}: ")
+
+        (0..7).forEach { dprint("${vm.memory[vm.r1.toInt() + it]} ") }
+        dprintln("")
+
+        LOADNUM(1, byteArrayOf(
+                vm.memory[vm.r1.toInt()],
+                vm.memory[vm.r1.toInt() + 1],
+                vm.memory[vm.r1.toInt() + 2],
+                vm.memory[vm.r1.toInt() + 3],
+                vm.memory[vm.r1.toInt() + 4],
+                vm.memory[vm.r1.toInt() + 5],
+                vm.memory[vm.r1.toInt() + 6],
+                vm.memory[vm.r1.toInt() + 7]
+        ).toLittleDouble())
+
+        dprintln("=== peeknum r1: ${vm.r1}")
+    }
 
     /** Peripheral(r3).memory(r2) <- r1 */
-    fun POKEPERI() { vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()] = vm.r1.toByte() }
+    fun STOREPERI() { vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()] = vm.r1.toByte() }
     /** r1 <- data in memory addr r2 of peripheral r3 */
-    fun PEEKPERI() { vm.r1 = vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()].toUint().toDouble() }
+    fun LOADPERI() {
+        LOADNUM(1, vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()].toUint().toDouble())
+    }
 
 
     /** Memory copy - source: r2, destination: r3, length: r4 */
@@ -333,7 +349,7 @@ object TBASOpcodes {
      */
     fun LOADNUM(register: Register, number: Double) {
         vm.writereg(register, number)
-        vm.writebreg(register, 0.toByte())
+        vm.writebreg(register, (TYPE_NUMBER shl 2).toByte())
     }
     
     fun LOADMNUM(number: Int) {
@@ -351,13 +367,15 @@ object TBASOpcodes {
      */
     fun LOADRAWNUM(register: Register, num_as_bytes: Long) {
         vm.writereg(register, java.lang.Double.longBitsToDouble(num_as_bytes))
-        vm.writebreg(register, 1.toByte())
+        vm.writebreg(register, (TYPE_NUMBER shl 2 or 1).toByte())
     }
 
     /**
      * Loads pointer's pointing address to r1, along with the marker that states r1 now holds memory address
      */
     fun LOADPTR(register: Register, addr: Int) {
+        dprintln("=== loadptr r$register, address: $addr")
+
         try {
             vm.writereg(register, addr.toDouble())
             if (addr == -1) {
@@ -406,18 +424,27 @@ object TBASOpcodes {
     /**
      * load variable to r1 as pointer. If the variable does not exist, null pointer will be loaded instead.
      */
-    fun LOADVARIABLE(identifier: String) { LOADPTR(1, vm.varTable[identifier]?.pointer?.memAddr ?: -1) }
+    fun LOADVARIABLE(identifier: String) {
+        dprintln("=== loadvariable '$identifier'")
+        LOADPTR(1, vm.getvar(identifier)?.pointer?.memAddr ?: -1)
+    }
     /**
      * save whatever on r1 (either an Immediate or Pointer) to variables table
      */
     fun SETVARIABLE(identifier: String) {
+
         val isPointer = vm.b1.and(0b10) != 0.toByte()
         val typeIndex = vm.b1.and(0b11100).toInt().ushr(2)
 
         if (!isPointer) {
             val byteSize = getByteSizeOfType(typeIndex)
-            val varPtr = vm.malloc(byteSize)
+            val varPtr = if (!vm.hasvar(identifier)) vm.malloc(byteSize) // create new var
+                         else vm.getvar(identifier)!!.pointer            // renew existing var
+
             varPtr.type = getPointerTypeFromID(typeIndex)
+
+            dprintln("=== setvariable pointer addr: ${varPtr.memAddr}")
+            dprintln("=== setvariable byteSize: $byteSize")
 
             if (byteSize == 8)
                 varPtr.write(vm.r1)
@@ -427,19 +454,26 @@ object TBASOpcodes {
                 varPtr.write(java.lang.Double.doubleToRawLongBits(vm.r1).and(0xFF).toByte())
 
 
-            val tbasValue: TBASValue = when(typeIndex) {
+            val tbasValue: TBASValue = when (typeIndex) {
                 TYPE_NIL -> TBASNil(varPtr)
                 TYPE_NUMBER -> TBASNumber(varPtr)
                 TYPE_BOOLEAN -> TBASBoolean(varPtr)
                 else -> throw InternalError("String is Pointer!")
             }
 
-            vm.varTable[identifier] = tbasValue
+            vm.setvar(identifier, tbasValue)
+
+
+
+            dprintln("=== setvariable memmap: wrote at ${varPtr.memAddr}: ")
+
+            (0..7).forEach { dprint("${vm.memory[varPtr.memAddr + it]} ") }
+            dprintln("")
         }
         else {
             // String
             val ptr = VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt())
-            vm.varTable[identifier] = TBASString(ptr)
+            vm.setvar(identifier, TBASString(ptr))
         }
     }
 
@@ -449,9 +483,9 @@ object TBASOpcodes {
     }
 
     /** r1 <- VM memory size in bytes */
-    fun MEM() { vm.r1 = vm.memory.size.toDouble() }
+    fun MEM() { LOADNUM(1, vm.memory.size.toDouble()) }
     /** r1 <- System uptime in milliseconds */
-    fun UPTIME() { vm.r1 = vm.uptime.toDouble() }
+    fun UPTIME() { LOADNUM(1, vm.uptime.toDouble()) }
 
 
 
@@ -597,8 +631,8 @@ object TBASOpcodes {
             "MEMCPY" to 73.toByte(),
             "MEMCPYPERI" to 74.toByte(),
 
-            "POKEPERI" to 75.toByte(),
-            "PEEKPERI" to 76.toByte(),
+            "STOREPERI" to 75.toByte(),
+            "LOADPERI" to 76.toByte(),
 
             "MEM" to 77.toByte(),
 
@@ -617,7 +651,10 @@ object TBASOpcodes {
             "CALL" to 85.toByte(),
 
             "GETCHAR" to 86.toByte(),
-            "READSTR" to 87.toByte()
+            "READSTR" to 87.toByte(),
+
+            "POKENUM" to 88.toByte(),
+            "PEEKNUM" to 89.toByte()
 
     )
 
@@ -638,8 +675,8 @@ object TBASOpcodes {
     val PUSH   = 11.toByte()
     val POP    = 12.toByte()
     val MOV    = 13.toByte()
-    val POKE   = 14.toByte()
-    val PEEK   = 15.toByte()
+    val STORE  = 14.toByte()
+    val LOAD   = 15.toByte()
 
     val SHL  = 16.toByte()
     val SHR  = 17.toByte()
@@ -710,8 +747,8 @@ object TBASOpcodes {
     val MEMCPY = 73.toByte()
     val MEMCPYPERI = 74.toByte()
 
-    val POKEPERI = 75.toByte()
-    val PEEKPERI = 76.toByte()
+    val STOREPERI = 75.toByte()
+    val LOADPERI  = 76.toByte()
 
     val MEM = 77.toByte()
 
@@ -731,6 +768,9 @@ object TBASOpcodes {
 
     val GETCHAR = 86.toByte()
     val READSTR = 87.toByte()
+
+    val POKENUM = 88.toByte()
+    val PEEKNUM = 89.toByte()
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -826,8 +866,8 @@ object TBASOpcodes {
             "MEMCPY" to fun(_) { MEMCPY() },
             "MEMCPYPERI" to fun(_) { MEMCPYPERI() },
 
-            "POKEPERI" to fun(_) { POKEPERI() },
-            "PEEKPERI" to fun(_) { PEEKPERI() },
+            "STOREPERI" to fun(_) { STOREPERI() },
+            "LOADPERI" to fun(_) { LOADPERI() },
 
             "MEM" to fun(_) { MEM() },
 
@@ -846,7 +886,10 @@ object TBASOpcodes {
             "CALL" to fun(args: List<ByteArray>) { CALL(args[0][0], args[1].toLittleInt()) },
 
             "GETCHAR" to fun(_) { GETCHAR() },
-            "READSTR" to fun(_) { READSTR() }
+            "READSTR" to fun(_) { READSTR() },
+
+            "POKENUM" to fun(_) { POKENUM() },
+            "PEEKNUM" to fun(_) { PEEKNUM() }
 
 
     )

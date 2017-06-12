@@ -68,6 +68,8 @@ object TBASOpcodeAssembler {
     private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
     private val matchInteger = Regex("""[0-9]+""")
 
+    private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
+
     private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
 
     private var currentSection = ".CODE"
@@ -75,7 +77,7 @@ object TBASOpcodeAssembler {
     val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
 
 
-    private fun debug(any: Any?) { if (true) { println(any) } }
+    private fun debug(any: Any?) { if (false) { println(any) } }
 
     var flagSpecifyJMP = false
 
@@ -152,21 +154,20 @@ object TBASOpcodeAssembler {
 
                     when (type) {
                         "STRING" -> {
-                            val strStart = line.indexOf(words[2], ignoreCase = false)
-                            val strEnd = line.length
-                            val data = line.substring(strStart, strEnd)
+                            val start = (dataSectActualData.find(line)?.value?.length
+                                    ?: throw IllegalArgumentException("malformed declaration syntax"))
+                            val end = line.length
 
-                            //debug("--> String payload: [$data]")
+                            val data = line.substring(start, end)
 
-                            data.toCString().forEach { virtualPC += 1 }
-                            // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
+                            virtualPC += data.toCString().size
                         }
                         "NUMBER" -> {
                             val number = words[2].toDouble()
 
                             //debug("--> Number payload: [$number]")
 
-                            number.toLittle().forEach { virtualPC += 1 }
+                            virtualPC += number.toLittle().size
                         }
                         "INT" -> {
                             val int = words[2].toInt()
@@ -320,10 +321,15 @@ object TBASOpcodeAssembler {
 
                     when (type) {
                         "STRING" -> {
-                            val strStart = line.indexOf(words[2], ignoreCase = false)
-                            val strEnd = line.length
-                            val data = line.substring(strStart, strEnd)
+                            debug("->> line: $line")
 
+                            val start = (dataSectActualData.find(line)?.value?.length
+                                    ?: throw IllegalArgumentException("malformed declaration syntax"))
+                            val end = line.length
+
+                            val data = line.substring(start, end)
+
+                            debug("--> strStart: $start")
                             debug("--> String payload: '$data'")
 
                             data.toCString().forEach { ret.add(it) }
@@ -400,7 +406,12 @@ object TBASOpcodeAssembler {
                                 try {
                                     when (it) {
                                         TBASOpcodes.SIZEOF_BYTE -> {
-                                            ret.add(words[index + 1].toInt().toByte())
+                                            if (words[index + 1].startsWith(labelMarker)) {
+                                                TODO("label that points to Byte (${words[index + 1]})")
+                                            }
+                                            else {
+                                                ret.add(words[index + 1].toInt().toByte())
+                                            }
                                         }
                                         TBASOpcodes.SIZEOF_NUMBER -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
@@ -457,6 +468,9 @@ object TBASOpcodeAssembler {
             }
 
         }
+
+
+        debug("======== Assembler: Done! ========")
 
         return ret.toByteArray()
     }

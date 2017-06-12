@@ -11,93 +11,125 @@ fun main(args: Array<String>) {
 
 class Executable {
 
-    val vm = VM(2.KB(), BIOS = VMBIOS(), tbasic_remove_string_dupes = true)
+    val vm = VM(2048, BIOS = VMBIOS(), tbasic_remove_string_dupes = true)
 
 
-    /*val rudimentaryHello = TBASOpcodeAssembler("""# Hello world on TBASASM using in-line strings
-    loadstrinline 1, Helvetti world! #
-;                              # String with \n
-printstr;
-loadstrinline 1, wut;                # String without \n
-printstr;
-loadstrinline 1, face                #
-;                              # String with \n
-printstr;
-""")*/
-
-    /*val testProgram = TBASOpcodeAssembler("""# Hello world on TBASASM using data section
+    val beers = TBASOpcodeAssembler("""
 .data;
-    string hai, Helvetti world!
+
+string beerone of beer on the wall, ;
+
+string beertwo of beer.
+Take one down, passes it around, ;
+
+string beerthree of beer on the wall.
+
 ;
+
+string gotostore of beer.
+Go to the store and buy some more, ;
+
+string bottles bottles ;
+string bottle bottle ;
+
+string omore o more ;
+
+
+.func;
+
+:printspace;
+loadnum 1, 32; putchar; return;
+
+
 .code;
-    LOADPTR 1, @hai;
-    PRINTSTR;
-""")*/
 
-    /*val testLoop = TBASOpcodeAssembler("""# Power of twos
-.data;
+loadnum 1, 99;                   #
+setvariable beercount;           # set beer count
 
-string theend, You are terminated
-;
 
-.code; # when there's no other sections, this section marker is optional.
+:compare;
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+mov 1, 2;                        # r2 <- beercount
+loadnum 3, 1;                    # r3 <- 1.0
+cmp;                             # m1 <- if (beercount > 1) 1 else if (beercount == 1) 0 else -1
 
-loadmnum 32;
-loadnum 1, 1.0;
 
-:loopstart;
+jgt @pluralBeers;                # plural beers
+jz  @singularBeers;              # singular beers
+jls @noBeers;                    # no beers
 
-printnum;
-gosub @printnewline;
 
-loadnum 2, 2.0;
-mov 1, 3;
-mul;
+:pluralBeers;
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and passes it around, '
 
-decm;
-jnz @loopstart;
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+dec1; setvariable beercount;     # decrement beercount by one
 
-loadptr 1, @theend;
-printstr;
+
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
+
+jmp @compare;
+
+
+
+:singularBeers;
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottle; printstr;    # 'bottle '
+loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottle; printstr;    # 'bottle '
+loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and passes it around, '
+
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+dec1; setvariable beercount;     # decrement beercount by one
+
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
+
+jmp @compare;
+
+
+
+:noBeers;
+loadnum 1, 78; putchar;          # 'N'
+loadptr 1, @omore; printstr;     # 'o more '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
+loadnum 1, 110; putchar;         # 'n'
+loadptr 1, @omore; printstr;     # 'o more '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @gotostore; printstr; # 'of beer.\nGo to the store and buy some more, '
+
+loadnum 1, 99                    # set beercount to 99
+setvariable beercount;           #
+
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
 
 halt;
 
-
-:printnewline;
-mov 1, 4;       # append \n
-loadstrinline 1,#
-;               #
-printstr;       #
-mov 4, 1;       # END append \n
-return;
-""")*/
-
-    /*val BIOS_POST = TBASOpcodeAssembler("""# Power On Self Test
-call 255, 0;                  # load memSize to r1
-printnum;                     # print out current memSize
-
-loadnum 1, 32;                #
-putchar;                      # print out a space
-
-loadstrinline 1, bytes OK     #
-;                             #
-printstr;                     # " bytes OK \n"
-""")*/
-
-    val funcSectionTest = TBASOpcodeAssembler("""
-loadstrinline 1, > ;
-printstr;
-readstr;
-printstr;
-halt;
 """)
+
 
     fun main() {
         //testProgram.forEach { print("$it ") }
 
-        vm.loadProgram(funcSectionTest)
+        vm.loadProgram(beers)
 
-        //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
+        //(0..511).forEach { print("${vm.memory[it].toUint()} ") }; println()
 
         vm.execute()
         //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()

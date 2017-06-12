@@ -1,6 +1,7 @@
 package net.torvald.tbasic.runtime
 
 import net.torvald.tbasic.*
+import net.torvald.tbasic.TBASOpcodes.POKEINT
 import net.torvald.tbasic.TBASOpcodes.READ_UNTIL_ZERO
 import java.io.InputStream
 import java.io.OutputStream
@@ -29,11 +30,23 @@ class VM(memSize: Int,
          // following is an options for VM's micro operation system
          val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC
 ) {
-    class Pointer(val parent: VM, var memAddr: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
+    private val DEBUG = false
+
+    class Pointer(val parent: VM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
         /*
         VOID    in memory: 0x00
         BOOLEAN in memory: 0x00 if false, 0xFF if true
          */
+
+        val traceMemAddrChange = true
+
+        var memAddr: Int = memoryAddress
+            set(value) {
+                if (traceMemAddrChange) {
+                    println("!! Pointer: memAddr change $memAddr -> $value")
+                }
+                field = value
+            }
 
         var type = type
             set(value) {
@@ -189,41 +202,36 @@ class VM(memSize: Int,
     fun memSliceBySize(from: Int, size: Int): ByteArray = memory.sliceArray(from..from + size - 1)
     fun memSlice(from: Int, to: Int): ByteArray = memory.sliceArray(from..to)
 
-    private val mallocList = ArrayList<IntRange>()
+    private val mallocList = ArrayList<Int>(64) // can be as large as memSize
 
+    private fun addToMallocList(range: IntRange) { range.forEach { mallocList.add(it) } }
+    private fun removeFromMallocList(range: IntRange) { range.forEach { mallocList.remove(it) } }
+
+    /**
+     * Return starting position of empty space
+     */
     private fun findEmptySlotForMalloc(size: Int): Int {
         if (mallocList.isEmpty())
             return userSpaceStart!!
 
-        mallocList.sortBy { it.first }
+        mallocList.sort()
 
-        val gaps = ArrayList<IntRange>()
-        var foundRightGap = false
-        for (it in 1..mallocList.lastIndex) {
-            val gap = mallocList[it - 1].endInclusive + 1..mallocList[it].start - 1
-            gaps.add(gap)
+        val candidates = ArrayList<Pair<Int, Int>>() // startingPos, size
+        for (it in 0..mallocList.lastIndex - 1) {
+            val gap = mallocList[it + 1] - mallocList[it] - 1
 
-            if (gap.endInclusive - gap.start + 1 == size) {
-                foundRightGap = true
-                break
-            } // found right gap, no need to search further
+            if (gap >= size) {
+                candidates.add(Pair(mallocList[it] + 1, gap))
+            }
         }
 
-        if (foundRightGap) {
-            return gaps.last().start
+
+        if (candidates.isNotEmpty()) {
+            candidates.sortBy { it.second } // tight gap comes first
+            return candidates.first().first
         }
         else {
-            if (gaps.isEmpty()) {
-                return mallocList.last().endInclusive + 1
-            }
-            else {
-                gaps.forEach {
-                    if (it.endInclusive - it.start + 1 >= size)
-                        return it.start
-                }
-
-                return gaps.last().endInclusive + 1
-            }
+            return mallocList.last() + 1
         }
     }
 
@@ -234,13 +242,13 @@ class VM(memSize: Int,
      */
     fun malloc(size: Int): Pointer {
         val addr = findEmptySlotForMalloc(size)
-        mallocList.add(addr..addr + size - 1)
+        addToMallocList(addr..addr + size - 1)
 
         return Pointer(this, addr)
     }
     fun calloc(size: Int): Pointer {
         val addr = findEmptySlotForMalloc(size)
-        mallocList.add(addr..addr + size - 1)
+        addToMallocList(addr..addr + size - 1)
 
         (0..size - 1).forEach { memory[addr + it] = 0.toByte() }
 
@@ -250,14 +258,13 @@ class VM(memSize: Int,
         freeBlock(variable.pointer.memAddr..variable.pointer.memAddr + variable.sizeOf() - 1)
     }
     fun freeBlock(range: IntRange) {
-        if (!mallocList.remove(range)) {
-            //interruptSegmentationFault()
-            //throw RuntimeException("Access violation -- no such block was assigned by operation system.")
-        }
+        removeFromMallocList(range)
     }
     fun reduceAllocatedBlock(range: IntRange, sizeToReduce: Int) {
-        freeBlock(range)
-        mallocList.add(range.start..range.endInclusive - sizeToReduce)
+        if (sizeToReduce == 0) return
+        if (sizeToReduce < 0) throw IllegalArgumentException("Reducing negative amount of space ($range, $sizeToReduce)")
+        val residual = (range.last - sizeToReduce + 1)..range.last
+        removeFromMallocList(residual)
     }
 
     fun makeStringDB(string: ByteArray): Pointer {
@@ -312,7 +319,12 @@ class VM(memSize: Int,
      */
     internal val memory = ByteArray(memSize)
 
-    val varTable = HashMap<String, TBASValue>() // UPPERCASE ONLY!
+    private val varTable = HashMap<String, TBASValue>() // UPPERCASE ONLY!
+
+    fun setvar(name: String, value: TBASValue) { varTable[name] = value }
+    fun getvar(name: String) = varTable[name]
+    fun hasvar(name: String) = varTable.containsKey(name)
+
     val callStack = IntArray(stackSize, { 0 })
 
     val ivtSize = 4 * VM.interruptCount
@@ -421,18 +433,94 @@ class VM(memSize: Int,
     }
 
     fun loadProgram(opcodes: ByteArray) {
+        if (opcodes.size + ivtSize >= memory.size) {
+            throw Error("Out of memory -- required: ${opcodes.size + ivtSize} (${opcodes.size} for program), installed: ${memory.size}")
+        }
+
         softReset()
 
         TBASOpcodes.invoke(this)
-        //TBASOpcodes.initTBasicEnv()
+
 
         System.arraycopy(opcodes, 0, memory, ivtSize, opcodes.size)
         memory[opcodes.size + ivtSize] = TBASOpcodes.opcodesList["HALT"]!!
 
         pc = ivtSize
         userSpaceStart = opcodes.size + 1 + ivtSize
+        userSpaceStart = userSpaceStart!! + setDefaultInterrepts()
 
-        execDebug("Program loaded; pc: $pc, userSpaceStart: $userSpaceStart")
+
+        warn("Program loaded; pc: $pc, userSpaceStart: $userSpaceStart")
+    }
+
+    private fun setDefaultInterrepts(): Int {
+        val intOOM = TBASOpcodeAssembler("""
+loadstrinline 1,
+Out of memory
+; printstr; halt;
+""")
+        val intSegfault = TBASOpcodeAssembler("""
+loadstrinline 1,
+Segmentation fault
+; printstr; halt;
+""")
+        val intDivZero = TBASOpcodeAssembler("""
+loadstrinline 1,
+Division by zero
+; printstr; halt;
+""")
+        val intIllegalOp = TBASOpcodeAssembler("""
+loadstrinline 1,
+Illegal operation
+; printstr; halt;
+""")
+        val intStackOverflow = TBASOpcodeAssembler("""
+loadstrinline 1,
+Stack overflow
+; printstr; halt;
+""")
+        val intMathFuck = TBASOpcodeAssembler("""
+loadstrinline 1,
+Math error
+; printstr; halt;
+""")
+
+        val intOOMPtr = malloc(intOOM.size)
+        val intSegfaultPtr = malloc(intSegfault.size)
+        val intDivZeroPtr = malloc(intDivZero.size)
+        val intIllegalOpPtr = malloc(intIllegalOp.size)
+        val intStackOvflPtr = malloc(intStackOverflow.size)
+        val intMathErrPtr = malloc(intMathFuck.size)
+
+        intOOMPtr.write(intOOM)
+        intSegfaultPtr.write(intSegfault)
+        intDivZeroPtr.write(intDivZero)
+        intIllegalOpPtr.write(intIllegalOp)
+        intStackOvflPtr.write(intStackOverflow)
+        intMathErrPtr.write(intMathFuck)
+
+
+        r1 = intOOMPtr.memAddr.toDouble()
+        r2 = INT_OUT_OF_MEMORY.toDouble() * 4
+        POKEINT()
+        r1 = intSegfaultPtr.memAddr.toDouble()
+        r2 = INT_SEGFAULT.toDouble() * 4
+        POKEINT()
+        r1 = intDivZeroPtr.memAddr.toDouble()
+        r2 = INT_DIV_BY_ZERO.toDouble() * 4
+        POKEINT()
+        r1 = intIllegalOpPtr.memAddr.toDouble()
+        r2 = INT_ILLEGAL_OP.toDouble() * 4
+        POKEINT()
+        r1 = intStackOvflPtr.memAddr.toDouble()
+        r2 = INT_STACK_OVERFLOW.toDouble() * 4
+        POKEINT()
+        r1 = intMathErrPtr.memAddr.toDouble()
+        r2 = INT_MATH_ERROR.toDouble() * 4
+        POKEINT()
+
+
+        return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
     }
 
     fun softReset() {
@@ -484,8 +572,8 @@ class VM(memSize: Int,
 
 
 
-    fun execDebugMain(any: Any?) { if (false) print(any) }
-    fun execDebug(any: Any?)     { if (false) print(any) }
+    fun execDebugMain(any: Any?) { if (DEBUG) print(any) }
+    fun execDebug(any: Any?)     { if (DEBUG) print(any) }
 
     fun execute(delayInMills: Int? = null) {
         if (userSpaceStart != null) {
@@ -494,10 +582,19 @@ class VM(memSize: Int,
 
 
             while (!terminate) {
-                //(0..255).forEach { print("${memory[it].toUint()} ") }; println()
+                //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
+
+
 
                 if (pc >= memory.size) {
+                    val oldpc = pc
                     interruptOutOfMem()
+                    //if (throwError) { throw Error("Out of memory; pc $oldpc") }
+                }
+                else if (pc < 0) {
+                    val oldpc = pc
+                    interruptSegmentationFault()
+                    //if (throwError) { throw Error("Illegal PC; pc $oldpc") }
                 }
 
                 val instruction = memory[pc]
@@ -526,7 +623,7 @@ class VM(memSize: Int,
                     }
                 }
                 val totalArgsSize = arguments.map { it.size }.sum()
-                execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pc")
+                execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pc, r1: $r1, r2: $r2, r3: $r3, m1: $m1")
 
 
                 // execute
@@ -617,13 +714,13 @@ fun Boolean.toLittle() = byteArrayOf(if (this) 0xFF.toByte() else 0.toByte())
 
 fun ByteArray.toLittleInt() =
         if (this.size != 4) throw Error()
-        else this[0].toInt() or
+        else    this[0].toUint() or
                 this[1].toUint().shl(8) or
                 this[2].toUint().shl(16) or
                 this[3].toUint().shl(24)
 fun ByteArray.toLittleLong() =
         if (this.size != 8) throw Error()
-        else this[0].toUlong() or
+        else    this[0].toUlong() or
                 this[1].toUlong().shl(8) or
                 this[2].toUlong().shl(16) or
                 this[3].toUlong().shl(24) or
