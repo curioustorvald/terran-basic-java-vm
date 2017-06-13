@@ -20,7 +20,7 @@ class Executable {
 string beerone of beer on the wall, ;
 
 string beertwo of beer.
-Take one down, passes it around, ;
+Take one down, pass it around, ;
 
 string beerthree of beer on the wall.
 
@@ -39,6 +39,35 @@ string omore o more ;
 
 :printspace;
 loadnum 1, 32; putchar; return;
+
+
+:printbeercnt;
+loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+mov 1, 2;
+loadnum 3, 1;
+cmp;
+jz  @printonebeer;
+jgt @printbeerasnum;
+jls @printnomore;
+
+
+:printonebeer;
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottle; printstr;    # 'bottle '
+return;                          #
+
+
+:printbeerasnum;
+printnum; gosub @printspace;     # beercount + ' '
+loadptr 1, @bottles; printstr;   # 'bottles '
+return;                          #
+
+
+:printnomore;
+loadnum 1, 110; putchar;         # 'n'
+loadptr 1, @omore; printstr;     # 'o more '
+loadptr 1, @bottles; printstr;   # 'bottles '
+return;                          #
 
 
 .code;
@@ -60,21 +89,16 @@ jls @noBeers;                    # no beers
 
 
 :pluralBeers;
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottles; printstr;   # 'bottles '
+gosub @printbeercnt;             # print beer count
 loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottles; printstr;   # 'bottles '
-loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and passes it around, '
+gosub @printbeercnt;             # print beer count'
+loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and pass it around, '
 
 loadvariable beercount; peeknum; # r1 <- beercount (deferred)
 dec1; setvariable beercount;     # decrement beercount by one
 
 
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottles; printstr;   # 'bottles '
+gosub @printbeercnt;             # print beer count
 loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
 
 jmp @compare;
@@ -82,20 +106,15 @@ jmp @compare;
 
 
 :singularBeers;
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottle; printstr;    # 'bottle '
+gosub @printbeercnt;             # print beer count
 loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottle; printstr;    # 'bottle '
-loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and passes it around, '
+gosub @printbeercnt;             # print beer count
+loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and pass it around, '
 
 loadvariable beercount; peeknum; # r1 <- beercount (deferred)
 dec1; setvariable beercount;     # decrement beercount by one
 
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottles; printstr;   # 'bottles '
+gosub @printbeercnt;             # print beer count
 loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
 
 jmp @compare;
@@ -107,16 +126,13 @@ loadnum 1, 78; putchar;          # 'N'
 loadptr 1, @omore; printstr;     # 'o more '
 loadptr 1, @bottles; printstr;   # 'bottles '
 loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
-loadnum 1, 110; putchar;         # 'n'
-loadptr 1, @omore; printstr;     # 'o more '
-loadptr 1, @bottles; printstr;   # 'bottles '
+gosub @printbeercnt;             # print beer count ('no more bottles ')
 loadptr 1, @gotostore; printstr; # 'of beer.\nGo to the store and buy some more, '
 
-loadnum 1, 99                    # set beercount to 99
+loadnum 1, 99;                   # set beercount to 99
 setvariable beercount;           #
 
-printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottles; printstr;   # 'bottles '
+gosub @printbeercnt;             # print beer count
 loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
 
 halt;

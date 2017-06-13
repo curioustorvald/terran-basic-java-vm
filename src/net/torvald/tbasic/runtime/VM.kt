@@ -573,7 +573,6 @@ Math error
 
 
     fun execDebugMain(any: Any?) { if (DEBUG) print(any) }
-    fun execDebug(any: Any?)     { if (DEBUG) print(any) }
 
     fun execute(delayInMills: Int? = null) {
         if (userSpaceStart != null) {
@@ -615,7 +614,7 @@ Math error
                             indexEnd += 1
                         }
                         // indexEnd now points \0
-                        execDebug("[varargCounter] indexStart: $indexStart, indexEnd: $indexEnd (byteat: ${memory[indexEnd]})")
+                        //execDebug("[varargCounter] indexStart: $indexStart, indexEnd: $indexEnd (byteat: ${memory[indexEnd]})")
                         memSlice(indexStart, indexEnd)
                     }
                     else {

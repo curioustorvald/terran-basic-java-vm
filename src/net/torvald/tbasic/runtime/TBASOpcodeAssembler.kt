@@ -1,6 +1,7 @@
 package net.torvald.tbasic.runtime
 
 import net.torvald.tbasic.TBASOpcodes
+import net.torvald.tbasic.TBASOpcodes.READ_UNTIL_ZERO
 import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
 
 /**
@@ -114,7 +115,6 @@ object TBASOpcodeAssembler {
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
             val words = line.split(delimiters)
-            val cmd = words[0].toUpperCase()
 
 
             if (line.isEmpty() || words.isEmpty()) {
@@ -208,8 +208,14 @@ object TBASOpcodeAssembler {
                         // will continue to next statements
                     }
                     else {
+                        // sanitise input
                         if (TBASOpcodes.opcodesList[cmd] == null) {
-                            throw Error("Invalid assembly: $cmd")
+                            throw Error("Invalid opcode: $cmd")
+                        }
+                        // filter arg count mismatch
+                        val argCount = TBASOpcodes.opcodeArgsList[cmd]?.size ?: 0
+                        if (argCount + 1 != words.size && (!(TBASOpcodes.opcodeArgsList[cmd]?.contains(READ_UNTIL_ZERO) ?: false))) {
+                            throw Error("Opcode $cmd -- Number of argument(s) are mismatched; requires $argCount, got ${words.size - 1}. Perhaps semicolon not placed?")
                         }
 
                         virtualPC += 1
