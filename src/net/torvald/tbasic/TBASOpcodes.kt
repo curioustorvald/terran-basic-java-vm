@@ -12,6 +12,8 @@ typealias Register = Int
  * * r1-r4: function arguments
  * * b1-b4: function argument supplements (type marker, etc)
  *
+ * Basically, the opcodes are all single-cycle. We're doing high-level emulation for high performance on your main application.
+ *
  * Created by minjaesong on 2017-05-10.
  */
 object TBASOpcodes {

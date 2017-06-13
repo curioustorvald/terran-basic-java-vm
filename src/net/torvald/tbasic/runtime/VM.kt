@@ -423,13 +423,15 @@ class VM(memSize: Int,
 
 
     init {
-        if (memSize > 16.MB()) {
-            warn("VM memory size might be too big — recommended max is 16 MBytes")
+        if (memSize > 4.MB()) {
+            warn("VM memory size might be too large — recommended max is 4 MBytes")
         }
-        else if (memSize < 256) { // arbitrary unit
+        else if (memSize < 256) { // arbitrary unit (note - ATtiny has at least 2K Flash + 128 EEPROM + 128 SRAM. Atari 2600 had 128)
             throw Error("VM memory size too small — minimum allowed is 256 bytes")
         }
-
+        else if (memSize > 16.MB()) {
+            throw Error("Memory size too large -- maximum allowed is 16 MBytes. (seriously, you don't want too much memory allocation)")
+        }
     }
 
     fun loadProgram(opcodes: ByteArray) {
@@ -447,7 +449,9 @@ class VM(memSize: Int,
 
         pc = ivtSize
         userSpaceStart = opcodes.size + 1 + ivtSize
-        userSpaceStart = userSpaceStart!! + setDefaultInterrepts()
+
+        userSpaceStart = userSpaceStart!! + setDefaultInterrepts() // renew userSpaceStart after interrupts
+        mallocList.clear()
 
 
         warn("Program loaded; pc: $pc, userSpaceStart: $userSpaceStart")
