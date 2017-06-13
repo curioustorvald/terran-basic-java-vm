@@ -92,7 +92,7 @@ object TBasCC {
     private val keywords = hashSetOf(
             // classic C
             "auto","break","case","char","const","continue","default","do","double","else","enum","extern","float",
-            "for","goto","if","int","long","register","return","short","signed","static","struct","switch",//"sizeof" // is an operator
+            "for","goto","if","int","long","register","return","short","signed","static","struct","switch","sizeof", // is an operator
             "typedef","union","unsigned","void","volatile","while",
             // SimpleC bool
             "bool","true","false",
@@ -112,7 +112,7 @@ object TBasCC {
             "extern"
     )
     private val operatorsHierarchyInternal = arrayOf(
-            // opirator precedence in internal format (#_nameinlowercase)  PUT NO PARENS HERE!   [ ] are allowed? pls chk
+            // opirator precedence in internal format (#_nameinlowercase)  PUT NO PARENS HERE!   TODO [ ] are allowed? pls chk
             // most important
             hashSetOf("++","--","[", "]",".","->"),
             hashSetOf("#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
@@ -222,9 +222,9 @@ object TBasCC {
     }
 
     // compiler options
-    private var useDigraph = false
-    private var useTrigraph = false
-    private var errorIncompatibles = true
+    var useDigraph = false
+    var useTrigraph = false
+    var errorIncompatibles = true
 
     operator fun invoke(
             program: String,
@@ -322,7 +322,7 @@ object TBasCC {
 
     /** No preprocessor should exist at this stage! */
     fun tokenise(program: String): ArrayList<LineStructure> {
-        fun debug1(any: Any) { if (true) println(any) }
+        fun debug1(any: Any) { if (false) println(any) }
 
         ///////////////////////////////////
         // STEP 0. Divide things cleanly //
@@ -398,12 +398,12 @@ object TBasCC {
             else if (!isLiteralMode && !isCharLiteral && !isBlockComment && !isLineComment) {
                 // replace digraphs
                 if (useDigraph && digraphs.containsKey(lookahead2)) { // replace digraphs
-                    char = program[charCtr]
+                    char = digraphs[lookahead2]!!
                     lookahead4 = char + lookahead4.substring(0..lookahead4.lastIndex)
                     lookahead3 = char + lookahead3.substring(0..lookahead3.lastIndex)
                     lookahead2 = char + lookahead2.substring(0..lookahead2.lastIndex)
                     lookbehind2 = lookbehind2.substring(0..lookahead2.lastIndex - 1) + char
-                    charCtr++
+                    charCtr += 1
                 }
 
 
@@ -554,34 +554,55 @@ object TBasCC {
 
 
     fun buildTree(lineStructures: List<LineStructure>): SyntaxTreeNode {
+        fun debug1(any: Any) { if (true) println(any) }
+
+
         ///////////////////////////
         // STEP 1. Create a tree //
         ///////////////////////////
 
         val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true, lineNumber = 1)
-        val middleNodes = Stack<SyntaxTreeNode>()
-        var currentDepth = 0
-        middleNodes.push(ASTroot)
 
-        fun getCurrentNode() = middleNodes.peek()
-        fun pushNode(node: SyntaxTreeNode) {
-            middleNodes.push(node)
-            currentDepth += 1
+        val workingNodes = Stack<SyntaxTreeNode>()
+        workingNodes.push(ASTroot)
+
+        fun getWorkingNode() = workingNodes.peek()
+
+
+
+        fun printStackDebug(): String {
+            val sb = StringBuilder()
+
+            sb.append("Node stack: [")
+            workingNodes.forEachIndexed { index, it ->
+                if (index > 0) { sb.append(", ") }
+                sb.append("l"); sb.append(it.lineNumber)
+            }
+            sb.append("]")
+
+            return sb.toString()
         }
 
-        lineStructures.forEach { val (lineNum, depth, tokens) = it
-            if (depth > currentDepth) throw SyntaxError("Unexpected code block")
-            if (depth < currentDepth) middleNodes.pop()
+        lineStructures.forEachIndexed { index, it -> val (lineNum, depth, tokens) = it
+            val nextLineDepth = if (index != lineStructures.lastIndex) lineStructures[index + 1].depth else null
 
-            val treeNode = asTreeNode(lineNum, tokens)
 
-            if (treeNode.expressionType == ExpressionType.FUNCTION_DEF) {
-                getCurrentNode().addStatement(treeNode)
-                pushNode(treeNode) // go one level deeper
+            val nodeBuilt = asTreeNode(lineNum, tokens)
+            getWorkingNode().addStatement(nodeBuilt)
+
+
+            if (nextLineDepth != null) {
+                // has code block
+                if (nextLineDepth > depth) {
+                    workingNodes.push(nodeBuilt)
+                }
+                // code block escape
+                else if (nextLineDepth < depth) {
+                    repeat(depth - nextLineDepth) { workingNodes.pop() }
+                }
             }
-            else {
-                getCurrentNode().addStatement(treeNode)
-            }
+
+
         }
 
 
@@ -1157,16 +1178,14 @@ object TBasCC {
         override fun toString() = toStringRepresentation(0)
 
         private fun toStringRepresentation(depth: Int): String {
-            val header = "│ ".repeat(depth) + if (isRoot) "⧫AST (name: $name)" else "AST$depth (name: $name)"
+            val header = "│ ".repeat(depth) + if (isRoot) "⧫AST (name: $name)" else if (isLeaf) "◊AST$depth (name: $name)" else "☐AST$depth (name: $name)"
             val lines = arrayListOf(
                     header,
                     "│ ".repeat(depth+1) + "ExprType : $expressionType",
                     "│ ".repeat(depth+1) + "RetnType : $returnType" +
                             if (returnType == ReturnType.STRUCT_PTR || returnType == ReturnType.STRUCT) " '$structName'"
                             else "",
-                    "│ ".repeat(depth+1) + "LiteralV : '$literalValue'",
-                    "│ ".repeat(depth+1) + "isRoot ? $isRoot",
-                    "│ ".repeat(depth+1) + "isLeaf ? $isLeaf"
+                    "│ ".repeat(depth+1) + "LiteralV : '$literalValue'"
             )
 
             if (!isLeaf) {
