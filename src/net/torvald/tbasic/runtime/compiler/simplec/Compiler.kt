@@ -115,7 +115,7 @@ object TBasCC {
             // opirator precedence in internal format (#_nameinlowercase)  PUT NO PARENS HERE!   TODO [ ] are allowed? pls chk
             // most important
             hashSetOf("++","--","[", "]",".","->"),
-            hashSetOf("#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
+            hashSetOf("#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_ptrderef","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
             hashSetOf("*","/","%"),
             hashSetOf("+","-"),
             hashSetOf("<<",">>"),
@@ -134,7 +134,7 @@ object TBasCC {
     // operators must return value when TREE is evaluated -- with NO EXCEPTION; '=' must return value too! (not just because of C standard, but design of #_assignvar)
     private val unaryOps = hashSetOf(
             "++","--",
-            "#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_pointer","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"
+            "#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_ptrderef","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"
     )
     private val operatorsHierarchyRTL = arrayOf(
             false,
@@ -206,6 +206,9 @@ object TBasCC {
     private val builtinFunctions = hashSetOf(
             "#_assignvar", "#_plusassignvar", "#_minusassignvar", // #_assignvar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype, SyntaxTreeNode value)
             "#_declarevar" // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
+    )
+    private val functionWithSingleArgNoParen = hashSetOf(
+            "return", "goto"
     )
 
 
@@ -279,44 +282,6 @@ object TBasCC {
         }
 
 
-
-        //  // ADD whitespaces //
-        //  // make sure operators HAVE a whitespace around (eventually, just between) them
-        //  var program = program
-        //  operatorSanitiseList.forEach {
-        //      // I know it's stupid but at least I don't have to deal with the complexity
-        //      val regexHeadTail = """[\s]*"""
-        //      val regexBody = it
-        //      val regex = Regex("$regexHeadTail$regexBody$regexHeadTail")
-//
-        //      program = program.replace(regex, " $it ")
-        //  } // NOTE : whitespaces added for [ and ] will be removed again by 'KILL whitespaces' below
-//
-//
-        //  // KILL whitespaces //
-        //  // FIXME TODO strings that matches these conditions are reck'd
-        //  program = program
-        //          .replace(Regex("""[\s]*//[^\n]*"""), "") // line comment killer
-        //          .replace(Regex("""[\s]*/\**\*/[\s]*"""), "") // comment blocks killer
-        //          .replace(Regex("""[\s]*;[\s]*"""), ";") // kill whitespace around ;
-        //          //.replace(Regex("""[\s]*:[\s]*"""), ":") // kill whitespace around label marker  COMMENTED: ternary op
-        //          .replace(Regex("""[\s]*\{[\s]*"""), "{") // kill whitespace around {
-        //          .replace(Regex("""[\s]*\}[\s]*"""), "}") // kill whitespace around }
-        //          .replace(Regex("""[\s]*\([\s]*"""), "(") // kill whitespace around (
-        //          .replace(Regex("""[\s]*\)[\s]*"""), ")") // kill whitespace around )
-        //          .replace(Regex("""[\s]*\[[\s]*"""), "[") // kill whitespace around [
-        //          .replace(Regex("""[\s]*\][\s]*"""), "]") // kill whitespace around ]
-        //          .replace(Regex("""[\s]*,[\s]*"""), ",") // kill whitespace around ,
-//
-//
-//
-        //  infiniteLoops.forEach { // replace classic infinite loops
-        //      program = program.replace(it, "forever")
-        //  }
-//
-        //  //println(program)
-
-
         return program
     }
 
@@ -343,6 +308,8 @@ object TBasCC {
                 if (errorIncompatibles && unsupportedKeywords.contains(sb.toString())) {
                     throw IllegalTokenException("at line $currentProgramLineNumber with token '$sb'")
                 }
+
+                debug1("!! split: depth $structureDepth, word $sb")
 
                 currentLine.depth = structureDepth // !important
                 currentLine.tokens.add(sb.toString())
@@ -415,9 +382,11 @@ object TBasCC {
 
                 // do the real jobs
                 if (char == structOpen) {
-                    structureDepth += 1 // must go first
+                    debug1("!! met structOpen at line $currentProgramLineNumber")
+
                     splitAndMoveAlong()
                     gotoNewline()
+                    structureDepth += 1 // must go last, because of quirks with 'codeblock{' and 'codeblock  {'
                 }
                 else if (char == structClose) {
                     debug1("!! met structClose at line $currentProgramLineNumber")
@@ -437,7 +406,7 @@ object TBasCC {
                         throw SyntaxError("Illegal usage of char literal")
                     isCharLiteral = !isCharLiteral
                 }
-                else if (char == ')' && forStatementEngaged) {
+                /*else if (char == ')' && forStatementEngaged) {
                     forStatementEngaged = false
                     TODO()
                 }
@@ -445,7 +414,7 @@ object TBasCC {
                     if (forStatementEngaged) throw SyntaxError("keyword 'for' used inside of 'for' statement")
                     forStatementEngaged = true
                     TODO()
-                }
+                }*/
                 else if (!forStatementEngaged && char == ';') {
                     splitAndMoveAlong()
                     gotoNewline()
@@ -552,7 +521,6 @@ object TBasCC {
         return lineStructures
     }
 
-
     fun buildTree(lineStructures: List<LineStructure>): SyntaxTreeNode {
         fun debug1(any: Any) { if (true) println(any) }
 
@@ -561,7 +529,7 @@ object TBasCC {
         // STEP 1. Create a tree //
         ///////////////////////////
 
-        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = null, isRoot = true, lineNumber = 1)
+        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = "root", isRoot = true, lineNumber = 1)
 
         val workingNodes = Stack<SyntaxTreeNode>()
         workingNodes.push(ASTroot)
@@ -608,8 +576,6 @@ object TBasCC {
 
         return ASTroot
     }
-
-
 
     private fun traverseAST() {
 
@@ -809,7 +775,14 @@ object TBasCC {
             // filter illegal lines (absurd keyword usage)
             tokens.forEach {
                 if (codeBlockKeywords.contains(it)) {
-                    throw IllegalTokenException("in line $lineNumber -- Unexpected token: $it")
+                    // code block without argumenets; give it proper parens and redirect
+                    val newTokens = tokens.toMutableList()
+                    if (newTokens.size != 1) {
+                        throw SyntaxError("Number of tokens is not 1; I have no idea on this level.")
+                    }
+
+                    newTokens.add("("); newTokens.add(")")
+                    return asTreeNode(lineNumber, newTokens)
                 }
             }
 
@@ -956,10 +929,18 @@ object TBasCC {
                             lineNumber
                     )
                     gotoNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
+                    return gotoNode
                 }
-                //else if (tokens[0] == "return") {
-
-                //}
+                else if (tokens[0] == "return") {
+                    val returnNode = SyntaxTreeNode(
+                            ExpressionType.FUNCTION_CALL,
+                            null,
+                            "return",
+                            lineNumber
+                    )
+                    returnNode.addArgument(turnInfixTokensIntoTree(lineNumber, tokens.subList(1, tokens.lastIndex + 1)))
+                    return returnNode
+                }
 
                 //////////////////////////
                 // variable declaration //
@@ -1032,7 +1013,6 @@ object TBasCC {
         }
     }
 
-
     fun turnInfixTokensIntoTree(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
         // based on https://stackoverflow.com/questions/1946896/conversion-from-infix-to-prefix
 
@@ -1048,7 +1028,6 @@ object TBasCC {
 
             throw SyntaxError("at $lineNumber -- unknown operator '$token'")
         }
-
 
         val tokens = tokens.reversed()
 
@@ -1099,7 +1078,7 @@ object TBasCC {
                         if (rawToken == "+") "#_unaryplus"
                         else if (rawToken == "-") "#_unaryminus"
                         else if (rawToken == "&") "#_addressof"
-                        else if (rawToken == "*") "#_pointer"
+                        else if (rawToken == "*") "#_ptrderef"
                         else if (rawToken == "++") "#_preinc"
                         else if (rawToken == "--") "#_predec"
                         else rawToken
@@ -1137,7 +1116,7 @@ object TBasCC {
 
 
         if (treeArgsStack.size != 1) {
-            throw InternalError("Stack size is wrong -- supposed to be 1, but it's ${treeArgsStack.size}")
+            throw InternalError("Stack size is wrong -- supposed to be 1, but it's ${treeArgsStack.size}\nstack: $treeArgsStack")
         }
         debug("finalised tree:\n${treeArgsStack.peek()}")
 

@@ -53,7 +53,7 @@ int main    () {
 
 
     //val line = """println( (a - b) / c * (d + e - f / g) );"""
-    val line = """
+    val line = /*"""
 bool clack = true;
 
 int main() {
@@ -64,8 +64,24 @@ int main() {
         printf("arst");
     }
 }
+"""*/"""
+int main() {
+
+    int bob_bailey = 43;
+
+    forever {
+        goto hell;
+
+        if (true) {
+            return 1;
+        }
+
+        return 2;
+    }
+
+    return 0;
+}
 """
-    TBasCC.useDigraph = true
 
     val preprocessedLine = TBasCC.preprocess(line)
 

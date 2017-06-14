@@ -300,7 +300,7 @@ object TBASOpcodes {
 
     /** memory(r2) <- r1 */
     fun POKENUM() { vm.r1.toLittle().forEachIndexed { index, byte -> vm.memory[vm.r2.toInt() + index] = byte } }
-    /** r1 <- data in memory addr r1 */
+    /** r1 <- data in memory addr r1 (aka pointer dereference) */
     fun PEEKNUM() {
         dprintln("=== peeknum memmap at ${vm.r1}: ")
 
@@ -334,6 +334,8 @@ object TBASOpcodes {
     /** Memory copy - peripheral index: r5, source (machine): r2, destination (peripheral): r3, length: r4 */
     fun MEMCPYPERI() { System.arraycopy(vm.memory, vm.r2.toInt(), vm.peripherals[vm.r5.toInt()], vm.r3.toInt(), vm.r4.toInt()) }
 
+    /** r1 <- allocated memory pointer, r2: size in bytes */
+    fun MALLOC() { LOADNUM(1, vm.malloc(vm.r2.toInt()).memAddr.toDouble()) }
 
     /*
      b registers:
@@ -491,7 +493,12 @@ object TBASOpcodes {
 
 
 
-    fun CALL(peripheral: Byte, arg: Int) { if (peripheral == 0xFF.toByte()) vm.BIOS.call(arg) else vm.peripherals[peripheral.toUint()].call(arg) }
+    fun CALL(peripheral: Byte, arg: Int) {
+        if (peripheral == 0xFF.toByte())
+            vm.bios.call(arg)
+        else
+            vm.peripherals[peripheral.toUint()].call(arg)
+    }
 
 
 
@@ -656,123 +663,11 @@ object TBASOpcodes {
             "READSTR" to 87.toByte(),
 
             "POKENUM" to 88.toByte(),
-            "PEEKNUM" to 89.toByte()
+            "PEEKNUM" to 89.toByte(),
+
+            "MALLOC" to 90.toByte()
 
     )
-
-    val NOP = 7.toByte()
-
-    val ADD = 1.toByte()
-    val SUB = 2.toByte()
-    val MUL = 3.toByte()
-    val DIV = 4.toByte()
-    val POW = 5.toByte()
-    val MOD = 6.toByte()
-
-    val HALT = 0.toByte()
-
-    val JMP   = 8.toByte()
-    val GOSUB  = 9.toByte()
-    val RETURN = 10.toByte()
-    val PUSH   = 11.toByte()
-    val POP    = 12.toByte()
-    val MOV    = 13.toByte()
-    val STORE  = 14.toByte()
-    val LOAD   = 15.toByte()
-
-    val SHL  = 16.toByte()
-    val SHR  = 17.toByte()
-    val USHR = 18.toByte()
-    val AND  = 19.toByte()
-    val OR   = 20.toByte()
-    val XOR  = 21.toByte()
-    val NOT  = 22.toByte()
-
-    val ABS   = 23.toByte()
-    val SIN   = 24.toByte()
-    val FLOOR = 25.toByte()
-    val CEIL  = 26.toByte()
-    val ROUND = 27.toByte()
-    val LOG   = 28.toByte()
-    val INT   = 29.toByte()
-    val RND   = 20.toByte()
-    val SGN   = 31.toByte()
-    val SQRT  = 32.toByte()
-    val CBRT  = 33.toByte()
-    val INV   = 34.toByte()
-    val RAD   = 35.toByte()
-
-    val INTERRUPT = 36.toByte()
-
-    val LOADNUM = 37.toByte()
-    val LOADRAWNUM = 38.toByte()
-    val LOADPTR = 39.toByte()
-    val LOADVARIABLE = 40.toByte()
-    val SETVARIABLE = 41.toByte()
-    val LOADMNUM = 42.toByte()
-    val LOADSTRINLINE = 43.toByte()
-
-    val PUTCHAR = 44.toByte()
-    val PRINTSTR = 45.toByte()
-    val PRINTNUM = 46.toByte()
-
-    val JZ = 48.toByte()
-    val JNZ = 49.toByte()
-    val JGT = 50.toByte()
-    val JLS = 51.toByte()
-
-    val CMP = 52.toByte()
-    val XCHG = 53.toByte()
-
-    val REGTOM = 54.toByte() // m1 <- r1.toInt()
-
-    val INC1 = 55.toByte()
-    val INC2 = 56.toByte()
-    val INC3 = 57.toByte()
-    val INC4 = 58.toByte()
-    val INC5 = 59.toByte()
-    val INC6 = 60.toByte()
-    val INC7 = 61.toByte()
-    val INC8 = 62.toByte()
-    val INCM = 63.toByte()
-
-    val DEC1 = 64.toByte()
-    val DEC2 = 65.toByte()
-    val DEC3 = 66.toByte()
-    val DEC4 = 67.toByte()
-    val DEC5 = 68.toByte()
-    val DEC6 = 69.toByte()
-    val DEC7 = 70.toByte()
-    val DEC8 = 71.toByte()
-    val DECM = 72.toByte()
-
-    val MEMCPY = 73.toByte()
-    val MEMCPYPERI = 74.toByte()
-
-    val STOREPERI = 75.toByte()
-    val LOADPERI  = 76.toByte()
-
-    val MEM = 77.toByte()
-
-    val SLP = 78.toByte()
-
-    val CLR = 79.toByte()
-
-    val UPTIME = 80.toByte()
-
-    val JFW = 81.toByte()
-    val JBW = 82.toByte()
-
-    val POKEINT = 83.toByte()
-    val PEEKINT = 84.toByte()
-
-    val CALL = 85.toByte()
-
-    val GETCHAR = 86.toByte()
-    val READSTR = 87.toByte()
-
-    val POKENUM = 88.toByte()
-    val PEEKNUM = 89.toByte()
 
     val opcodesListInverse = HashMap<Byte, String>()
     init {
@@ -891,7 +786,9 @@ object TBASOpcodes {
             "READSTR" to fun(_) { READSTR() },
 
             "POKENUM" to fun(_) { POKENUM() },
-            "PEEKNUM" to fun(_) { PEEKNUM() }
+            "PEEKNUM" to fun(_) { PEEKNUM() },
+
+            "MALLOC" to fun(_) { MALLOC() }
 
 
     )

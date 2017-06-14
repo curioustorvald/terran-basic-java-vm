@@ -57,7 +57,7 @@ import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
  *
  * Created by minjaesong on 2017-05-28.
  */
-object TBASOpcodeAssembler {
+object OpcodeAssembler {
 
     private val delimiters = Regex("""[ \t,]+""")
     private val blankLines = Regex("""(?<=;)[\n ]+""")
@@ -80,6 +80,9 @@ object TBASOpcodeAssembler {
     private var currentSection = ".CODE"
 
     val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
+
+
+    private val ASM_JMP = TBASOpcodes.opcodesList["JMP"]!!
 
 
     private fun debug(any: Any?) { if (false) { println(any) } }
@@ -367,7 +370,7 @@ object TBASOpcodeAssembler {
 
                     // insert JMP instruction that jumps to .code section
                     if (!flagSpecifyJMP) {
-                        ret.add(TBASOpcodes.JMP)
+                        ret.add(ASM_JMP)
                         repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
                         flagSpecifyJMP = true
                     }
@@ -442,7 +445,7 @@ object TBASOpcodeAssembler {
                     }
                     else if (!flagSpecifyJMP && currentSection == ".FUNC") {
                         // insert JMP instruction that jumps to .code section
-                        ret.add(TBASOpcodes.JMP)
+                        ret.add(ASM_JMP)
                         repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
                         flagSpecifyJMP = true
                     }
