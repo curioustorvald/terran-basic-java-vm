@@ -11,28 +11,28 @@ fun main(args: Array<String>) {
 
 class Executable {
 
-    val vm = VM(2048, BIOS = VMBIOS(), tbasic_remove_string_dupes = true)
+    val vm = VM(2048, tbasic_remove_string_dupes = true)
 
 
     val beers = TBASOpcodeAssembler("""
 .data;
 
-string beerone of beer on the wall, ;
+string beerone "of beer on the wall, ";
 
-string beertwo of beer.
-Take one down, pass it around, ;
+string beertwo "of beer.
+Take one down, pass it around; ";
 
-string beerthree of beer on the wall.
+string beerthree "of beer on the wall.
 
-;
+";
 
-string gotostore of beer.
-Go to the store and buy some more, ;
+string gotostore "of beer.
+Go to the store and buy some more, ";
 
-string bottles bottles ;
-string bottle bottle ;
+string bottles "bottles ";
+string bottle "bottle ";
 
-string omore o more ;
+string omore "o more ";
 
 
 .func;

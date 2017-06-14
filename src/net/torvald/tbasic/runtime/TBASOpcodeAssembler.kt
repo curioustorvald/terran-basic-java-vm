@@ -60,14 +60,18 @@ import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
 object TBASOpcodeAssembler {
 
     private val delimiters = Regex("""[ \t,]+""")
-    private val comments = Regex("""#[^\n]*""")
     private val blankLines = Regex("""(?<=;)[\n ]+""")
     private val stringMarker = Regex("""\"[^\n]*\"""")
     private val labelMarker = '@'
     private val labelDefinitionMarker = ':'
     private val lineEndMarker = ';'
+    private val commentMarker = '#'
+    private val literalMarker = '"'
     private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
     private val matchInteger = Regex("""[0-9]+""")
+    private val regexWhitespaceNoSP = Regex("""[\t\r\n\v\f]""")
+    private val prependedSpaces = Regex("""^[\s]+""")
+
 
     private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
 
@@ -99,6 +103,66 @@ object TBASOpcodeAssembler {
         return labelTable[name] ?: throw Error("Label '$name' not defined")
     }
 
+    private fun splitLines(program: String): List<String> {
+        val lines = ArrayList<String>()
+        val sb = StringBuilder()
+
+        fun split() {
+            var str = sb.toString()
+
+            // preprocess some
+            // remove prepending whitespace
+            str = str.replace(prependedSpaces, "")
+
+            lines.add(str)
+            sb.setLength(0)
+        }
+
+        var literalMode = false
+        var commentMode = false
+        var charCtr = 0
+        while (charCtr < program.length) {
+            val char = program[charCtr]
+            val charNext = if (charCtr < program.lastIndex) program[charCtr + 1] else null
+
+            if (!literalMode && !commentMode) {
+                if (char == literalMarker) {
+                    sb.append(literalMarker)
+                    literalMode = true
+                }
+                else if (char == commentMarker) {
+                    commentMode = true
+                }
+                else if (char == lineEndMarker) {
+                    split()
+                    charCtr++
+                }
+                else if (!char.toString().matches(regexWhitespaceNoSP)) {
+                    sb.append(char)
+                }
+            }
+            else if (!commentMode) {
+                if (char == literalMarker && charNext == lineEndMarker) { // quote end must be ";
+                    sb.append(literalMarker)
+                    split()
+                    literalMode = false
+                }
+                else {
+                    sb.append(char)
+                }
+            }
+            else { // comment mode
+                if (char == '\n') {
+                    commentMode = false
+                }
+            }
+
+            charCtr++
+        }
+
+        return lines
+    }
+
     operator fun invoke(userProgram: String): ByteArray {
         val ret = ArrayList<Byte>()
 
@@ -108,10 +172,7 @@ object TBASOpcodeAssembler {
         // pass 1: pre-scan for labels
         debug("\n\n== Pass 1 ==\n\n")
         var virtualPC = VM.interruptCount * 4
-        userProgram
-                .replace(comments, "")
-                .replace(blankLines, "")
-                .split(lineEndMarker).forEach { lline ->
+        splitLines(userProgram).forEach { lline ->
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
             val words = line.split(delimiters)
@@ -154,9 +215,9 @@ object TBASOpcodeAssembler {
 
                     when (type) {
                         "STRING" -> {
-                            val start = (dataSectActualData.find(line)?.value?.length
-                                    ?: throw IllegalArgumentException("malformed declaration syntax"))
-                            val end = line.length
+                            val start = line.indexOf('"') + 1
+                            val end = line.lastIndexOf('"')
+                            if (end <= start) throw IllegalArgumentException("malformed string declaration syntax -- must be surrounded with pair of \" (double quote)")
 
                             val data = line.substring(start, end)
 
@@ -280,10 +341,7 @@ object TBASOpcodeAssembler {
         flagSpecifyJMP = false
         // <-- end of reset flags
         debug("\n\n== Pass 2 ==\n\n")
-        userProgram
-                .replace(comments, "")
-                .replace(blankLines, "")
-                .split(lineEndMarker).forEach { lline ->
+        splitLines(userProgram).forEach { lline ->
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
             val words = line.split(delimiters)
@@ -329,9 +387,9 @@ object TBASOpcodeAssembler {
                         "STRING" -> {
                             debug("->> line: $line")
 
-                            val start = (dataSectActualData.find(line)?.value?.length
-                                    ?: throw IllegalArgumentException("malformed declaration syntax"))
-                            val end = line.length
+                            val start = line.indexOf('"') + 1
+                            val end = line.lastIndexOf('"')
+                            if (end <= start) throw IllegalArgumentException("malformed string declaration syntax -- must be surrounded with pair of \" (double quote)")
 
                             val data = line.substring(start, end)
 
