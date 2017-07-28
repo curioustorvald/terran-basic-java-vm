@@ -1,7 +1,6 @@
 package net.torvald.tbasic
 
-import net.torvald.tbasic.runtime.compiler.simplec.TBasCC
-import java.util.*
+import net.torvald.tbasic.runtime.compiler.simplec.SimpleC
 
 /**
  * Created by minjaesong on 2017-06-04.
@@ -25,18 +24,18 @@ int main    () {
 }
 """
     /*try {
-        TBasCC(prg)
+        SimpleC(prg)
     }
     catch (gottaCatchEmAll: Exception) {
 
     }*/
 
-    //val node = TBasCC.asTreeNode("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
+    //val node = SimpleC.asTreeNode("""void testfn(int* index,boolean *isSomething,double * someNumber)""")
     //println(node)
 
     //val line = """return dup(foo("bar",0x24),null)"""
     //val line = """int foo"""
-    //val node2 = TBasCC.asTreeNode(line, line)
+    //val node2 = SimpleC.asTreeNode(line, line)
     //println(node2)
 
 
@@ -44,9 +43,9 @@ int main    () {
 
     /*val equations = """int harambe = burr - argone * - argtwo + 42"""
     val eqNorm = """assignint(harambe,+(-(burr,*(argone,unaryminus(argtwo))),42))"""
-    //println(TBasCC.preprocess(equations))
+    //println(SimpleC.preprocess(equations))
     val atre = """int printf(...)"""
-    val node2 = TBasCC.asTreeNode(atre, atre)
+    val node2 = SimpleC.asTreeNode(atre, atre)
     println(node2)*/
 
 
@@ -67,7 +66,8 @@ int main() {
 """*/"""
 int main() {
 
-    int bob_bailey = 43;
+    int bob_bailey = 43 + 2;
+    int declarevar;0
 
     forever {
         goto hell;
@@ -83,15 +83,15 @@ int main() {
 }
 """
 
-    val preprocessedLine = TBasCC.preprocess(line)
+    val preprocessedLine = SimpleC.preprocess(line)
 
     println(preprocessedLine)
 
-    val lineStructures = TBasCC.tokenise(preprocessedLine)
+    val lineStructures = SimpleC.tokenise(preprocessedLine)
 
     lineStructures.forEach { println(it) }
 
-    val tree = TBasCC.buildTree(lineStructures)
+    val tree = SimpleC.buildTree(lineStructures)
 
     println(tree)
 

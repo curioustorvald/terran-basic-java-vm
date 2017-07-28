@@ -5,7 +5,7 @@ package net.torvald.tbasic.runtime
  *
  * Created by minjaesong on 2017-05-27.
  */
-abstract class VMPeripheralWrapper(val parent: VM, memSize: Int, var suppressWarnings: Boolean = false): VMPeripheralHardware {
+abstract class VMPeripheralWrapper(memSize: Int, var suppressWarnings: Boolean = false): VMPeripheralHardware {
 
     internal val memory = ByteArray(memSize)
 

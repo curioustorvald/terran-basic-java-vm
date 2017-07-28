@@ -16,7 +16,7 @@ typealias Register = Int
  *
  * Created by minjaesong on 2017-05-10.
  */
-object TBASOpcodes {
+object Opcodes {
 
     private val DEBUG = false
 
@@ -49,21 +49,21 @@ object TBASOpcodes {
         val writePointer = VM.Pointer(vm, 0, VM.Pointer.PointerType.INT32, true)
 
         run { // --> SYNTAX ERROR (invalid opcode??)
-            val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(Opcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(Opcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_ILLEGAL_OP * 4
             writePointer.write(syntaxErrorPtr.memAddr)
         }
 
         run { // --> DIVISION BY ZERO ERROR (invalid opcode??)
-            val div0Ptr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val div0Ptr = vm.makeBytesDB(byteArrayOf(Opcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(Opcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_DIV_BY_ZERO * 4
             writePointer.write(div0Ptr.memAddr)
         }
 
         run { // --> OUT OF MEMORY ERROR
-            val oomPtr = vm.makeBytesDB(byteArrayOf(TBASOpcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(TBASOpcodes.opcodesList["PRINTSTR"]!!))
+            val oomPtr = vm.makeBytesDB(byteArrayOf(Opcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(Opcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
             writePointer.memAddr = VM.INT_OUT_OF_MEMORY * 4
             writePointer.write(oomPtr.memAddr)
@@ -113,8 +113,10 @@ object TBASOpcodes {
 
     // flow control //
 
-    fun PUSH(addr: Int) { vm.callStack[vm.sp++] = addr }
-    fun POP() { vm.lr = vm.callStack[--vm.sp] }
+    fun PUSH(register: Register) { vm.callStack[vm.sp++] = vm.readreg(register) }
+    fun PUSHINT(addr: Int) { vm.callStack[vm.sp++] = addr.toDouble() }
+    fun POP(register: Register) { vm.writereg(register, vm.callStack[--vm.sp]) }
+    fun POPINT() { vm.lr = vm.callStack[--vm.sp].toInt() }
 
     fun JMP(addr: Int) { vm.pc = addr }
     fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + offset, 0x7FFFFFFF) }
@@ -125,8 +127,8 @@ object TBASOpcodes {
     fun JGT(addr: Int) { if (vm.m1 > 0) JMP(addr) }
     fun JLS(addr: Int) { if (vm.m1 < 0) JMP(addr) }
 
-    fun RETURN() { POP(); vm.pc = vm.lr }
-    fun GOSUB(addr: Int) { PUSH(vm.pc); JMP(addr) }
+    fun RETURN() { POPINT(); vm.pc = vm.lr }
+    fun GOSUB(addr: Int) { PUSHINT(vm.pc); JMP(addr) }
 
     fun HALT() { vm.terminate = true }
 
@@ -565,8 +567,8 @@ object TBASOpcodes {
             "JMP"   to 8.toByte(),
             "GOSUB"  to 9.toByte(),
             "RETURN" to 10.toByte(),
-            "PUSH"   to 11.toByte(),
-            "POP"    to 12.toByte(),
+            "PUSHINT"   to 11.toByte(),
+            "POPINT"    to 12.toByte(),
             "MOV"    to 13.toByte(),
             "POKE"   to 14.toByte(),
             "PEEK"   to 15.toByte(),
@@ -665,7 +667,8 @@ object TBASOpcodes {
             "POKENUM" to 88.toByte(),
             "PEEKNUM" to 89.toByte(),
 
-            "MALLOC" to 90.toByte()
+            "MALLOC" to 90.toByte(),
+            "PUSH" to 91.toByte()
 
     )
 
@@ -688,8 +691,10 @@ object TBASOpcodes {
             "JMP"   to fun(args: List<ByteArray>) { JMP(args[0].toLittleInt()) },
             "GOSUB"  to fun(args: List<ByteArray>) { GOSUB(args[0].toLittleInt()) },
             "RETURN" to fun(_) { RETURN() },
-            "PUSH"   to fun(args: List<ByteArray>) { PUSH(args[0].toLittleInt()) },
-            "POP"    to fun(_) { POP() },
+            "PUSHINT" to fun(args: List<ByteArray>) { PUSHINT(args[0].toLittleInt()) },
+            "PUSH"   to fun(args: List<ByteArray>) { PUSH(args[0][0].toUint()) },
+            "POPINT" to fun(_) { POPINT() },
+            "POP"    to fun(args: List<ByteArray>) { POP(args[0][0].toUint()) },
             "MOV"    to fun(args: List<ByteArray>) { MOV(args[0][0].toInt(), args[1][0].toInt()) },
             "POKE"   to fun(_) { POKE() },
             "PEEK"   to fun(_) { PEEK() },
@@ -800,7 +805,9 @@ object TBASOpcodes {
             "LOADPTR" to intArrayOf(SIZEOF_BYTE, SIZEOF_POINTER),
             "LOADVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
             "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
-            "PUSH" to intArrayOf(SIZEOF_INT32),
+            "PUSHINT" to intArrayOf(SIZEOF_INT32),
+            "PUSH" to intArrayOf(SIZEOF_BYTE),
+            "POP" to intArrayOf(SIZEOF_BYTE),
             "LOADMNUM" to intArrayOf(SIZEOF_INT32),
             "LOADSTRINLINE" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
             "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
@@ -813,7 +820,7 @@ object TBASOpcodes {
             "JLS" to intArrayOf(SIZEOF_POINTER),
             "SLP" to intArrayOf(SIZEOF_NUMBER),
             "GOSUB" to intArrayOf(SIZEOF_POINTER),
-            "PUSH" to intArrayOf(SIZEOF_POINTER),
+            "PUSHINT" to intArrayOf(SIZEOF_POINTER),
             "CALL" to intArrayOf(SIZEOF_BYTE, SIZEOF_INT32)
     )
 }

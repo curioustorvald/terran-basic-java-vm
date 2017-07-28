@@ -1,8 +1,8 @@
 package net.torvald.tbasic.runtime
 
 import net.torvald.tbasic.*
-import net.torvald.tbasic.TBASOpcodes.POKEINT
-import net.torvald.tbasic.TBASOpcodes.READ_UNTIL_ZERO
+import net.torvald.tbasic.Opcodes.POKEINT
+import net.torvald.tbasic.Opcodes.READ_UNTIL_ZERO
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
@@ -22,7 +22,6 @@ typealias Number = Double
  * Created by minjaesong on 2017-05-09.
  */
 class VM(memSize: Int,
-         val BIOS: VMBIOS,
          private val stackSize: Int = 2500,
          val stdout: OutputStream = System.out,
          val stdin: InputStream = System.`in`,
@@ -204,8 +203,8 @@ class VM(memSize: Int,
 
     private val mallocList = ArrayList<Int>(64) // can be as large as memSize
 
-    private fun addToMallocList(range: IntRange) { range.forEach { mallocList.add(it) } }
-    private fun removeFromMallocList(range: IntRange) { range.forEach { mallocList.remove(it) } }
+    private inline fun addToMallocList(range: IntRange) { range.forEach { mallocList.add(it) } }
+    private inline fun removeFromMallocList(range: IntRange) { range.forEach { mallocList.remove(it) } }
 
     /**
      * Return starting position of empty space
@@ -217,8 +216,8 @@ class VM(memSize: Int,
         mallocList.sort()
 
         val candidates = ArrayList<Pair<Int, Int>>() // startingPos, size
-        for (it in 0..mallocList.lastIndex - 1) {
-            val gap = mallocList[it + 1] - mallocList[it] - 1
+        for (it in 1..mallocList.lastIndex) {
+            val gap = mallocList[it] - 1 - (if (it == 0) userSpaceStart!! else mallocList[it - 1])
 
             if (gap >= size) {
                 candidates.add(Pair(mallocList[it] + 1, gap))
@@ -304,6 +303,7 @@ class VM(memSize: Int,
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     val peripherals = ArrayList<VMPeripheralWrapper>() // peri addr: 0x00..0xFE; 0xFF being on-board BIOS/UEFI
+    val bios = BIOS(this)
 
     /**
      * Memory Map
@@ -325,7 +325,7 @@ class VM(memSize: Int,
     fun getvar(name: String) = varTable[name]
     fun hasvar(name: String) = varTable.containsKey(name)
 
-    val callStack = IntArray(stackSize, { 0 })
+    val callStack = DoubleArray(stackSize, { 0.0 })
 
     val ivtSize = 4 * VM.interruptCount
     var userSpaceStart: Int? = null // lateinit
@@ -432,6 +432,9 @@ class VM(memSize: Int,
         else if (memSize > 16.MB()) {
             throw Error("Memory size too large -- maximum allowed is 16 MBytes. (seriously, you don't want too much memory allocation)")
         }
+
+        // attach basic peripherals
+        peripherals.add(PeripheralKeyboard(this))
     }
 
     fun loadProgram(opcodes: ByteArray) {
@@ -441,11 +444,11 @@ class VM(memSize: Int,
 
         softReset()
 
-        TBASOpcodes.invoke(this)
+        Opcodes.invoke(this)
 
 
         System.arraycopy(opcodes, 0, memory, ivtSize, opcodes.size)
-        memory[opcodes.size + ivtSize] = TBASOpcodes.opcodesList["HALT"]!!
+        memory[opcodes.size + ivtSize] = Opcodes.opcodesList["HALT"]!!
 
         pc = ivtSize
         userSpaceStart = opcodes.size + 1 + ivtSize
@@ -458,32 +461,32 @@ class VM(memSize: Int,
     }
 
     private fun setDefaultInterrepts(): Int {
-        val intOOM = TBASOpcodeAssembler("""
+        val intOOM = Assembler("""
 loadstrinline 1,
 Out of memory
 ; printstr; halt;
 """)
-        val intSegfault = TBASOpcodeAssembler("""
+        val intSegfault = Assembler("""
 loadstrinline 1,
 Segmentation fault
 ; printstr; halt;
 """)
-        val intDivZero = TBASOpcodeAssembler("""
+        val intDivZero = Assembler("""
 loadstrinline 1,
 Division by zero
 ; printstr; halt;
 """)
-        val intIllegalOp = TBASOpcodeAssembler("""
+        val intIllegalOp = Assembler("""
 loadstrinline 1,
 Illegal operation
 ; printstr; halt;
 """)
-        val intStackOverflow = TBASOpcodeAssembler("""
+        val intStackOverflow = Assembler("""
 loadstrinline 1,
 Stack overflow
 ; printstr; halt;
 """)
-        val intMathFuck = TBASOpcodeAssembler("""
+        val intMathFuck = Assembler("""
 loadstrinline 1,
 Math error
 ; printstr; halt;
@@ -601,11 +604,11 @@ Math error
                 }
 
                 val instruction = memory[pc]
-                val instAsm = TBASOpcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pc")
+                val instAsm = Opcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pc")
 
                 execDebugMain("\nExec: $instAsm, ")
 
-                val argumentsInfo = TBASOpcodes.opcodeArgsList[instAsm] ?: intArrayOf()
+                val argumentsInfo = Opcodes.opcodeArgsList[instAsm] ?: intArrayOf()
 
                 val arguments = argumentsInfo.mapIndexed { index, i ->
                     if (i > 0) {
@@ -634,7 +637,7 @@ Math error
                 execDebugMain(", PC-next: $pc\n")
                 // invoke function
                 try {
-                    TBASOpcodes.opcodesFunList[instAsm]!!(arguments)
+                    Opcodes.opcodesFunList[instAsm]!!(arguments)
                 }
                 catch (oom: ArrayIndexOutOfBoundsException) {
                     execDebugMain("[TBASRT] illegal memory address access")
@@ -689,6 +692,38 @@ Math error
     fun interruptStackOverflow() { pc = memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt() }
     fun interruptMathError() { pc = memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt() }
     fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
+
+
+    class BIOS(val vm: VM) : VMPeripheralHardware {
+        override fun call(arg: Int) {
+            when (arg) {
+            // memory check
+            // @return memory size in Number, saved to r1
+                0 -> {
+                    vm.r1 = vm.memory.size.toDouble()
+                }
+            // find boot device and load boot script to memory, move PC
+            // @return modified memory
+                1 -> {
+
+                }
+                else -> vm.interruptIllegalOp()
+            }
+        }
+    }
+
+
+    // depends on the implementation. Here I used LibGDX.
+    class PeripheralKeyboard(val vm: VM) : VMPeripheralWrapper(2) {
+        override fun call(arg: Int) {
+            when (arg) {
+                // 0-255: is this key pressed?
+                /*in 1..255 -> {
+                    vm.r1 = Gdx.input.isKeyPressed(arg)
+                }*/
+            }
+        }
+    }
 }
 
 fun Int.KB() = this shl 10

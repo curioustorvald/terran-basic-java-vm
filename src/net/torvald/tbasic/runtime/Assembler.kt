@@ -1,8 +1,8 @@
 package net.torvald.tbasic.runtime
 
-import net.torvald.tbasic.TBASOpcodes
-import net.torvald.tbasic.TBASOpcodes.READ_UNTIL_ZERO
-import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
+import net.torvald.tbasic.Opcodes
+import net.torvald.tbasic.Opcodes.READ_UNTIL_ZERO
+import net.torvald.tbasic.Opcodes.SIZEOF_POINTER
 
 /**
  * ## Syntax
@@ -57,7 +57,7 @@ import net.torvald.tbasic.TBASOpcodes.SIZEOF_POINTER
  *
  * Created by minjaesong on 2017-05-28.
  */
-object OpcodeAssembler {
+object Assembler {
 
     private val delimiters = Regex("""[ \t,]+""")
     private val blankLines = Regex("""(?<=;)[\n ]+""")
@@ -82,7 +82,7 @@ object OpcodeAssembler {
     val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
 
 
-    private val ASM_JMP = TBASOpcodes.opcodesList["JMP"]!!
+    private val ASM_JMP = Opcodes.opcodesList["JMP"]!!
 
 
     private fun debug(any: Any?) { if (false) { println(any) } }
@@ -273,18 +273,18 @@ object OpcodeAssembler {
                     }
                     else {
                         // sanitise input
-                        if (TBASOpcodes.opcodesList[cmd] == null) {
+                        if (Opcodes.opcodesList[cmd] == null) {
                             throw Error("Invalid opcode: $cmd")
                         }
                         // filter arg count mismatch
-                        val argCount = TBASOpcodes.opcodeArgsList[cmd]?.size ?: 0
-                        if (argCount + 1 != words.size && (!(TBASOpcodes.opcodeArgsList[cmd]?.contains(READ_UNTIL_ZERO) ?: false))) {
+                        val argCount = Opcodes.opcodeArgsList[cmd]?.size ?: 0
+                        if (argCount + 1 != words.size && (!(Opcodes.opcodeArgsList[cmd]?.contains(READ_UNTIL_ZERO) ?: false))) {
                             throw Error("Opcode $cmd -- Number of argument(s) are mismatched; requires $argCount, got ${words.size - 1}. Perhaps semicolon not placed?")
                         }
 
                         virtualPC += 1
 
-                        val argumentInfo = TBASOpcodes.opcodeArgsList[cmd] ?: intArrayOf()
+                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: intArrayOf()
 
                         // By the definition, "string argument" is always the last, and only one should exist.
                         if (argumentInfo.isNotEmpty()) {
@@ -294,16 +294,16 @@ object OpcodeAssembler {
 
                                 try {
                                     when (it) {
-                                        TBASOpcodes.SIZEOF_BYTE -> {
+                                        Opcodes.SIZEOF_BYTE -> {
                                             virtualPC += 1
                                         }
-                                        TBASOpcodes.SIZEOF_NUMBER -> {
+                                        Opcodes.SIZEOF_NUMBER -> {
                                             virtualPC += 8
                                         }
-                                        TBASOpcodes.SIZEOF_INT32 -> {
+                                        Opcodes.SIZEOF_INT32 -> {
                                             virtualPC += 4
                                         }
-                                        TBASOpcodes.READ_UNTIL_ZERO -> {
+                                        Opcodes.READ_UNTIL_ZERO -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
                                             }
@@ -456,13 +456,13 @@ object OpcodeAssembler {
                         // will continue to next statements
                     }
                     else {
-                        if (TBASOpcodes.opcodesList[cmd] == null) {
+                        if (Opcodes.opcodesList[cmd] == null) {
                             throw Error("Invalid assembly: $cmd")
                         }
 
-                        ret.add(TBASOpcodes.opcodesList[cmd]!!)
+                        ret.add(Opcodes.opcodesList[cmd]!!)
 
-                        val argumentInfo = TBASOpcodes.opcodeArgsList[cmd] ?: intArrayOf()
+                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: intArrayOf()
 
                         // By the definition, "string argument" is always the last, and only one should exist.
                         if (argumentInfo.isNotEmpty()) {
@@ -472,7 +472,7 @@ object OpcodeAssembler {
 
                                 try {
                                     when (it) {
-                                        TBASOpcodes.SIZEOF_BYTE -> {
+                                        Opcodes.SIZEOF_BYTE -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 TODO("label that points to Byte (${words[index + 1]})")
                                             }
@@ -480,7 +480,7 @@ object OpcodeAssembler {
                                                 ret.add(words[index + 1].toInt().toByte())
                                             }
                                         }
-                                        TBASOpcodes.SIZEOF_NUMBER -> {
+                                        Opcodes.SIZEOF_NUMBER -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 TODO("label that points to Number (${words[index + 1]})")
                                             }
@@ -490,7 +490,7 @@ object OpcodeAssembler {
                                                 }
                                             }
                                         }
-                                        TBASOpcodes.SIZEOF_INT32 -> {
+                                        Opcodes.SIZEOF_INT32 -> {
                                             if (words[index + 1].startsWith(labelMarker)) { // label for PC or Pointer number
                                                 getLabel(words[index + 1]).toLittle().forEach {
                                                     ret.add(it)
@@ -502,7 +502,7 @@ object OpcodeAssembler {
                                                 }
                                             }
                                         }
-                                        TBASOpcodes.READ_UNTIL_ZERO -> {
+                                        Opcodes.READ_UNTIL_ZERO -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
                                             }

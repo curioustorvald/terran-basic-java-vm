@@ -42,7 +42,7 @@ import kotlin.collections.HashSet
  *
  * Created by minjaesong on 2017-06-04.
  */
-object TBasCC {
+object SimpleC {
 
     private val structOpen = '{'
     private val structClose = '}'
@@ -246,14 +246,31 @@ object TBasCC {
     }
 
 
-    private val structNames = HashSet<String>()
     private val structDict = ArrayList<CStruct>()
-
-    private val funcNames = HashSet<String>()
+    private val structNameDict = ArrayList<String>()
     private val funcDict = ArrayList<CFunction>()
+    private val funcNameDict = ArrayList<String>()
+    private val varDict = HashSet<CData>()
+    private val varNameDict = HashSet<String>()
+
 
     private val includesUser = HashSet<String>()
     private val includesLib = HashSet<String>()
+
+
+    private fun getFuncByName(name: String): CFunction? {
+        funcDict.forEach {
+            if (it.name == name) return it
+        }
+        return null
+    }
+    private fun structSearchByName(name: String): CStruct? {
+        structDict.forEach {
+            if (it.name == name) return it
+        }
+        return null
+    }
+
 
     fun preprocess(program: String): String {
         var program = program
@@ -462,7 +479,7 @@ object TBasCC {
                                 val numberWord = program.substring(charCtr..charCtr + travelForth - 1)
 
 
-                                debug1("[TBasCC.tokenise] decimal number token: $sb$numberWord, on line $currentProgramLineNumber")
+                                debug1("[SimpleC.tokenise] decimal number token: $sb$numberWord, on line $currentProgramLineNumber")
                                 sb.append(numberWord)
                                 splitAndMoveAlong()
 
@@ -472,7 +489,7 @@ object TBasCC {
                             else { // reference call
                                 splitAndMoveAlong() // split previously accumulated word
 
-                                debug1("[TBasCC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
+                                debug1("[SimpleC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
                                 sb.append(char)
                                 splitAndMoveAlong()
                             }
@@ -480,7 +497,7 @@ object TBasCC {
                         else if (char != ' ') {
                             splitAndMoveAlong() // split previously accumulated word
 
-                            debug1("[TBasCC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
+                            debug1("[SimpleC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
                             sb.append(char)
                             splitAndMoveAlong()
                         }
@@ -522,7 +539,7 @@ object TBasCC {
     }
 
     fun buildTree(lineStructures: List<LineStructure>): SyntaxTreeNode {
-        fun debug1(any: Any) { if (true) println(any) }
+        fun debug1(any: Any) { if (false) println(any) }
 
 
         ///////////////////////////
@@ -554,6 +571,7 @@ object TBasCC {
         lineStructures.forEachIndexed { index, it -> val (lineNum, depth, tokens) = it
             val nextLineDepth = if (index != lineStructures.lastIndex) lineStructures[index + 1].depth else null
 
+            debug1("buildtree!!  tokens: $tokens")
 
             val nodeBuilt = asTreeNode(lineNum, tokens)
             getWorkingNode().addStatement(nodeBuilt)
@@ -577,8 +595,83 @@ object TBasCC {
         return ASTroot
     }
 
-    private fun traverseAST() {
+    fun traverseAST(root: SyntaxTreeNode): String? {
+        // make postfix
+        // strat:
+        //  visitNode() -- ".func; :funcName;"
+        //  for each statements: recurse;
+        //  for each arguments: recurse;
+        //  visitNode() -- "return;"
+        //  (return)
 
+
+        val pileOfLeaves = Stack<SyntaxTreeNode>()
+        val assembly = StringBuilder()
+        //var currentFunctionDef: CFunction
+
+        fun traverse1(node: SyntaxTreeNode) {
+
+            // visit 1
+            when (node.expressionType) {
+                ExpressionType.FUNCTION_DEF -> {
+                    if (funcNameDict.contains(node.name!!)) {
+                        throw DuplicatedDefinition("at line ${node.lineNumber} -- function '${node.name}' already defined")
+                    }
+
+                    currentFunctionDef = CFunction(node.name!!, node.returnType!!)
+                    funcDict.add(currentFunctionDef)
+                    funcNameDict.add(node.name!!)
+
+                    assembly.append(".func;\n:${node.name!!};\n")
+                }
+                ExpressionType.FUNCTION_CALL -> {
+                    if (funcNameDict.contains(node.name!!)) {
+                        val args = ArrayList<SyntaxTreeNode>()
+                        repeat(node.arguments.size) { args.add(pileOfLeaves.pop()) }
+                        getFuncByName(node.name!!)!!.call(args.toTypedArray())
+                    }
+                    else {
+                        throw UnresolvedReference("at line ${node.lineNumber} -- function '${node.name}'")
+                    }
+                }
+                ExpressionType.FUNC_ARGUMENT_DEF -> {
+                    try {
+                        val arg = if (node.returnType!! == ReturnType.STRUCT || node.returnType == ReturnType.STRUCT_PTR) {
+                            TODO()
+                            //structSearchByName(node)
+                        }
+                        else {
+                            CPrimitive(node.name!!, node.returnType, null)
+                        }
+                    }
+                    catch (e: KotlinNullPointerException) {
+                        throw UnresolvedReference("at line ${node.lineNumber} -- struct '${node.name}' as function argument")
+                    }
+                }
+                else -> pileOfLeaves.push(node)
+            }
+
+
+            node.arguments.forEach { traverse1(it) }
+            node.statements.forEach { traverse1(it) }
+
+
+            // visit 2
+            when (node.expressionType) {
+                ExpressionType.FUNCTION_DEF -> {
+                    assembly.append("return;\n")
+                }
+
+                else -> {}
+            }
+        }
+
+
+
+
+
+
+        return null
     }
 
 
@@ -704,6 +797,7 @@ object TBasCC {
             }
 
             argTypeNamePair.forEach { val (type, name) = it
+                // TODO struct and structName
                 val funcDefArgNode = SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, type, name, lineNumber)
                 funcDefNode.addArgument(funcDefArgNode)
             }
@@ -988,7 +1082,7 @@ object TBasCC {
                         else {
                             // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
 
-                            val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_DEF, ReturnType.VOID, "#_declarevar", lineNumber)
+                            val leafNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.VOID, "#_declarevar", lineNumber)
                             leafNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
                             leafNode.addArgument(tokens[0].toRawTreeNode(lineNumber))
 
@@ -1121,7 +1215,10 @@ object TBasCC {
         debug("finalised tree:\n${treeArgsStack.peek()}")
 
 
-        return treeArgsStack.peek() as SyntaxTreeNode
+        return if (treeArgsStack.peek() is SyntaxTreeNode)
+                treeArgsStack.peek() as SyntaxTreeNode
+        else
+            asTreeNode(lineNumber, listOf(treeArgsStack.peek() as String))
     }
 
 
@@ -1133,7 +1230,8 @@ object TBasCC {
             val returnType: ReturnType?, // STATEMENT, LITERAL_LEAF: valid ReturnType; VAREABLE_LEAF: always null
             var name: String?,
             val lineNumber: Int, // used to generate error message
-            val isRoot: Boolean = false
+            val isRoot: Boolean = false,
+            val derefDepth: Int = 0 // how many ***s are there for pointer
     ) {
 
         var literalValue: Any? = null // for LITERALs only
@@ -1195,75 +1293,21 @@ object TBasCC {
     enum class ExpressionType {
         FUNCTION_DEF, FUNC_ARGUMENT_DEF, // expect Arguments and Statements
 
-        VARIABLE_DEF, // see OPERATOR_CALL
-
         FUNCTION_CALL, // expect Arguments and Statements
-        CODE_BLOCK, // special case of function call; expect Arguments and Statements
-        OPERATOR_CALL, // special case of function call; name: operator symbol/converted literal (e.g. ->  #_plusassign  (listed in operatorsHierarchyInternal))
-        // the case of VARIABLE DEF //
+        // the case of OPERATOR CALL //
         // returnType: variable type; name: "="; TODO add description for STRUCT
         // arg0: name of the variable (String)
         // arg1: (optional) assigned value, either LITERAL or FUNCTION_CALL or another OPERATOR CALL
         // arg2: (if STRUCT) struct identifier (String)
 
-        //STATEMENT, // equations that needs to be eval'd; has returnType of null?; things like "(3 + 4) * 12" are leaves; "(i + 1) % 16" is not (it calls variable 'i', which _is_ a leaf)
-
         LITERAL_LEAF, // literals, also act as a leaf of the tree; has returnType of null
-        VARIABLE_LEAF, // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
-        GOTO_LABEL_LEAF // self-explanatory
+        VARIABLE_LEAF // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
     }
     enum class ReturnType {
         VOID, BOOL, CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, STRUCT,
         VOID_PTR, BOOL_PTR, CHAR_PTR, SHORT_PTR, INT_PTR, LONG_PTR, FLOAT_PTR, DOUBLE_PTR, STRUCT_PTR,
 
-        VARARG
-    }
-
-    abstract class CData(val name: String) {
-        abstract fun sizeOf(): Int
-    }
-
-    class CStruct(name: String, val identifier: String): CData(name) {
-        val members = ArrayList<CData>()
-
-        fun addMember(member: CData) {
-            members.add(member)
-        }
-
-        override fun sizeOf(): Int {
-            return members.map { it.sizeOf() }.sum()
-        }
-
-        override fun toString(): String {
-            val sb = StringBuilder()
-            sb.append("Struct $name: ")
-            members.forEachIndexed { index, cData ->
-                if (cData is CPrimitive) {
-                    sb.append(cData.type)
-                    sb.append(' ')
-                    sb.append(cData.name)
-                }
-                else if (cData is CStruct) {
-                    sb.append(cData.identifier)
-                    sb.append(' ')
-                    sb.append(cData.name)
-                }
-                else throw IllegalArgumentException("Unknown CData extension: ${cData.javaClass.simpleName}")
-            }
-            return sb.toString()
-        }
-    }
-
-    class CPrimitive(name: String, val type: ReturnType, val value: Any): CData(name) {
-        override fun sizeOf(): Int {
-            var typestr = type.toString().toLowerCase()
-            if (typestr.endsWith("_ptr")) typestr = typestr.drop(4)
-            return sizeofPrimitive(typestr)
-        }
-    }
-
-    abstract class CFunction(val name: String, val returnType: ReturnType) {
-        abstract fun generateOpcode(vararg args: Any)
+        VARARG, ANY
     }
 
 
@@ -1273,4 +1317,5 @@ open class SyntaxError(msg: String? = null) : Exception(msg)
 class IllegalTokenException(msg: String? = null) : SyntaxError(msg)
 class UnresolvedReference(msg: String? = null) : SyntaxError(msg)
 class UndefinedStatement(msg: String? = null) : SyntaxError(msg)
+class DuplicatedDefinition(msg: String? = null) : SyntaxError(msg)
 class PreprocessorErrorMessage(msg: String) : SyntaxError(msg)

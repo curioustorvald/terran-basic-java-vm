@@ -14,7 +14,7 @@ class Executable {
     val vm = VM(2048, tbasic_remove_string_dupes = true)
 
 
-    val beers = TBASOpcodeAssembler("""
+    val beers = Assembler("""
 .data;
 
 string beerone "of beer on the wall, ";
