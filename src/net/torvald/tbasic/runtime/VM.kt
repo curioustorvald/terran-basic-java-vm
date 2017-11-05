@@ -37,7 +37,7 @@ class VM(memSize: Int,
         BOOLEAN in memory: 0x00 if false, 0xFF if true
          */
 
-        val traceMemAddrChange = true
+        val traceMemAddrChange = false
 
         var memAddr: Int = memoryAddress
             set(value) {
@@ -433,8 +433,6 @@ class VM(memSize: Int,
             throw Error("Memory size too large -- maximum allowed is 16 MBytes. (seriously, you don't want too much memory allocation)")
         }
 
-        // attach basic peripherals
-        peripherals.add(PeripheralKeyboard(this))
     }
 
     fun loadProgram(opcodes: ByteArray) {
@@ -532,7 +530,7 @@ Math error
 
     fun softReset() {
         varTable.clear()
-        Arrays.fill(callStack, 0)
+        Arrays.fill(callStack, 0.0)
         userSpaceStart = null
         terminate = false
 
@@ -680,6 +678,10 @@ Math error
         val INT_STACK_OVERFLOW = 3
         val INT_MATH_ERROR = 4
         val INT_SEGFAULT = 5
+        val INT_KEYPRESS = 6
+        val INT_PERI_INPUT = 7
+        val INT_PERI_OUTPUT = 8
+        val INT_INTERRUPT = 9
     }
 
 
@@ -692,6 +694,10 @@ Math error
     fun interruptStackOverflow() { pc = memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt() }
     fun interruptMathError() { pc = memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt() }
     fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
+    fun interruptKeyPress() { pc = memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt() }
+    fun interruptPeripheralInput() { pc = memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt() }
+    fun interruptPeripheralOutput() { pc = memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt() }
+    fun interruptStopExecution() { pc = memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt() }
 
 
     class BIOS(val vm: VM) : VMPeripheralHardware {
@@ -712,18 +718,6 @@ Math error
         }
     }
 
-
-    // depends on the implementation. Here I used LibGDX.
-    class PeripheralKeyboard(val vm: VM) : VMPeripheralWrapper(2) {
-        override fun call(arg: Int) {
-            when (arg) {
-                // 0-255: is this key pressed?
-                /*in 1..255 -> {
-                    vm.r1 = Gdx.input.isKeyPressed(arg)
-                }*/
-            }
-        }
-    }
 }
 
 fun Int.KB() = this shl 10
