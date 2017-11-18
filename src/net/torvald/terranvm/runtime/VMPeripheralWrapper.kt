@@ -1,4 +1,4 @@
-package net.torvald.tbasic.runtime
+package net.torvald.terranvm.runtime
 
 /**
  * Peripheral wrapper that provides memory access to the peripheral

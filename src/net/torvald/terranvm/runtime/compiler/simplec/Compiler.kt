@@ -1,8 +1,4 @@
-package net.torvald.tbasic.runtime.compiler.simplec
-
-import java.util.*
-import kotlin.collections.ArrayList
-import kotlin.collections.HashSet
+package net.torvald.terranvm.runtime.compiler.simplec
 
 /**
  * A compiler for SimpleC language that compiles into TBASOpcode.
@@ -42,7 +38,7 @@ import kotlin.collections.HashSet
  *
  * Created by minjaesong on 2017-06-04.
  */
-object SimpleC {
+/*object SimpleC {
 
     private val structOpen = '{'
     private val structClose = '}'
@@ -1311,7 +1307,7 @@ object SimpleC {
     }
 
 
-}
+}*/
 
 open class SyntaxError(msg: String? = null) : Exception(msg)
 class IllegalTokenException(msg: String? = null) : SyntaxError(msg)

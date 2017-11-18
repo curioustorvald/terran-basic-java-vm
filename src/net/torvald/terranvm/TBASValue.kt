@@ -1,6 +1,6 @@
-package net.torvald.tbasic
+package net.torvald.terranvm
 
-import net.torvald.tbasic.runtime.VM
+import net.torvald.terranvm.runtime.VM
 import java.util.*
 
 /**

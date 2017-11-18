@@ -1,4 +1,4 @@
-package net.torvald.tbasic.runtime.compiler.simplec
+package net.torvald.terranvm.runtime.compiler.simplec
 
 /**
  * Created by minjaesong on 2017-06-15.
@@ -7,7 +7,7 @@ abstract class CData(val name: String) {
     abstract fun sizeOf(): Int
 }
 
-class CStruct(name: String, val identifier: String): CData(name) {
+/*class CStruct(name: String, val identifier: String): CData(name) {
     val members = ArrayList<CData>()
 
     fun addMember(member: CData) {
@@ -44,4 +44,4 @@ class CPrimitive(name: String, val type: SimpleC.ReturnType, val value: Any?, va
         if (typestr.endsWith("_PTR")) typestr = typestr.drop(4)
         return SimpleC.sizeofPrimitive(typestr)
     }
-}
+}*/

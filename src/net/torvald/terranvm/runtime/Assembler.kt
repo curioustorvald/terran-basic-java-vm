@@ -1,8 +1,8 @@
-package net.torvald.tbasic.runtime
+package net.torvald.terranvm.runtime
 
-import net.torvald.tbasic.Opcodes
-import net.torvald.tbasic.Opcodes.READ_UNTIL_ZERO
-import net.torvald.tbasic.Opcodes.SIZEOF_POINTER
+import net.torvald.terranvm.Opcodes
+import net.torvald.terranvm.Opcodes.READ_UNTIL_ZERO
+import net.torvald.terranvm.Opcodes.SIZEOF_POINTER
 
 /**
  * ## Syntax
@@ -53,6 +53,12 @@ import net.torvald.tbasic.Opcodes.SIZEOF_POINTER
  * Predefined labels:
  * - r1..r8
  * - m1..m4
+ *
+ * Defining labels:
+ * :label_name;
+ *
+ * Referring labels:
+ * @label_name
  *
  *
  * Created by minjaesong on 2017-05-28.
@@ -138,7 +144,6 @@ object Assembler {
                 }
                 else if (char == lineEndMarker) {
                     split()
-                    charCtr++
                 }
                 else if (!char.toString().matches(regexWhitespaceNoSP)) {
                     sb.append(char)
@@ -278,13 +283,13 @@ object Assembler {
                         }
                         // filter arg count mismatch
                         val argCount = Opcodes.opcodeArgsList[cmd]?.size ?: 0
-                        if (argCount + 1 != words.size && (!(Opcodes.opcodeArgsList[cmd]?.contains(READ_UNTIL_ZERO) ?: false))) {
+                        if (argCount + 1 != words.size && (!(Opcodes.opcodeArgsList[cmd]?.contains(Opcodes.ArgType.STRING) ?: false))) {
                             throw Error("Opcode $cmd -- Number of argument(s) are mismatched; requires $argCount, got ${words.size - 1}. Perhaps semicolon not placed?")
                         }
 
                         virtualPC += 1
 
-                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: intArrayOf()
+                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: arrayOf()
 
                         // By the definition, "string argument" is always the last, and only one should exist.
                         if (argumentInfo.isNotEmpty()) {
@@ -294,16 +299,16 @@ object Assembler {
 
                                 try {
                                     when (it) {
-                                        Opcodes.SIZEOF_BYTE -> {
+                                        Opcodes.ArgType.BYTE, Opcodes.ArgType.REGISTER -> {
                                             virtualPC += 1
                                         }
-                                        Opcodes.SIZEOF_NUMBER -> {
+                                        Opcodes.ArgType.NUMBER -> {
                                             virtualPC += 8
                                         }
-                                        Opcodes.SIZEOF_INT32 -> {
+                                        Opcodes.ArgType.POINTER, Opcodes.ArgType.INT32 -> {
                                             virtualPC += 4
                                         }
-                                        Opcodes.READ_UNTIL_ZERO -> {
+                                        Opcodes.ArgType.STRING -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
                                             }
@@ -462,7 +467,7 @@ object Assembler {
 
                         ret.add(Opcodes.opcodesList[cmd]!!)
 
-                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: intArrayOf()
+                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: arrayOf()
 
                         // By the definition, "string argument" is always the last, and only one should exist.
                         if (argumentInfo.isNotEmpty()) {
@@ -472,7 +477,20 @@ object Assembler {
 
                                 try {
                                     when (it) {
-                                        Opcodes.SIZEOF_BYTE -> {
+                                        Opcodes.ArgType.REGISTER -> {
+                                            if (words[index + 1].startsWith(labelMarker)) {
+                                                Error("label that points to Register (${words[index + 1]})")
+                                            }
+                                            else {
+                                                if (words[index + 1].startsWith("r", ignoreCase = true)) {
+                                                    ret.add(words[index + 1].drop(1).toInt().toByte())
+                                                }
+                                                else {
+                                                    throw Error("Register expected, got something else (${words[index + 1]})")
+                                                }
+                                            }
+                                        }
+                                        Opcodes.ArgType.BYTE -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 TODO("label that points to Byte (${words[index + 1]})")
                                             }
@@ -480,7 +498,7 @@ object Assembler {
                                                 ret.add(words[index + 1].toInt().toByte())
                                             }
                                         }
-                                        Opcodes.SIZEOF_NUMBER -> {
+                                        Opcodes.ArgType.NUMBER -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 TODO("label that points to Number (${words[index + 1]})")
                                             }
@@ -490,7 +508,7 @@ object Assembler {
                                                 }
                                             }
                                         }
-                                        Opcodes.SIZEOF_INT32 -> {
+                                        Opcodes.ArgType.POINTER, Opcodes.ArgType.INT32 -> {
                                             if (words[index + 1].startsWith(labelMarker)) { // label for PC or Pointer number
                                                 getLabel(words[index + 1]).toLittle().forEach {
                                                     ret.add(it)
@@ -502,7 +520,7 @@ object Assembler {
                                                 }
                                             }
                                         }
-                                        Opcodes.READ_UNTIL_ZERO -> {
+                                        Opcodes.ArgType.STRING -> {
                                             if (words[index + 1].startsWith(labelMarker)) {
                                                 throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
                                             }

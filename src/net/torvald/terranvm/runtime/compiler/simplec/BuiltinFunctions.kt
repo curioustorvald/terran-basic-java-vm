@@ -1,6 +1,6 @@
-package net.torvald.tbasic.runtime.compiler.simplec
+package net.torvald.terranvm.runtime.compiler.simplec
 
-import net.torvald.tbasic.runtime.Assembler
+import net.torvald.terranvm.runtime.Assembler
 
 /**
  * Created by minjaesong on 2017-06-14.
@@ -8,7 +8,7 @@ import net.torvald.tbasic.runtime.Assembler
 
 internal fun asm(assembly: String) = Assembler(assembly)
 
-class Assignvar : CBuiltinFunction("#_assignvar", 3) {
+/*class Assignvar : CBuiltinFunction("#_assignvar", 3) {
     override fun toASM(args: Array<SimpleC.SyntaxTreeNode>): ByteArray {
         val varname = args[0].literalValue!! as String
         val vartype = args[1].literalValue!! as String
@@ -55,4 +55,4 @@ class Malloc : CBuiltinFunction("malloc", 1) {
 
         return asm("""loadnum 2, $size; malloc; push 1;""") // 'push 1' acts as 'return something;'
     }
-}
+}*/

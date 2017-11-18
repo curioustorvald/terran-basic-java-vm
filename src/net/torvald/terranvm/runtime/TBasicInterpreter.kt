@@ -1,4 +1,4 @@
-package net.torvald.tbasic.runtime
+package net.torvald.terranvm.runtime
 
 /**
  * Created by minjaesong on 2017-06-04.

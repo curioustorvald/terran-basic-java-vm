@@ -1,15 +1,11 @@
-package net.torvald.tbasic
+package net.torvald.terranvm
 
-import net.torvald.tbasic.runtime.*
+import net.torvald.terranvm.runtime.*
 
 /**
  * Created by minjaesong on 2017-05-25.
  */
-fun main(args: Array<String>) {
-    Executable().main()
-}
-
-class Executable {
+object Executable {
 
     val vm = VM(2048, tbasic_remove_string_dupes = true)
 
@@ -38,13 +34,13 @@ string omore "o more ";
 .func;
 
 :printspace;
-loadnum 1, 32; putchar; return;
+loadnum r1, 32; putchar; return;
 
 
 :printbeercnt;
 loadvariable beercount; peeknum; # r1 <- beercount (deferred)
-mov 1, 2;
-loadnum 3, 1;
+mov r1, r2;
+loadnum r3, 1;
 cmp;
 jz  @printonebeer;
 jgt @printbeerasnum;
@@ -53,33 +49,33 @@ jls @printnomore;
 
 :printonebeer;
 printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottle; printstr;    # 'bottle '
+loadptr r1, @bottle; printstr;   # 'bottle '
 return;                          #
 
 
 :printbeerasnum;
 printnum; gosub @printspace;     # beercount + ' '
-loadptr 1, @bottles; printstr;   # 'bottles '
+loadptr r1, @bottles; printstr;  # 'bottles '
 return;                          #
 
 
 :printnomore;
-loadnum 1, 110; putchar;         # 'n'
-loadptr 1, @omore; printstr;     # 'o more '
-loadptr 1, @bottles; printstr;   # 'bottles '
+loadnum r1, 110; putchar;        # 'n'
+loadptr r1, @omore; printstr;    # 'o more '
+loadptr r1, @bottles; printstr;  # 'bottles '
 return;                          #
 
 
 .code;
 
-loadnum 1, 99;                   #
+loadnum r1, 99;                  #
 setvariable beercount;           # set beer count
 
 
 :compare;
 loadvariable beercount; peeknum; # r1 <- beercount (deferred)
-mov 1, 2;                        # r2 <- beercount
-loadnum 3, 1;                    # r3 <- 1.0
+mov r1, r2;                      # r2 <- beercount
+loadnum r3, 1;                   # r3 <- 1.0
 cmp;                             # m1 <- if (beercount > 1) 1 else if (beercount == 1) 0 else -1
 
 
@@ -90,16 +86,16 @@ jls @noBeers;                    # no beers
 
 :pluralBeers;
 gosub @printbeercnt;             # print beer count
-loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
+loadptr r1, @beerone; printstr;  # 'of beer on the wall, '
 gosub @printbeercnt;             # print beer count'
-loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and pass it around, '
+loadptr r1, @beertwo; printstr;  # 'of beer.\nTake one down and pass it around, '
 
 loadvariable beercount; peeknum; # r1 <- beercount (deferred)
 dec1; setvariable beercount;     # decrement beercount by one
 
 
 gosub @printbeercnt;             # print beer count
-loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
+loadptr r1, @beerthree; printstr;# 'of beer on the wall.\n\n'
 
 jmp @compare;
 
@@ -107,36 +103,62 @@ jmp @compare;
 
 :singularBeers;
 gosub @printbeercnt;             # print beer count
-loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
+loadptr r1, @beerone; printstr;  # 'of beer on the wall, '
 gosub @printbeercnt;             # print beer count
-loadptr 1, @beertwo; printstr;   # 'of beer.\nTake one down and pass it around, '
+loadptr r1, @beertwo; printstr;  # 'of beer.\nTake one down and pass it around, '
 
 loadvariable beercount; peeknum; # r1 <- beercount (deferred)
 dec1; setvariable beercount;     # decrement beercount by one
 
 gosub @printbeercnt;             # print beer count
-loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
+loadptr r1, @beerthree; printstr;# 'of beer on the wall.\n\n'
 
 jmp @compare;
 
 
 
 :noBeers;
-loadnum 1, 78; putchar;          # 'N'
-loadptr 1, @omore; printstr;     # 'o more '
-loadptr 1, @bottles; printstr;   # 'bottles '
-loadptr 1, @beerone; printstr;   # 'of beer on the wall, '
+loadnum r1, 78; putchar;         # 'N'
+loadptr r1, @omore; printstr;    # 'o more '
+loadptr r1, @bottles; printstr;  # 'bottles '
+loadptr r1, @beerone; printstr;  # 'of beer on the wall, '
 gosub @printbeercnt;             # print beer count ('no more bottles ')
-loadptr 1, @gotostore; printstr; # 'of beer.\nGo to the store and buy some more, '
+loadptr r1, @gotostore; printstr;# 'of beer.\nGo to the store and buy some more, '
 
-loadnum 1, 99;                   # set beercount to 99
+loadnum r1, 99;                  # set beercount to 99
 setvariable beercount;           #
 
 gosub @printbeercnt;             # print beer count
-loadptr 1, @beerthree; printstr; # 'of beer on the wall.\n\n'
+loadptr r1, @beerthree; printstr;# 'of beer on the wall.\n\n'
 
 halt;
 
+""")
+
+
+    val keyboardTest = Assembler("""
+
+# loadstrinline r1, What's your name?
+# ; printstr;
+#
+# readstr; mov r1, 2;
+#
+# loadstrinline r1, Hello, ; printstr;
+# mov r2, r1; printstr;
+# loadnum r1, 33; putchar;
+
+
+getchar;
+
+putchar;putchar;putchar;putchar;putchar;
+
+""")
+
+
+    val pcinc = Assembler("""
+:loop;
+jfw 1;
+jmp @loop;
 """)
 
 
@@ -147,6 +169,8 @@ halt;
 
         //(0..511).forEach { print("${vm.memory[it].toUint()} ") }; println()
 
+        vm.delayInMills = 10
+
         vm.execute()
         //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
     }
@@ -156,4 +180,8 @@ halt;
     private fun Int.MB() = this shl 20
     private fun Byte.toUint() = java.lang.Byte.toUnsignedInt(this)
 
+}
+
+fun main(args: Array<String>) {
+    Executable.main()
 }

@@ -1,6 +1,7 @@
-package net.torvald.tbasic
+package net.torvald.terranvm
 
-import net.torvald.tbasic.runtime.*
+import net.torvald.terranvm.runtime.*
+import net.torvald.terranvm.runtime.Number
 import kotlin.experimental.and
 
 
@@ -119,8 +120,8 @@ object Opcodes {
     fun POPINT() { vm.lr = vm.callStack[--vm.sp].toInt() }
 
     fun JMP(addr: Int) { vm.pc = addr }
-    fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + offset, 0x7FFFFFFF) }
-    fun JBW(offset: Int) { JFW(-offset) }
+    fun JFW(offset: Number) { vm.pc = Math.floorMod(vm.pc + offset.toInt(), 0x7FFFFFFF) }
+    fun JBW(offset: Number) { JFW(-offset) }
 
     fun JZ(addr: Int) { if (vm.m1 == 0) JMP(addr) }
     fun JNZ(addr: Int) { if (vm.m1 != 0) JMP(addr) }
@@ -324,10 +325,10 @@ object Opcodes {
     }
 
     /** Peripheral(r3).memory(r2) <- r1 */
-    fun STOREPERI() { vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()] = vm.r1.toByte() }
+    fun STOREPERI() { vm.peripherals[vm.r3.toInt()]!!.memory[vm.r2.toInt()] = vm.r1.toByte() }
     /** r1 <- data in memory addr r2 of peripheral r3 */
     fun LOADPERI() {
-        LOADNUM(1, vm.peripherals[vm.r3.toInt()].memory[vm.r2.toInt()].toUint().toDouble())
+        LOADNUM(1, vm.peripherals[vm.r3.toInt()]!!.memory[vm.r2.toInt()].toUint().toDouble())
     }
 
 
@@ -499,7 +500,7 @@ object Opcodes {
         if (peripheral == 0xFF.toByte())
             vm.bios.call(arg)
         else
-            vm.peripherals[peripheral.toUint()].call(arg)
+            vm.peripherals[peripheral.toUint()]!!.call(arg)
     }
 
 
@@ -547,11 +548,27 @@ object Opcodes {
 
 
     val SIZEOF_BYTE = VM.Pointer.sizeOf(VM.Pointer.PointerType.BYTE)
+    val SIZEOF_REGISTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.BYTE)
     val SIZEOF_POINTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
     val SIZEOF_INT32 = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
     val SIZEOF_NUMBER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT64)
     val READ_UNTIL_ZERO = -2
 
+    enum class ArgType {
+        BYTE, REGISTER, POINTER, NUMBER, STRING, INT32
+    }
+
+    fun getArgumentSize(arg: ArgType): Int {
+        return when (arg) {
+            ArgType.BYTE -> SIZEOF_BYTE
+            ArgType.REGISTER -> SIZEOF_REGISTER
+            ArgType.STRING -> READ_UNTIL_ZERO
+            ArgType.INT32 -> SIZEOF_INT32
+            ArgType.NUMBER -> SIZEOF_NUMBER
+            ArgType.POINTER -> SIZEOF_POINTER
+        }
+    }
+    
     val opcodesList = hashMapOf<String, Byte>(
             "NOP" to 7.toByte(),
 
@@ -779,8 +796,8 @@ object Opcodes {
 
             "UPTIME" to fun(_) { UPTIME() },
 
-            "JFW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) },
-            "JBW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleInt()) },
+            "JFW" to fun(args: List<ByteArray>) { JFW(args[0].toLittleDouble()) },
+            "JBW" to fun(args: List<ByteArray>) { JBW(args[0].toLittleDouble()) },
 
             "POKEINT" to fun(_) { POKEINT() },
             "PEEKINT" to fun(_) { PEEKINT() },
@@ -797,30 +814,30 @@ object Opcodes {
 
 
     )
-    val opcodeArgsList = hashMapOf<String, IntArray>( // null == 0 operands
-            "MOV" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
-            "XCHG" to intArrayOf(SIZEOF_BYTE, SIZEOF_BYTE),
-            "LOADNUM" to intArrayOf(SIZEOF_BYTE, SIZEOF_NUMBER),
-            "LOADRAWNUM" to intArrayOf(SIZEOF_BYTE, SIZEOF_NUMBER),
-            "LOADPTR" to intArrayOf(SIZEOF_BYTE, SIZEOF_POINTER),
-            "LOADVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
-            "SETVARIABLE" to intArrayOf(READ_UNTIL_ZERO),
-            "PUSHINT" to intArrayOf(SIZEOF_INT32),
-            "PUSH" to intArrayOf(SIZEOF_BYTE),
-            "POP" to intArrayOf(SIZEOF_BYTE),
-            "LOADMNUM" to intArrayOf(SIZEOF_INT32),
-            "LOADSTRINLINE" to intArrayOf(SIZEOF_BYTE, READ_UNTIL_ZERO),
-            "INTERRUPT" to intArrayOf(SIZEOF_BYTE),
-            "JMP" to intArrayOf(SIZEOF_POINTER),
-            "JZ" to intArrayOf(SIZEOF_POINTER),
-            "JNZ" to intArrayOf(SIZEOF_POINTER),
-            "JFW" to intArrayOf(SIZEOF_POINTER),
-            "JBW" to intArrayOf(SIZEOF_POINTER),
-            "JGT" to intArrayOf(SIZEOF_POINTER),
-            "JLS" to intArrayOf(SIZEOF_POINTER),
-            "SLP" to intArrayOf(SIZEOF_NUMBER),
-            "GOSUB" to intArrayOf(SIZEOF_POINTER),
-            "PUSHINT" to intArrayOf(SIZEOF_POINTER),
-            "CALL" to intArrayOf(SIZEOF_BYTE, SIZEOF_INT32)
+    val opcodeArgsList = hashMapOf<String, Array<ArgType>>( // null == 0 operands
+            "MOV" to arrayOf(ArgType.REGISTER, ArgType.REGISTER),
+            "XCHG" to arrayOf(ArgType.REGISTER, ArgType.REGISTER),
+            "LOADNUM" to arrayOf(ArgType.REGISTER, ArgType.NUMBER),
+            "LOADRAWNUM" to arrayOf(ArgType.REGISTER, ArgType.NUMBER),
+            "LOADPTR" to arrayOf(ArgType.REGISTER, ArgType.POINTER),
+            "LOADVARIABLE" to arrayOf(ArgType.STRING),
+            "SETVARIABLE" to arrayOf(ArgType.STRING),
+            "PUSHINT" to arrayOf(ArgType.INT32),
+            "PUSH" to arrayOf(ArgType.BYTE),
+            "POP" to arrayOf(ArgType.BYTE),
+            "LOADMNUM" to arrayOf(ArgType.INT32),
+            "LOADSTRINLINE" to arrayOf(ArgType.REGISTER, ArgType.STRING),
+            "INTERRUPT" to arrayOf(ArgType.BYTE),
+            "JMP" to arrayOf(ArgType.POINTER),
+            "JZ" to arrayOf(ArgType.POINTER),
+            "JNZ" to arrayOf(ArgType.POINTER),
+            "JFW" to arrayOf(ArgType.NUMBER),
+            "JBW" to arrayOf(ArgType.NUMBER),
+            "JGT" to arrayOf(ArgType.POINTER),
+            "JLS" to arrayOf(ArgType.POINTER),
+            "SLP" to arrayOf(ArgType.NUMBER),
+            "GOSUB" to arrayOf(ArgType.POINTER),
+            "PUSHINT" to arrayOf(ArgType.POINTER),
+            "CALL" to arrayOf(ArgType.BYTE, ArgType.INT32)
     )
 }

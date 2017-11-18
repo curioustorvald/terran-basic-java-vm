@@ -1,6 +1,6 @@
-package net.torvald.tbasic
+package net.torvald.terranvm
 
-import net.torvald.tbasic.runtime.compiler.simplec.SimpleC
+//import net.torvald.terranvm.runtime.compiler.simplec.SimpleC
 
 /**
  * Created by minjaesong on 2017-06-04.
@@ -83,7 +83,7 @@ int main() {
 }
 """
 
-    val preprocessedLine = SimpleC.preprocess(line)
+    /*val preprocessedLine = SimpleC.preprocess(line)
 
     println(preprocessedLine)
 
@@ -93,7 +93,7 @@ int main() {
 
     val tree = SimpleC.buildTree(lineStructures)
 
-    println(tree)
+    println(tree)*/
 
 
 

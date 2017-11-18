@@ -1,8 +1,9 @@
-package net.torvald.tbasic.runtime
+package net.torvald.terranvm.runtime
 
-import net.torvald.tbasic.*
-import net.torvald.tbasic.Opcodes.POKEINT
-import net.torvald.tbasic.Opcodes.READ_UNTIL_ZERO
+import net.torvald.terranvm.*
+import net.torvald.terranvm.Opcodes.POKEINT
+import net.torvald.terranvm.Opcodes.READ_UNTIL_ZERO
+import net.torvald.terranvm.Opcodes.getArgumentSize
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
@@ -23,12 +24,12 @@ typealias Number = Double
  */
 class VM(memSize: Int,
          private val stackSize: Int = 2500,
-         val stdout: OutputStream = System.out,
-         val stdin: InputStream = System.`in`,
+         var stdout: OutputStream = System.out,
+         var stdin: InputStream = System.`in`,
          var suppressWarnings: Boolean = false,
          // following is an options for VM's micro operation system
          val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC
-) {
+) : Runnable {
     private val DEBUG = false
 
     class Pointer(val parent: VM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
@@ -302,7 +303,7 @@ class VM(memSize: Int,
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    val peripherals = ArrayList<VMPeripheralWrapper>() // peri addr: 0x00..0xFE; 0xFF being on-board BIOS/UEFI
+    val peripherals = Array<VMPeripheralWrapper?>(255, { null }) // peri addr: 0x00..0xFE; 0xFF being on-board BIOS/UEFI
     val bios = BIOS(this)
 
     /**
@@ -455,37 +456,37 @@ class VM(memSize: Int,
         mallocList.clear()
 
 
-        warn("Program loaded; pc: $pc, userSpaceStart: $userSpaceStart")
+        warn("Program loaded; pc: $pcHex, userSpaceStart: $userSpaceStart")
     }
 
     private fun setDefaultInterrepts(): Int {
         val intOOM = Assembler("""
-loadstrinline 1,
+loadstrinline r1,
 Out of memory
 ; printstr; halt;
 """)
         val intSegfault = Assembler("""
-loadstrinline 1,
+loadstrinline r1,
 Segmentation fault
 ; printstr; halt;
 """)
         val intDivZero = Assembler("""
-loadstrinline 1,
+loadstrinline r1,
 Division by zero
 ; printstr; halt;
 """)
         val intIllegalOp = Assembler("""
-loadstrinline 1,
+loadstrinline r1,
 Illegal operation
 ; printstr; halt;
 """)
         val intStackOverflow = Assembler("""
-loadstrinline 1,
+loadstrinline r1,
 Stack overflow
 ; printstr; halt;
 """)
         val intMathFuck = Assembler("""
-loadstrinline 1,
+loadstrinline r1,
 Math error
 ; printstr; halt;
 """)
@@ -576,10 +577,34 @@ Math error
     }
 
 
+    var delayInMills: Int? = null
+
 
     fun execDebugMain(any: Any?) { if (DEBUG) print(any) }
 
-    fun execute(delayInMills: Int? = null) {
+    private var pauseExec = false
+
+    fun pauseExec() {
+        pauseExec = true
+    }
+
+    fun resumeExec() {
+        pauseExec = false
+        synchronized(lock) {
+            lock.notify()
+        }
+    }
+
+    override fun run() {
+        execute()
+    }
+
+    val lock = java.lang.Object()
+
+    val pcHex: String; get() = pc.toString(16) + "h"
+
+    fun execute() {
+
         if (userSpaceStart != null) {
 
             uptimeHolder = System.currentTimeMillis()
@@ -602,18 +627,18 @@ Math error
                 }
 
                 val instruction = memory[pc]
-                val instAsm = Opcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pc")
+                val instAsm = Opcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pcHex")
 
                 execDebugMain("\nExec: $instAsm, ")
 
-                val argumentsInfo = Opcodes.opcodeArgsList[instAsm] ?: intArrayOf()
+                val argumentsInfo = Opcodes.opcodeArgsList[instAsm] ?: arrayOf()
 
                 val arguments = argumentsInfo.mapIndexed { index, i ->
-                    if (i > 0) {
-                        memSliceBySize(pc + 1 + (0..index - 1).map { argumentsInfo[it] }.sum(), i)
+                    if (getArgumentSize(i) > 0) {
+                        memSliceBySize(pc + 1 + (0..index - 1).map { getArgumentSize(argumentsInfo[it]) }.sum(), getArgumentSize(i))
                     }
-                    else if (i == READ_UNTIL_ZERO) { // READ_UNTIL_ZERO(-2) is guaranteed to be the last
-                        val indexStart = pc + 1 + (0..index - 1).map { argumentsInfo[it] }.sum()
+                    else if (i == Opcodes.ArgType.STRING) { // READ_UNTIL_ZERO(-2) is guaranteed to be the last
+                        val indexStart = pc + 1 + (0..index - 1).map { getArgumentSize(argumentsInfo[it]) }.sum()
                         var indexEnd = indexStart
                         while (memory[indexEnd] != 0.toByte()) {
                             indexEnd += 1
@@ -627,12 +652,12 @@ Math error
                     }
                 }
                 val totalArgsSize = arguments.map { it.size }.sum()
-                execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pc, r1: $r1, r2: $r2, r3: $r3, m1: $m1")
+                execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pcHex, r1: $r1, r2: $r2, r3: $r3, m1: $m1")
 
 
                 // execute
                 pc += (1 + totalArgsSize)
-                execDebugMain(", PC-next: $pc\n")
+                execDebugMain(", PC-next: $pcHex\n")
                 // invoke function
                 try {
                     Opcodes.opcodesFunList[instAsm]!!(arguments)
@@ -644,14 +669,22 @@ Math error
 
 
                 if (instAsm == "HALT") {
-                    execDebugMain("HALT at PC $pc")
+                    execDebugMain("HALT at PC $pcHex")
                 }
 
 
 
 
+                synchronized(lock) {
+                    if (pauseExec) {
+                        lock.wait()
+                    }
+                }
+
+
+
                 if (delayInMills != null) {
-                    Thread.sleep(delayInMills.toLong())
+                    Thread.sleep(delayInMills!!.toLong())
                 }
             }
         }

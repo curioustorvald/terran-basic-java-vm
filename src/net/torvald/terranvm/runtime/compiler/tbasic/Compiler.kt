@@ -1,7 +1,7 @@
-package net.torvald.tbasic.runtime.compiler.tbasic
+package net.torvald.terranvm.runtime.compiler.tbasic
 
-import net.torvald.tbasic.runtime.compiler.simplec.SimpleC.LineStructure
-import net.torvald.tbasic.runtime.compiler.simplec.SyntaxError
+/*import net.torvald.terranvm.runtime.compiler.simplec.SimpleC.LineStructure
+import net.torvald.terranvm.runtime.compiler.simplec.SyntaxError
 
 /**
  * Created by minjaesong on 2017-06-26.
@@ -233,4 +233,4 @@ object TBasic {
     }
 
 
-}
+}*/
