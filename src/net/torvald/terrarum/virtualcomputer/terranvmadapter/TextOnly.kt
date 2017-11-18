@@ -33,7 +33,7 @@ class TextOnly : Game() {
 
 
     override fun create() {
-        val vmDelay = 10
+        val vmDelay = 50
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
 
@@ -96,9 +96,13 @@ jmp @loop;
             sevensegFont.draw(batch, vm.memory.size.toString().padStart(8, ' '), 307f, height - 18 - 500f)
             // -> program counter
             batch.color = Color(0xff9a4bff.toInt())
-            sevensegFont.draw(batch, vm.pc.toString(16).padStart(6, ' '), 457f, height - 18 - 500f)
+            sevensegFont.draw(batch, vm.pc.toString(16).padStart(6, ' '), 451f, height - 18 - 500f)
+            // -> link register
+            sevensegFont.draw(batch, vm.lr.toString(16).padStart(6, ' '), 585f, height - 18 - 500f)
             // -> stack pointer
-            sevensegFont.draw(batch, vm.sp.toString(16).padStart(4, ' '), 597f, height - 18 - 500f)
+            sevensegFont.draw(batch, vm.sp.toString(16).padStart(4, ' '), 719f, height - 18 - 500f)
+            // -> string counter
+            sevensegFont.draw(batch, vm.strCntr.toString().padStart(4, ' '), 851f, height - 18 - 500f)
         }
 
 
