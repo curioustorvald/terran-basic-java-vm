@@ -138,7 +138,7 @@ object Opcodes {
     /**
      * prints any byte (stored as Number) on r1 as a character. If r1 has a number of 33.0, '!' will be printed.
      */
-    fun PUTCHAR() { vm.stdout.write(vm.r1.toInt()); vm.stdout.flush() }
+    fun PUTCHAR() { vm.stdout.write(vm.r1.toInt()) }
     /**
      * print a string. String should be prepared to r1 as pointer. (r1 will be garbled afterwards!)
      */

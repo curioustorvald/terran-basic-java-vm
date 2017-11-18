@@ -96,7 +96,9 @@ jmp @loop;
             sevensegFont.draw(batch, vm.memory.size.toString().padStart(8, ' '), 307f, height - 18 - 500f)
             // -> program counter
             batch.color = Color(0xff9a4bff.toInt())
-            sevensegFont.draw(batch, vm.pc.toString(16).padStart(6, ' '), 461f, height - 18 - 500f)
+            sevensegFont.draw(batch, vm.pc.toString(16).padStart(6, ' '), 457f, height - 18 - 500f)
+            // -> stack pointer
+            sevensegFont.draw(batch, vm.sp.toString(16).padStart(4, ' '), 597f, height - 18 - 500f)
         }
 
 

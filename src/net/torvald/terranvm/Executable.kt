@@ -28,7 +28,7 @@ Go to the store and buy some more, ";
 string bottles "bottles ";
 string bottle "bottle ";
 
-string omore "o more ";
+string omore "o more ";  # Using "omore" because of capitalisation of N. (No more/no more)
 
 
 .func;
