@@ -38,7 +38,7 @@ loadnum r1, 32; putchar; return;
 
 
 :printbeercnt;
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+loadvariable beercount; peeknum; # r1 <- beercount (dereferenced)
 mov r1, r2;
 loadnum r3, 1;
 cmp;
@@ -70,10 +70,11 @@ return;                          #
 
 loadnum r1, 99;                  #
 setvariable beercount;           # set beer count
+setvariable originalcount;       # set original count
 
 
 :compare;
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+loadvariable beercount; peeknum; # r1 <- beercount (dereferenced)
 mov r1, r2;                      # r2 <- beercount
 loadnum r3, 1;                   # r3 <- 1.0
 cmp;                             # m1 <- if (beercount > 1) 1 else if (beercount == 1) 0 else -1
@@ -90,7 +91,7 @@ loadptr r1, @beerone; printstr;  # 'of beer on the wall, '
 gosub @printbeercnt;             # print beer count'
 loadptr r1, @beertwo; printstr;  # 'of beer.\nTake one down and pass it around, '
 
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+loadvariable beercount; peeknum; # r1 <- beercount (dereferenced)
 dec1; setvariable beercount;     # decrement beercount by one
 
 
@@ -107,7 +108,7 @@ loadptr r1, @beerone; printstr;  # 'of beer on the wall, '
 gosub @printbeercnt;             # print beer count
 loadptr r1, @beertwo; printstr;  # 'of beer.\nTake one down and pass it around, '
 
-loadvariable beercount; peeknum; # r1 <- beercount (deferred)
+loadvariable beercount; peeknum; # r1 <- beercount (dereferenced)
 dec1; setvariable beercount;     # decrement beercount by one
 
 gosub @printbeercnt;             # print beer count
@@ -125,8 +126,9 @@ loadptr r1, @beerone; printstr;  # 'of beer on the wall, '
 gosub @printbeercnt;             # print beer count ('no more bottles ')
 loadptr r1, @gotostore; printstr;# 'of beer.\nGo to the store and buy some more, '
 
-loadnum r1, 99;                  # set beercount to 99
-setvariable beercount;           #
+loadvariable originalcount;      # r1 <- originalcount.pointer
+peeknum;                         # dereference the pointer
+setvariable beercount;           # set beercount to originalcount
 
 gosub @printbeercnt;             # print beer count
 loadptr r1, @beerthree; printstr;# 'of beer on the wall.\n\n'

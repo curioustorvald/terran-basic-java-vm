@@ -20,6 +20,7 @@ import net.torvald.terranvm.runtime.VMPeripheralHardware
 class TextOnly : Game() {
 
     lateinit var background: Texture
+    lateinit var execLed: Texture
 
     lateinit var batch: SpriteBatch
 
@@ -33,9 +34,10 @@ class TextOnly : Game() {
 
 
     override fun create() {
-        val vmDelay = 50
+        val vmDelay = 2
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
+        execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
 
         batch = SpriteBatch()
 
@@ -85,6 +87,11 @@ jmp @loop;
             batch.color = Color.WHITE
             batch.draw(background, 0f, 0f)
 
+
+            // exec lamp
+            if (vm.isRunning) {
+                batch.draw(execLed, 51f, 39f)
+            }
 
             // draw whatever on the peripheral's memory
             peripheral.render(batch, Gdx.graphics.rawDeltaTime, lcdOffX, lcdOffY)

@@ -333,6 +333,8 @@ class VM(memSize: Int,
         private set
 
     var terminate = false
+    var isRunning = false
+        private set
 
     // number registers (64 bit, function args)
     var r1 = 0.0
@@ -607,6 +609,7 @@ Math error
 
         if (userSpaceStart != null) {
 
+            isRunning = true
             uptimeHolder = System.currentTimeMillis()
 
 
@@ -687,6 +690,8 @@ Math error
                     Thread.sleep(delayInMills!!.toLong())
                 }
             }
+
+            isRunning = false
         }
     }
 
