@@ -2,7 +2,6 @@ package net.torvald.terranvm.runtime
 
 import net.torvald.terranvm.*
 import net.torvald.terranvm.Opcodes.POKEINT
-import net.torvald.terranvm.Opcodes.READ_UNTIL_ZERO
 import net.torvald.terranvm.Opcodes.getArgumentSize
 import java.io.InputStream
 import java.io.OutputStream
@@ -22,17 +21,17 @@ typealias Number = Double
  *
  * Created by minjaesong on 2017-05-09.
  */
-class VM(memSize: Int,
-         private val stackSize: Int = 2500,
-         var stdout: OutputStream = System.out,
-         var stdin: InputStream = System.`in`,
-         var suppressWarnings: Boolean = false,
-         // following is an options for VM's micro operation system
-         val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC
+class TerranVM(memSize: Int,
+               private val stackSize: Int = 2500,
+               var stdout: OutputStream = System.out,
+               var stdin: InputStream = System.`in`,
+               var suppressWarnings: Boolean = false,
+         // following is an options for TerranVM's micro operation system
+               val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC TODO: turning this on makes it run faster?!
 ) : Runnable {
     private val DEBUG = false
 
-    class Pointer(val parent: VM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
+    class Pointer(val parent: TerranVM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
         /*
         VOID    in memory: 0x00
         BOOLEAN in memory: 0x00 if false, 0xFF if true
@@ -141,7 +140,7 @@ class VM(memSize: Int,
             System.arraycopy(byteArray, 0, parent.memory, memAddr, byteArray.size)
         }
         fun write(string: String) {
-            val strBytes = string.toByteArray(VM.charset)
+            val strBytes = string.toByteArray(TerranVM.charset)
             write(strBytes.size.toLittle() + strBytes) // according to TBASString
         }
         fun write(boolean: Boolean) {
@@ -161,7 +160,7 @@ class VM(memSize: Int,
         fun toLittle() = memAddr.toLittle()
     }
 
-    class IntStack(vm: VM, val startPointer: Int, val stackSize: Int) {
+    class IntStack(vm: TerranVM, val startPointer: Int, val stackSize: Int) {
         private val ptr = Pointer(vm, startPointer, Pointer.PointerType.INT32)
 
         fun push(value: Int) {
@@ -175,7 +174,7 @@ class VM(memSize: Int,
         fun peek(): Int = ptr.readData() as Int
     }
 
-    class Stack(vm: VM, val stackSize: Int, type: Pointer.PointerType) {
+    class Stack(vm: TerranVM, val stackSize: Int, type: Pointer.PointerType) {
         init {
             if (type == Pointer.PointerType.VOID) {
                 throw Error("Unsupported pointer type: VOID")
@@ -328,7 +327,7 @@ class VM(memSize: Int,
 
     val callStack = DoubleArray(stackSize, { 0.0 })
 
-    val ivtSize = 4 * VM.interruptCount
+    val ivtSize = 4 * TerranVM.interruptCount
     var userSpaceStart: Int? = null // lateinit
         private set
 
@@ -738,7 +737,7 @@ Math error
     fun interruptStopExecution() { pc = memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt() }
 
 
-    class BIOS(val vm: VM) : VMPeripheralHardware {
+    class BIOS(val vm: TerranVM) : VMPeripheralHardware {
         override fun call(arg: Int) {
             when (arg) {
             // memory check
@@ -762,7 +761,7 @@ fun Int.KB() = this shl 10
 fun Int.MB() = this shl 20
 
 /** Turn string into byte array with null terminator */
-fun String.toCString() = this.toByteArray(VM.charset) + 0
+fun String.toCString() = this.toByteArray(TerranVM.charset) + 0
 fun Int.toLittle() = byteArrayOf(
         this.and(0xFF).toByte(),
         this.ushr(8).and(0xFF).toByte(),

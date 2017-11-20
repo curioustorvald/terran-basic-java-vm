@@ -26,9 +26,9 @@ object Opcodes {
     
     val TBASVERSION = 0.4
 
-    lateinit var vm: VM
+    lateinit var vm: TerranVM
 
-    fun invoke(vm: VM) {
+    fun invoke(vm: TerranVM) {
         this.vm = vm
 
         //initTBasicEnv()
@@ -47,54 +47,54 @@ object Opcodes {
         // load things for TBASIC
 
         // Compose Interrupt Vector Table to display errors //
-        val writePointer = VM.Pointer(vm, 0, VM.Pointer.PointerType.INT32, true)
+        val writePointer = TerranVM.Pointer(vm, 0, TerranVM.Pointer.PointerType.INT32, true)
 
         run { // --> SYNTAX ERROR (invalid opcode??)
             val syntaxErrorPtr = vm.makeBytesDB(byteArrayOf(Opcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?SYNTAX\tERROR\n".toCString() + byteArrayOf(Opcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
-            writePointer.memAddr = VM.INT_ILLEGAL_OP * 4
+            writePointer.memAddr = TerranVM.INT_ILLEGAL_OP * 4
             writePointer.write(syntaxErrorPtr.memAddr)
         }
 
         run { // --> DIVISION BY ZERO ERROR (invalid opcode??)
             val div0Ptr = vm.makeBytesDB(byteArrayOf(Opcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?DIVISION BY ZERO\tERROR\n".toCString() + byteArrayOf(Opcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
-            writePointer.memAddr = VM.INT_DIV_BY_ZERO * 4
+            writePointer.memAddr = TerranVM.INT_DIV_BY_ZERO * 4
             writePointer.write(div0Ptr.memAddr)
         }
 
         run { // --> OUT OF MEMORY ERROR
             val oomPtr = vm.makeBytesDB(byteArrayOf(Opcodes.opcodesList["LOADSTRINLINE"]!!) + 1 + "?OUT OF MEMORY\tERROR\n".toCString() + byteArrayOf(Opcodes.opcodesList["PRINTSTR"]!!))
             // write INT32 using yet another pointer
-            writePointer.memAddr = VM.INT_OUT_OF_MEMORY * 4
+            writePointer.memAddr = TerranVM.INT_OUT_OF_MEMORY * 4
             writePointer.write(oomPtr.memAddr)
         }
     }
 
     fun resetTBASVarTable() {
         val ptrM_PI = vm.malloc(SIZEOF_NUMBER)
-        ptrM_PI.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_PI.type = TerranVM.Pointer.PointerType.DOUBLE
         ptrM_PI.write(3.141592653589793)
         val ptrM_2PI = vm.malloc(SIZEOF_NUMBER)
-        ptrM_2PI.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_2PI.type = TerranVM.Pointer.PointerType.DOUBLE
         ptrM_2PI.write(6.283185307179586)
         val ptrM_E = vm.malloc(SIZEOF_NUMBER)
-        ptrM_E.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_E.type = TerranVM.Pointer.PointerType.DOUBLE
         ptrM_E.write(2.718281828459045)
         val ptrM_ROOT2 = vm.malloc(SIZEOF_NUMBER)
-        ptrM_ROOT2.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_ROOT2.type = TerranVM.Pointer.PointerType.DOUBLE
         ptrM_ROOT2.write(1.414213562373095)
         val ptrTRUE = vm.malloc(SIZEOF_BYTE)
-        ptrM_PI.type = VM.Pointer.PointerType.BOOLEAN
+        ptrM_PI.type = TerranVM.Pointer.PointerType.BOOLEAN
         ptrM_PI.write(true)
         val ptrFALSE = vm.malloc(SIZEOF_BYTE)
-        ptrM_PI.type = VM.Pointer.PointerType.BOOLEAN
+        ptrM_PI.type = TerranVM.Pointer.PointerType.BOOLEAN
         ptrM_PI.write(false)
         val ptrNIL = vm.malloc(SIZEOF_BYTE)
-        ptrM_PI.type = VM.Pointer.PointerType.VOID
+        ptrM_PI.type = TerranVM.Pointer.PointerType.VOID
         ptrM_PI.write(false)
         val ptr_VERSION = vm.malloc(SIZEOF_NUMBER)
-        ptrM_PI.type = VM.Pointer.PointerType.DOUBLE
+        ptrM_PI.type = TerranVM.Pointer.PointerType.DOUBLE
         ptrM_PI.write(TBASVERSION)
 
         vm.setvar("M_PI", TBASNumber(ptrM_PI))
@@ -143,7 +143,7 @@ object Opcodes {
      * print a string. String should be prepared to r1 as pointer. (r1 will be garbled afterwards!)
      */
     fun PRINTSTR() {
-        val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
+        val string = TBASString(TerranVM.Pointer(vm, vm.r1.toInt()))
         vm.strCntr = 0 // string counter
 
         while (true) {
@@ -192,7 +192,7 @@ object Opcodes {
 
         LOADSTRINLINE(1, str.toCString())
 
-        val string = TBASString(VM.Pointer(vm, vm.r1.toInt()))
+        val string = TBASString(TerranVM.Pointer(vm, vm.r1.toInt()))
         vm.strCntr = 0 // string counter
 
         while (true) {
@@ -479,7 +479,7 @@ object Opcodes {
         }
         else {
             // String
-            val ptr = VM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt())
+            val ptr = TerranVM.Pointer(vm, java.lang.Double.doubleToRawLongBits(vm.r1).toInt())
             vm.setvar(identifier, TBASString(ptr))
         }
     }
@@ -515,11 +515,11 @@ object Opcodes {
         TYPE_NUMBER -> 8
         else -> throw IllegalArgumentException()
     }
-    private fun getPointerTypeFromID(typeID: Int): VM.Pointer.PointerType = when(typeID) {
-        TYPE_NIL -> VM.Pointer.PointerType.VOID
-        TYPE_BOOLEAN -> VM.Pointer.PointerType.BOOLEAN
-        TYPE_BYTES -> VM.Pointer.PointerType.BYTE
-        TYPE_NUMBER -> VM.Pointer.PointerType.INT64
+    private fun getPointerTypeFromID(typeID: Int): TerranVM.Pointer.PointerType = when(typeID) {
+        TYPE_NIL -> TerranVM.Pointer.PointerType.VOID
+        TYPE_BOOLEAN -> TerranVM.Pointer.PointerType.BOOLEAN
+        TYPE_BYTES -> TerranVM.Pointer.PointerType.BYTE
+        TYPE_NUMBER -> TerranVM.Pointer.PointerType.INT64
         else -> throw IllegalArgumentException()
     }
 
@@ -547,11 +547,11 @@ object Opcodes {
 
 
 
-    val SIZEOF_BYTE = VM.Pointer.sizeOf(VM.Pointer.PointerType.BYTE)
-    val SIZEOF_REGISTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.BYTE)
-    val SIZEOF_POINTER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
-    val SIZEOF_INT32 = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT32)
-    val SIZEOF_NUMBER = VM.Pointer.sizeOf(VM.Pointer.PointerType.INT64)
+    val SIZEOF_BYTE = TerranVM.Pointer.sizeOf(TerranVM.Pointer.PointerType.BYTE)
+    val SIZEOF_REGISTER = TerranVM.Pointer.sizeOf(TerranVM.Pointer.PointerType.BYTE)
+    val SIZEOF_POINTER = TerranVM.Pointer.sizeOf(TerranVM.Pointer.PointerType.INT32)
+    val SIZEOF_INT32 = TerranVM.Pointer.sizeOf(TerranVM.Pointer.PointerType.INT32)
+    val SIZEOF_NUMBER = TerranVM.Pointer.sizeOf(TerranVM.Pointer.PointerType.INT64)
     val READ_UNTIL_ZERO = -2
 
     enum class ArgType {
@@ -743,8 +743,8 @@ object Opcodes {
             "LOADNUM" to fun(args: List<ByteArray>) { LOADNUM(args[0][0].toInt(), args[1].toLittleDouble()) },
             "LOADRAWNUM" to fun(args: List<ByteArray>) { LOADRAWNUM(args[0][0].toInt(), args[1].toLittleLong()) },
             "LOADPTR" to fun(args: List<ByteArray>) { LOADPTR(args[0][0].toInt(), args[1].toLittleInt()) },
-            "LOADVARIABLE" to fun(args: List<ByteArray>) { LOADVARIABLE(args[0].toString(VM.charset)) },
-            "SETVARIABLE" to fun(args: List<ByteArray>) { SETVARIABLE(args[0].toString(VM.charset)) },
+            "LOADVARIABLE" to fun(args: List<ByteArray>) { LOADVARIABLE(args[0].toString(TerranVM.charset)) },
+            "SETVARIABLE" to fun(args: List<ByteArray>) { SETVARIABLE(args[0].toString(TerranVM.charset)) },
             "LOADMNUM" to fun(args: List<ByteArray>) { LOADMNUM(args[0].toLittleInt()) },
             "LOADSTRINLINE" to fun(args: List<ByteArray>) { LOADSTRINLINE(args[0][0].toInt(), args[1]) },
 

@@ -7,7 +7,7 @@ import net.torvald.terranvm.runtime.*
  */
 object Executable {
 
-    val vm = VM(2048, tbasic_remove_string_dupes = true)
+    val vm = TerranVM(2048, tbasic_remove_string_dupes = true)
 
 
     val beers = Assembler("""

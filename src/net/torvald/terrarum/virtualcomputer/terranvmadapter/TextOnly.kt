@@ -9,10 +9,7 @@ import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.Executable
-import net.torvald.terranvm.runtime.Assembler
-import net.torvald.terranvm.runtime.GdxPeripheralWrapper
-import net.torvald.terranvm.runtime.VM
-import net.torvald.terranvm.runtime.VMPeripheralHardware
+import net.torvald.terranvm.runtime.TerranVM
 
 /**
  * Created by minjaesong on 2017-11-17.
@@ -24,7 +21,7 @@ class TextOnly : Game() {
 
     lateinit var batch: SpriteBatch
 
-    lateinit var vm: VM
+    lateinit var vm: TerranVM
 
     lateinit var sevensegFont: BitmapFont
 
@@ -32,9 +29,10 @@ class TextOnly : Game() {
 
     lateinit var vmThread: Thread
 
+    lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 100
+        val vmDelay = 20
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -45,7 +43,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = VM(4096, stdout = peripheral.printStream)
+        vm = TerranVM(1024, stdout = peripheral.printStream, tbasic_remove_string_dupes = true)
 
         vm.peripherals[1] = peripheral
 
@@ -67,6 +65,9 @@ jmp @loop;
         vm.delayInMills = vmDelay
 
 
+        memvwr = Memvwr(vm)
+
+
         vmThread = Thread(vm)
         vmThread.start()
     }
@@ -77,10 +78,13 @@ jmp @loop;
     private val lcdOffY = 56f
 
     override fun render() {
-        Gdx.graphics.setTitle("TerranVM Debugging console - text only mode — F: ${Gdx.graphics.framesPerSecond}")
+        Gdx.graphics.setTitle("TerranVM Debugging Console - text only mode — F: ${Gdx.graphics.framesPerSecond}")
 
 
         vm.pauseExec()
+
+
+        memvwr.update()
 
 
         batch.inUse {

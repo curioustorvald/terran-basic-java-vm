@@ -1,7 +1,6 @@
 package net.torvald.terranvm.runtime
 
 import net.torvald.terranvm.Opcodes
-import net.torvald.terranvm.Opcodes.READ_UNTIL_ZERO
 import net.torvald.terranvm.Opcodes.SIZEOF_POINTER
 
 /**
@@ -174,12 +173,12 @@ object Assembler {
     operator fun invoke(userProgram: String): ByteArray {
         val ret = ArrayList<Byte>()
 
-        fun getPC() = VM.interruptCount * 4 + ret.size
+        fun getPC() = TerranVM.interruptCount * 4 + ret.size
 
 
         // pass 1: pre-scan for labels
         debug("\n\n== Pass 1 ==\n\n")
-        var virtualPC = VM.interruptCount * 4
+        var virtualPC = TerranVM.interruptCount * 4
         splitLines(userProgram).forEach { lline ->
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
