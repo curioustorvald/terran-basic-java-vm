@@ -10,4 +10,9 @@ abstract class GdxPeripheralWrapper(memSize: Int, suppressWarnings: Boolean = fa
 
     abstract fun render(batch: SpriteBatch, delta: Float, offsetX: Float, offsetY: Float)
 
+    abstract fun keyDown(keycode: Int): Boolean
+    abstract fun touchDown(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean
+
+    abstract fun dispose()
+
 }

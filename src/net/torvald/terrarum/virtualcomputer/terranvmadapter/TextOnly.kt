@@ -34,7 +34,7 @@ class TextOnly : Game() {
 
 
     override fun create() {
-        val vmDelay = 2
+        val vmDelay = 100
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))

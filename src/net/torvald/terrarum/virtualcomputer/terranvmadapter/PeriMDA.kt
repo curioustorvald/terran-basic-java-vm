@@ -26,6 +26,8 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
      * 0x01bb: text cursor X position 0-255
      * 0x02bb: text cursor Y position 0-255
      * 0x03bb: change graphics mode (if supported)
+     * 0x04bb: change foreground colour (if supported)
+     * 0x05bb: change background colour (if supported)
      */
     override fun call(arg: Int) {
         when (arg) {
@@ -42,13 +44,29 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
 
     private val height: Int; get() = Gdx.graphics.height
 
+    private var blinkTimer = 0f
+    private val blinkTime = 0.2f
+    private var blinkOn = false
+
     override fun render(batch: SpriteBatch, delta: Float, offsetX: Float, offsetY: Float) {
+        if (cursorBlink && blinkTimer > blinkTime) {
+            blinkTimer -= blinkTime
+            blinkOn = !blinkOn
+        }
+
+        blinkTimer += delta
+
+
         batch.color = Color(0x141414ff)
         for (y in 0 until H) {
             for (x in 0 until W) {
                 val char = memory[y * 80 + x].toChar()
                 lcdFont.draw(batch, "$char", offsetX + 12 * x, height - 16 - (offsetY + 16 * y))
             }
+        }
+
+        if (cursorBlink && blinkOn) {
+            lcdFont.draw(batch, "${0xdb.toChar()}", offsetX + 12 * (cursorX), height - 16 - (offsetY + 16 * minOf(cursorY, H - 1)))
         }
     }
 
@@ -130,6 +148,18 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
         }
     } ) { }
 
+
+    override fun keyDown(keycode: Int): Boolean {
+        return false
+    }
+
+    override fun touchDown(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
+        return false
+    }
+
+    override fun dispose() {
+
+    }
 
     val TABSIZE = 4
 
