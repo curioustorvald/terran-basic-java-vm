@@ -32,7 +32,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 20
+        val vmDelay = 50
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -78,7 +78,7 @@ jmp @loop;
     private val lcdOffY = 56f
 
     override fun render() {
-        Gdx.graphics.setTitle("TerranVM Debugging Console - text only mode — F: ${Gdx.graphics.framesPerSecond}")
+        Gdx.graphics.setTitle("TerranVM Debugging Console - Text Only Mode — F: ${Gdx.graphics.framesPerSecond}")
 
 
         vm.pauseExec()

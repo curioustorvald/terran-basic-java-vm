@@ -60,7 +60,7 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
         batch.color = Color(0x141414ff)
         for (y in 0 until H) {
             for (x in 0 until W) {
-                val char = memory[y * 80 + x].toChar()
+                val char = memory[y * W + x].toChar()
                 lcdFont.draw(batch, "$char", offsetX + 12 * x, height - 16 - (offsetY + 16 * y))
             }
         }

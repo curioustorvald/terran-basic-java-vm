@@ -1,5 +1,6 @@
 package net.torvald.terrarum.virtualcomputer.terranvmadapter
 
+import net.torvald.terranvm.Opcodes
 import net.torvald.terranvm.runtime.TerranVM
 import net.torvald.terranvm.runtime.toUint
 import java.awt.BorderLayout
@@ -12,7 +13,7 @@ import javax.swing.WindowConstants
 /**
  * Created by minjaesong on 2017-11-21.
  */
-class Memvwr(val vm: TerranVM) : JFrame() {
+class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") {
 
     val memArea = JTextArea()
 
@@ -22,9 +23,66 @@ class Memvwr(val vm: TerranVM) : JFrame() {
         val sb = StringBuilder()
 
         /*
+        r1: 0.000000000 (Number)
         000000 : 00 00 00 00 00 00 00 48 00 00 00 50 00 00 00 58 | .......H...P...X
          */
 
+        // registers
+        for (r in 1..8) {
+            val rreg = vm.readreg(r)
+            val breg = vm.readbreg(r).toInt()
+
+            val rregtype = breg.ushr(2).and(7)
+            val rregtypeStr = when (rregtype) {
+                0 -> "Nil"
+                1 -> "Boolean"
+                2 -> "Number"
+                3 -> "Bytes"
+                4 -> "String"
+                else -> "Undefined--$rregtype"
+            }
+            val isInt = breg.and(1) != 0
+            val isPtr = breg.and(2) != 0
+
+            sb.append("r$r: ")
+
+            if (!isInt && !isPtr) {
+                if (rregtype == Opcodes.TYPE_NUMBER) {
+                    sb.append("$rreg ($rregtypeStr)")
+                }
+                else {
+                    sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h ($rregtypeStr)")
+                }
+            }
+            else if (isInt && !isPtr) {
+                sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Int)")
+            }
+            else if (isInt && isPtr) {
+                sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Pointer)")
+            }
+            else {
+                sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Null Pointer)")
+            }
+
+            sb.append('\n')
+        }
+
+        for (m in 1..4) {
+            val mreg = when (m) {
+                1 -> vm.m1
+                2 -> vm.m2
+                3 -> vm.m3
+                4 -> vm.m4
+                else -> throw InternalError("Your RAM just got hit by gamma radiation.")
+            }
+
+            sb.append("m$m: ${mreg.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase()}h ($mreg)\n")
+        }
+
+        sb.append("uptime: ${vm.uptime} ms\n")
+
+
+        // coremem
         for (i in 0..vm.memory.lastIndex) {
             if (i % columns == 0) {
                 sb.append(i.toString(16).toUpperCase().padStart(6, '0')) // mem addr
@@ -69,7 +127,6 @@ class Memvwr(val vm: TerranVM) : JFrame() {
     init {
         memArea.font = Font("Monospaced", Font.PLAIN, 12)
         memArea.highlighter = null
-        memArea.name = "TerranVM Memory Viewer"
 
         this.layout = BorderLayout()
         this.isVisible = true

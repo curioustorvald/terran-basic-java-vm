@@ -395,6 +395,14 @@ class TerranVM(memSize: Int,
     }
 
     // byte registers (flags for r registers)
+    /*
+     b registers:
+
+     0 - true (1) if INT, false (0) if Number
+     1 - true (1) if Pointer (NOTE: all valid pointer will have '11' as LSB.
+                              '10' (pointer but is number) stands for NULL POINTER)
+     2, 3, 4 - Type ID
+     */
     var b1 = 0.toByte()
     var b2 = 0.toByte()
     var b3 = 0.toByte()
@@ -419,7 +427,6 @@ class TerranVM(memSize: Int,
         get() {
             val currentTime = System.currentTimeMillis()
             val ret = currentTime - uptimeHolder
-            uptimeHolder = currentTime
             return ret.toInt()
         }
 

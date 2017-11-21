@@ -157,9 +157,12 @@ putchar;putchar;putchar;putchar;putchar;
 """)
 
 
-    val pcinc = Assembler("""
+    val oomtest = Assembler("""
+loadnum r1, 99;
+loadnum r2, 256;
 :loop;
-jfw 1;
+poke;
+inc2;
 jmp @loop;
 """)
 

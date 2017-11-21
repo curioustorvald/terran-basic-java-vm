@@ -347,6 +347,9 @@ object Opcodes {
      1 - true (1) if Pointer (NOTE: all valid pointer will have '11' as LSB.
                               '10' (pointer but is number) stands for NULL POINTER)
      2, 3, 4 - Type ID
+
+
+     (copied from TerranVM.kt)
      */
 
     /**
@@ -523,11 +526,11 @@ object Opcodes {
         else -> throw IllegalArgumentException()
     }
 
-    private val TYPE_NIL = 0b000
-    private val TYPE_BOOLEAN = 0b001
-    private val TYPE_NUMBER = 0b010
-    private val TYPE_BYTES = 0b011
-    private val TYPE_STRING = 0b100 // implies "pointer: true"
+    val TYPE_NIL = 0b000
+    val TYPE_BOOLEAN = 0b001
+    val TYPE_NUMBER = 0b010
+    val TYPE_BYTES = 0b011
+    val TYPE_STRING = 0b100 // implies "pointer: true"
 
     /*
 
