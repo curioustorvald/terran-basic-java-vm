@@ -58,7 +58,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
                 sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Int)")
             }
             else if (isInt && isPtr) {
-                sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Pointer)")
+                sb.append("${rreg.toInt().toString(16).padStart(8, '0').toUpperCase()}h (Pointer)")
             }
             else {
                 sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Null Pointer)")
