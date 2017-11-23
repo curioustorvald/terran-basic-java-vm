@@ -302,7 +302,10 @@ class TerranVM(memSize: Int,
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    val peripherals = Array<VMPeripheralWrapper?>(255, { null }) // peri addr: 0x00..0xFE; 0xFF being on-board BIOS/UEFI
+    val peripherals = Array<VMPeripheralWrapper?>(255, { null }) // peri addr: 0x00..0xFE;
+    // 0x00: fixed to keyboard
+    // 0x01: main display is expected
+    // 0xFF: BIOS/UEFI
     val bios = BIOS(this)
 
     /**

@@ -20,14 +20,19 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
     var cursorBlink = true
     var cursorX = 0
     var cursorY = 0
+    // will wrap around; think of how NES's graphic work
+    var scrollX = 0
+    var scrollY = 0
 
     /**
      * 0x00bb: cursorblink; 00: false, ff: true
      * 0x01bb: text cursor X position 0-255
      * 0x02bb: text cursor Y position 0-255
-     * 0x03bb: change graphics mode (if supported)
-     * 0x04bb: change foreground colour (if supported)
-     * 0x05bb: change background colour (if supported)
+     * 0x03bb: text scroll X (-128..127)
+     * 0x04bb: text scroll Y (-128..127)
+     * 0x05bb: change graphics mode (if supported)
+     * 0x06bb: change foreground colour (if supported)
+     * 0x07bb: change background colour (if supported)
      */
     override fun call(arg: Int) {
         when (arg) {
@@ -38,6 +43,8 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
         when (arg.shl(8)) {
             0x01 -> { cursorX = arg.and(0xff) }
             0x02 -> { cursorY = arg.and(0xff) }
+            0x03 -> { scrollX += arg.and(0xff).toByte().toInt() } // DON'T use toUint()
+            0x04 -> { scrollY += arg.and(0xff).toByte().toInt() } // DON'T use toUint()
         }
     }
 
@@ -60,7 +67,7 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
         batch.color = Color(0x141414ff)
         for (y in 0 until H) {
             for (x in 0 until W) {
-                val char = memory[y * W + x].toChar()
+                val char = getByte(x, y).toChar()
                 lcdFont.draw(batch, "$char", offsetX + 12 * x, height - 16 - (offsetY + 16 * y))
             }
         }
@@ -75,8 +82,15 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
     }
 
     private fun clearLine(line: Int = cursorY) {
-        for (i in 0 until W) memory[W * line + i] = 0.toByte()
+        for (i in 0 until W) setByte(i, line, 0.toByte())
     }
+
+    private fun setByte(x: Int, y: Int, byte: Byte) {
+        memory[x.plus(scrollX).rem(W) + y.plus(scrollY).rem(H) * W] = byte
+    }
+
+    private fun getByte(x: Int, y: Int): Byte =
+            memory[x.plus(scrollX).rem(W) + y.plus(scrollY).rem(H) * W]
 
     // will make display adapter run as if it was a dumb terminal
     val printStream = object : PrintStream(object : OutputStream() {
@@ -121,7 +135,8 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
 
             if (cursorY == H) {
                 // scroll
-                System.arraycopy(memory, W, memory, 0, W * (H - 1))
+                //System.arraycopy(memory, W, memory, 0, W * (H - 1))
+                scrollY++
                 clearLine(H - 1)
 
 
@@ -131,10 +146,10 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
             // blit text
             if (!controlCharacterUsed) {
                 if (delCalled) {
-                    memory[cursorX + cursorY * W] = 0.toByte()
+                    setByte(cursorX, cursorY, 0.toByte())
                 }
                 else {
-                    memory[cursorX + cursorY * W] = b.and(0xFF).toByte()
+                    setByte(cursorX, cursorY, b.and(0xFF).toByte())
                 }
 
 

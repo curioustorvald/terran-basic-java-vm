@@ -121,7 +121,7 @@ object Opcodes {
 
     fun JMP(addr: Int) { vm.pc = addr }
     fun JFW(offset: Number) { vm.pc = Math.floorMod(vm.pc + offset.toInt(), 0x7FFFFFFF) }
-    fun JBW(offset: Number) { JFW(-offset) }
+    fun JBW(offset: Number) { vm.pc = Math.floorMod(vm.pc - offset.toInt(), 0x7FFFFFFF) }
 
     fun JZ(addr: Int) { if (vm.m1 == 0) JMP(addr) }
     fun JNZ(addr: Int) { if (vm.m1 != 0) JMP(addr) }

@@ -82,6 +82,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         sb.append("uptime: ${vm.uptime} ms\n")
 
 
+
         // coremem
         for (i in 0..vm.memory.lastIndex) {
             if (i % columns == 0) {
@@ -111,6 +112,20 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
                 sb.append('\n')
             }
+        }
+
+
+        // stack
+        sb.append("stack size: ${vm.sp}/${vm.callStack.size}\n")
+        for (i in 0 until vm.sp) {
+            sb.append("s${i.toString().padStart(4, '0')} : ${vm.callStack[i].toInt().toString(16).padStart(8, '0').toUpperCase()}h\n")
+        }
+
+
+        // peripherals
+        sb.append("peripherals:\n")
+        for (i in 1 until vm.peripherals.size) {
+            sb.append("peri[$i]: ${vm.peripherals[i]?.javaClass?.simpleName ?: "null"}\n")
         }
 
 
