@@ -117,7 +117,7 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
                     controlCharacterUsed = true
                 }
                 ASCII_CR -> {
-                    cursorX = 0
+                    cursorY += 1; cursorX = 0
                     controlCharacterUsed = true
                 }
                 ASCII_DEL -> {
@@ -164,6 +164,10 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
     } ) { }
 
 
+    override fun keyTyped(char: Char): Boolean {
+        return false
+    }
+
     override fun keyDown(keycode: Int): Boolean {
         return false
     }
@@ -173,7 +177,7 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
     }
 
     override fun dispose() {
-
+        lcdFont.dispose()
     }
 
     val TABSIZE = 4

@@ -2,6 +2,7 @@ package net.torvald.terrarum.virtualcomputer.terranvmadapter
 
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.InputProcessor
 import com.badlogic.gdx.backends.lwjgl.LwjglApplication
 import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration
 import com.badlogic.gdx.graphics.Color
@@ -9,6 +10,8 @@ import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.Executable
+import net.torvald.terranvm.runtime.Assembler
+import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
 
 /**
@@ -32,7 +35,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 25
+        val vmDelay = 2
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -45,27 +48,45 @@ class TextOnly : Game() {
 
         vm = TerranVM(1024, stdout = peripheral.printStream, tbasic_remove_string_dupes = true)
 
-        vm.peripherals[1] = peripheral
+        vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction()
+        vm.peripherals[3] = peripheral
 
 
-        /*vm.loadProgram(Assembler("""
-# loadnum r3, 1; # peripheral ID
-# loadnum r2, 0; # peripheral mem addr
-# loadnum r1, 0; # what byte to write
 
+        val programEchoKeyPress = Assembler("""
+.func;
+:keyboardint;
+loadnum r3, 1; # peripheral IRQ 1
+loadnum r2, 0; # memaddr of 0
+loadperi; # r1 <- keycode in Number
+putchar;
 
+return;
+
+.code;
+
+# install the interrupt
+loadnum r2, 24;
+loadptr r1, @keyboardint;
+pokeint;
+
+# main loop
 :loop;
-jfw 1;
+nop;
 jmp @loop;
 
+""")
 
-"""))*/
 
-        vm.loadProgram(Executable.beers)
+        vm.loadProgram(programEchoKeyPress)
         vm.delayInMills = vmDelay
 
 
+
         memvwr = Memvwr(vm)
+
+
+        Gdx.input.inputProcessor = TVMInputProcessor(vm)
 
 
         vmThread = Thread(vm)
@@ -120,15 +141,52 @@ jmp @loop;
         vm.resumeExec()
     }
 
-
-
-
-
+    override fun dispose() {
+        background.dispose()
+        execLed.dispose()
+    }
 
     private inline fun SpriteBatch.inUse(action: () -> Unit) {
         this.begin()
         action.invoke()
         this.end()
+    }
+
+
+    class TVMInputProcessor(val vm: TerranVM) : InputProcessor {
+        override fun touchUp(p0: Int, p1: Int, p2: Int, p3: Int): Boolean {
+            return false
+        }
+
+        override fun mouseMoved(p0: Int, p1: Int): Boolean {
+            return false
+        }
+
+        override fun keyTyped(p0: Char): Boolean {
+            (vm.peripherals[TerranVM.IRQ_KEYBOARD] as GdxPeripheralWrapper).keyTyped(p0)
+            vm.interruptKeyPress()
+            return true
+        }
+
+        override fun scrolled(p0: Int): Boolean {
+            return false
+        }
+
+        override fun keyUp(p0: Int): Boolean {
+            return false
+        }
+
+        override fun touchDragged(p0: Int, p1: Int, p2: Int): Boolean {
+            return false
+        }
+
+        override fun keyDown(p0: Int): Boolean {
+            return false
+        }
+
+        override fun touchDown(p0: Int, p1: Int, p2: Int, p3: Int): Boolean {
+            return false
+        }
     }
 
 }

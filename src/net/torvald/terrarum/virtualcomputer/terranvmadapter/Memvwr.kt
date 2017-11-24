@@ -124,7 +124,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
         // peripherals
         sb.append("peripherals:\n")
-        for (i in 1 until vm.peripherals.size) {
+        for (i in 0 until vm.peripherals.size) {
             sb.append("peri[$i]: ${vm.peripherals[i]?.javaClass?.simpleName ?: "null"}\n")
         }
 

@@ -30,6 +30,7 @@ class TerranVM(memSize: Int,
                val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC TODO: turning this on makes it run faster?!
 ) : Runnable {
     private val DEBUG = false
+    private val ERROR = true
 
     class Pointer(val parent: TerranVM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
         /*
@@ -303,9 +304,14 @@ class TerranVM(memSize: Int,
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     val peripherals = Array<VMPeripheralWrapper?>(255, { null }) // peri addr: 0x00..0xFE;
-    // 0x00: fixed to keyboard
-    // 0x01: main display is expected
-    // 0xFF: BIOS/UEFI
+    /** - 0x00: fixed to system timer
+     *  - 0x01: fixed to keyboard
+     *  - 0x02: fixed to real-time clock
+     *  - 0x03: main display is expected
+     *  - 0xFF: Used to address BIOS/UEFI
+     *
+     * (see IRQ_ vars in the companion object)
+     */
     val bios = BIOS(this)
 
     /**
@@ -591,7 +597,8 @@ Math error
     var delayInMills: Int? = null
 
 
-    fun execDebugMain(any: Any?) { if (DEBUG) print(any) }
+    fun execDebugMain(any: Any?) { if (DEBUG) println(any) }
+    fun execDebugError(any: Any?) { if (ERROR) System.err.println(any) }
 
     private var pauseExec = false
 
@@ -629,13 +636,13 @@ Math error
 
                 if (pc >= memory.size) {
                     val oldpc = pc
+                    execDebugError("Out of memory: Illegal PC; pc ${oldpc.toLong().and(0xffffffff).toString(16).toUpperCase()}h")
                     interruptOutOfMem()
-                    //if (throwError) { throw Error("Out of memory; pc $oldpc") }
                 }
                 else if (pc < 0) {
                     val oldpc = pc
+                    execDebugError("Segmentation fault: Illegal PC; pc ${oldpc.toLong().and(0xffffffff).toString(16).toUpperCase()}h")
                     interruptSegmentationFault()
-                    //if (throwError) { throw Error("Illegal PC; pc $oldpc") }
                 }
 
                 val instruction = memory[pc]
@@ -675,7 +682,7 @@ Math error
                     Opcodes.opcodesFunList[instAsm]!!(arguments)
                 }
                 catch (oom: ArrayIndexOutOfBoundsException) {
-                    execDebugMain("[TBASRT] illegal memory address access")
+                    execDebugError("[TBASRT] illegal memory address access")
                     interruptOutOfMem()
                 }
 
@@ -729,22 +736,27 @@ Math error
         val INT_PERI_INPUT = 7
         val INT_PERI_OUTPUT = 8
         val INT_INTERRUPT = 9
+
+
+        val IRQ_SYSTEM_TIMER = 0
+        val IRQ_KEYBOARD = 1
+        val IRQ_RTC = 2
     }
 
 
     private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
 
     // Interrupt handlers (its just JMPs) //
-    fun interruptDivByZero() { pc = memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt() }
-    fun interruptIllegalOp() { pc = memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt() }
-    fun interruptOutOfMem()  { pc = memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt() }
-    fun interruptStackOverflow() { pc = memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt() }
-    fun interruptMathError() { pc = memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt() }
-    fun interruptSegmentationFault() { pc = memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt() }
-    fun interruptKeyPress() { pc = memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt() }
-    fun interruptPeripheralInput() { pc = memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt() }
-    fun interruptPeripheralOutput() { pc = memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt() }
-    fun interruptStopExecution() { pc = memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt() }
+    fun interruptDivByZero() { Opcodes.GOSUB(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt()) }
+    fun interruptIllegalOp() { Opcodes.GOSUB(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt()) }
+    fun interruptOutOfMem()  { Opcodes.GOSUB(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt()) }
+    fun interruptStackOverflow() { Opcodes.GOSUB(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt()) }
+    fun interruptMathError() { Opcodes.GOSUB(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt()) }
+    fun interruptSegmentationFault() { Opcodes.GOSUB(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt()) }
+    fun interruptKeyPress() { Opcodes.GOSUB(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt()) }
+    fun interruptPeripheralInput() { Opcodes.GOSUB(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt()) }
+    fun interruptPeripheralOutput() { Opcodes.GOSUB(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt()) }
+    fun interruptStopExecution() { Opcodes.GOSUB(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt()) }
 
 
     class BIOS(val vm: TerranVM) : VMPeripheralHardware {

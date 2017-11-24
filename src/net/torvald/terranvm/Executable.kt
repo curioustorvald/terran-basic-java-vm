@@ -174,7 +174,6 @@ jmp @loop;
 
         //(0..511).forEach { print("${vm.memory[it].toUint()} ") }; println()
 
-        vm.delayInMills = 10
 
         vm.execute()
         //(0..255).forEach { print("${vm.memory[it].toUint()} ") }; println()
