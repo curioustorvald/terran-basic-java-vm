@@ -170,7 +170,14 @@ object Assembler {
         return lines
     }
 
+    private fun resetStatus() {
+        labelTable.clear()
+    }
+
     operator fun invoke(userProgram: String): ByteArray {
+        resetStatus()
+
+
         val ret = ArrayList<Byte>()
 
         fun getPC() = TerranVM.interruptCount * 4 + ret.size
