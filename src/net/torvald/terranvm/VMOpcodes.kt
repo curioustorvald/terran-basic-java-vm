@@ -114,8 +114,18 @@ object Opcodes {
 
     // flow control //
 
-    fun PUSH(register: Register) { vm.callStack[vm.sp++] = vm.readreg(register) }
-    fun PUSHINT(addr: Int) { vm.callStack[vm.sp++] = addr.toDouble() }
+    fun PUSH(register: Register) {
+        if (vm.sp < vm.callStack.size)
+            vm.callStack[vm.sp++] = vm.readreg(register)
+        else
+            vm.interruptStackOverflow()
+    }
+    fun PUSHINT(addr: Int) {
+        if (vm.sp < vm.callStack.size)
+            vm.callStack[vm.sp++] = addr.toDouble()
+        else
+            vm.interruptStackOverflow()
+    }
     fun POP(register: Register) { vm.writereg(register, vm.callStack[--vm.sp]) }
     fun POPINT() { vm.lr = vm.callStack[--vm.sp].toInt() }
 
@@ -171,7 +181,7 @@ object Opcodes {
             GETCHAR()
             strPtr.write(vm.r1.toByte())
             strPtr.inc()
-            PUTCHAR() // print out what the hell the user has just hit
+            // to print out what the hell the user has just hit, install your own interrupt.
         }
 
         // truncate and free remaining bytes
@@ -608,7 +618,7 @@ object Opcodes {
             "ROUND" to 27.toByte(),
             "LOG"   to 28.toByte(),
             "INT"   to 29.toByte(),
-            "RND"   to 20.toByte(),
+            "RND"   to 30.toByte(),
             "SGN"   to 31.toByte(),
             "SQRT"  to 32.toByte(),
             "CBRT"  to 33.toByte(),
