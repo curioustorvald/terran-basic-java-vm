@@ -100,29 +100,21 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
 
             when (b) {
             //ASCII_BEL -> bell(".")
-                ASCII_BS -> {
+                ASCII_BS, ASCII_DEL -> {
                     cursorX -= 1
-                    controlCharacterUsed = true
+                    delCalled = true
                 }
                 ASCII_TAB -> {
                     cursorX = (cursorX).div(TABSIZE).times(TABSIZE) + TABSIZE
                     controlCharacterUsed = true
                 }
-                ASCII_LF -> {
+                ASCII_LF, ASCII_CR -> {
                     cursorY += 1; cursorX = 0
                     controlCharacterUsed = true
                 }
                 ASCII_FF -> {
                     clear()
                     controlCharacterUsed = true
-                }
-                ASCII_CR -> {
-                    cursorY += 1; cursorX = 0
-                    controlCharacterUsed = true
-                }
-                ASCII_DEL -> {
-                    cursorX -= 1
-                    delCalled = true
                 }
             }
 
@@ -150,10 +142,8 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
                 }
                 else {
                     setByte(cursorX, cursorY, b.and(0xFF).toByte())
+                    cursorX++ // advance cursor
                 }
-
-
-                cursorX++ // advance cursor
             }
 
 

@@ -2,6 +2,7 @@ package net.torvald.terranvm
 
 import net.torvald.terranvm.runtime.*
 import net.torvald.terranvm.runtime.Number
+import java.util.*
 import kotlin.experimental.and
 
 
@@ -252,7 +253,7 @@ object Opcodes {
     fun ROUND() { vm.r1 = Math.round(vm.r2).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
     fun LOG()   { vm.r1 = Math.log  (vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
     fun INT()   { if (vm.r2 >= 0.0) FLOOR() else CEIL() }
-    fun RND()   { vm.r1 = Math.random(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
+    fun RND()   { LOADNUM(1, VMRNG.nextDouble()) }
     fun SGN()   { vm.r1 = Math.signum(vm.r2); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
     fun SQRT() { LOADNUM(3, 2.0); POW() }
     fun CBRT() { LOADNUM(3, 3.0); POW() }
@@ -517,7 +518,17 @@ object Opcodes {
     }
 
 
+    /**
+     * Will seed itself using RTC or uptime
+     */
+    object VMRNG : Random(vm.peripherals[TerranVM.IRQ_RTC]?.memory?.toLittleLong() ?: vm.uptime.toLong()) {
+        var s = -2208269211404306670L
 
+        override fun nextLong(): Long {
+            s = (s * 6364136223846793005) + 1442695040888963407 // knuth is the man
+            return s
+        }
+    }
 
 
 
@@ -556,8 +567,6 @@ object Opcodes {
      */
 
     private fun Byte.toUint() = java.lang.Byte.toUnsignedInt(this)
-
-
 
 
     val SIZEOF_BYTE = TerranVM.Pointer.sizeOf(TerranVM.Pointer.PointerType.BYTE)
@@ -739,17 +748,19 @@ object Opcodes {
 
             "ABS"   to fun(_) { ABS() },
             "SIN"   to fun(_) { SIN() },
-            "FLOOR" to fun(_) { COS() },
-            "CEIL"  to fun(_) { TAN() },
-            "ROUND" to fun(_) { FLOOR() },
-            "LOG"   to fun(_) { CEIL() },
-            "INT"   to fun(_) { ROUND() },
-            "RND"   to fun(_) { LOG() },
-            "SGN"   to fun(_) { INT() },
-            "SQRT"  to fun(_) { RND() },
-            "CBRT"  to fun(_) { SGN() },
+            "COS"   to fun(_) { COS() },
+            "TAN"   to fun(_) { TAN() },
+            "FLOOR" to fun(_) { FLOOR() },
+            "CEIL"  to fun(_) { CEIL() },
+            "ROUND" to fun(_) { ROUND() },
+            "LOG"   to fun(_) { LOG() },
+            "INT"   to fun(_) { INT() },
+            "RND"   to fun(_) { RND() },
+            "SGN"   to fun(_) { SGN() },
             "INV"   to fun(_) { INV() },
             "RAD"   to fun(_) { RAD() },
+            "SQRT"  to fun(_) { SQRT() },
+            "CBRT"  to fun(_) { CBRT() },
 
             "INTERRUPT" to fun(args: List<ByteArray>) { INTERRUPT(args[0][0].toInt()) },
 

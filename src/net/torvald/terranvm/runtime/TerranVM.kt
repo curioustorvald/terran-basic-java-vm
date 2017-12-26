@@ -137,7 +137,7 @@ class TerranVM(memSize: Int,
             (0..7).forEach { parent.memory[memAddr + it] = long.ushr(8 * it).and(0xFF).toByte() }
         }
         fun write(byteArray: ByteArray) {
-            if (parent.memory.size < memAddr + byteArray.size) throw ArrayIndexOutOfBoundsException()
+            if (parent.memory.size < memAddr + byteArray.size) throw ArrayIndexOutOfBoundsException("Out of memory; couldn't install default interrupts")
             System.arraycopy(byteArray, 0, parent.memory, memAddr, byteArray.size)
         }
         fun write(string: String) {
@@ -304,10 +304,23 @@ class TerranVM(memSize: Int,
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     val peripherals = Array<VMPeripheralWrapper?>(255, { null }) // peri addr: 0x00..0xFE;
-    /** - 0x00: fixed to system timer
-     *  - 0x01: fixed to keyboard
-     *  - 0x02: fixed to real-time clock
-     *  - 0x03: main display is expected
+    /** - 0x00: system timer
+     *  - 0x01: keyboard
+     *  - 0x02: real-time clock
+     *  - 0x03: primary display adaptor
+     *  - 0x04: reserved
+     *  - 0x05: reserved
+     *  - 0x06: serial port
+     *  - 0x07: serial port
+     *  - 0x08: disk drive A
+     *  - 0x09: disk drive B
+     *  - 0x0A: disk drive C
+     *  - 0x0B: disk drive D
+     *  - 0x0C: SCSI
+     *  - 0x0D: SCSI
+     *  - 0x0E: SCSI
+     *  - 0x0F: SCSI
+     *  - 0x10..0xFE: user space
      *  - 0xFF: Used to address BIOS/UEFI
      *
      * (see IRQ_ vars in the companion object)
@@ -479,32 +492,32 @@ class TerranVM(memSize: Int,
     private fun setDefaultInterrepts(): Int {
         val intOOM = Assembler("""
 loadstrinline r1,
-Out of memory
+NOMEM
 ; printstr; halt;
 """)
         val intSegfault = Assembler("""
 loadstrinline r1,
-Segmentation fault
+SEGFU
 ; printstr; halt;
 """)
         val intDivZero = Assembler("""
 loadstrinline r1,
-Division by zero
+DIV/0
 ; printstr; halt;
 """)
         val intIllegalOp = Assembler("""
 loadstrinline r1,
-Illegal operation
+ILLOP
 ; printstr; halt;
 """)
         val intStackOverflow = Assembler("""
 loadstrinline r1,
-Stack overflow
+STKOF
 ; printstr; halt;
 """)
         val intMathFuck = Assembler("""
 loadstrinline r1,
-Math error
+MTHFU
 ; printstr; halt;
 """)
 
@@ -741,6 +754,18 @@ Math error
         val IRQ_SYSTEM_TIMER = 0
         val IRQ_KEYBOARD = 1
         val IRQ_RTC = 2
+        val IRQ_PRIMARY_DISPLAY = 3
+        val IRQ_SERIAL_1 = 6
+        val IRQ_SERIAL_2 = 7
+        val IRQ_DISK_A = 8
+        val IRQ_DISK_B = 9
+        val IRQ_DISK_C = 10
+        val IRQ_DISK_D = 11
+        val IRQ_SCSI_1 = 12
+        val IRQ_SCSI_2 = 13
+        val IRQ_SCSI_3 = 14
+        val IRQ_SCSI_4 = 15
+        val IRQ_BIOS = 255
     }
 
 

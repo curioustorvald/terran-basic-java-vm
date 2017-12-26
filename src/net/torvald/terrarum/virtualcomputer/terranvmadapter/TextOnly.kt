@@ -46,7 +46,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(1024, stdout = peripheral.printStream, tbasic_remove_string_dupes = true)
+        vm = TerranVM(512, stdout = peripheral.printStream, tbasic_remove_string_dupes = true)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction()
         vm.peripherals[3] = peripheral
@@ -77,8 +77,61 @@ jmp @loop;
 
 """)
 
+        val programScanf = Assembler("""
+.func;
+:scanfstr;
+readstr;
 
-        vm.loadProgram(programEchoKeyPress)
+return;
+
+.code;
+gosub @scanfstr;
+printstr;
+
+""")
+
+
+        val randommaze = Assembler("""
+.func;
+:left;
+loadnum r1, 47;
+putchar;
+return;
+
+:right;
+loadnum r1, 92;
+putchar;
+return;
+
+.code;
+:loop;
+
+rnd;
+mov r1, r3;
+loadnum r2, 0.5;
+
+cmp;
+
+jgt @p1;
+jls @p2;
+jmp @loop;
+
+:p1;
+gosub @left;
+jmp @loop;
+
+:p2;
+gosub @right;
+jmp @loop;
+""")
+
+
+        val yunornd = Assembler("""
+            :loop; rnd; jmp @loop;
+        """.trimIndent())
+
+
+        vm.loadProgram(randommaze)
         vm.delayInMills = vmDelay
 
 
@@ -127,7 +180,7 @@ jmp @loop;
             batch.color = Color(0x25e000ff)
             sevensegFont.draw(batch, vm.memory.size.toString().padStart(8, ' '), 307f, height - 18 - 500f)
             // -> program counter
-            batch.color = Color(0xff9a4bff.toInt())
+            batch.color = Color(0xff5a66ff.toInt())
             sevensegFont.draw(batch, vm.pc.toString(16).padStart(6, ' '), 451f, height - 18 - 500f)
             // -> link register
             sevensegFont.draw(batch, vm.lr.toString(16).padStart(6, ' '), 585f, height - 18 - 500f)
