@@ -357,17 +357,30 @@ class TerranVM(memSize: Int,
     var isRunning = false
         private set
 
-    // number registers (64 bit, function args)
-    var r1 = 0.0
-    var r2 = 0.0
-    var r3 = 0.0
-    var r4 = 0.0
-    var r5 = 0.0
-    var r6 = 0.0
-    var r7 = 0.0
-    var r8 = 0.0
+    // number registers (32 bit)
+    var r1 = 0
+    var r2 = 0
+    var r3 = 0
+    var r4 = 0
+    var r5 = 0
+    var r6 = 0
+    var r7 = 0
+    var r8 = 0
 
-    fun writereg(register: Int, data: Number) {
+    fun writeregFloat(register: Int, data: Float) {
+        when (register) {
+            1 -> r1 = java.lang.Float.floatToIntBits(data)
+            2 -> r2 = java.lang.Float.floatToIntBits(data)
+            3 -> r3 = java.lang.Float.floatToIntBits(data)
+            4 -> r4 = java.lang.Float.floatToIntBits(data)
+            5 -> r5 = java.lang.Float.floatToIntBits(data)
+            6 -> r6 = java.lang.Float.floatToIntBits(data)
+            7 -> r7 = java.lang.Float.floatToIntBits(data)
+            8 -> r8 = java.lang.Float.floatToIntBits(data)
+            else -> throw IllegalArgumentException("No such register: r$register")
+        }
+    }
+    fun writeregInt(register: Int, data: Int) {
         when (register) {
             1 -> r1 = data
             2 -> r2 = data
@@ -391,48 +404,6 @@ class TerranVM(memSize: Int,
         8 -> r8
         else -> throw IllegalArgumentException("No such register: r$register")
     }
-    fun writebreg(register: Int, data: Byte) {
-        when (register) {
-            1 -> b1 = data
-            2 -> b2 = data
-            3 -> b3 = data
-            4 -> b4 = data
-            5 -> b5 = data
-            6 -> b6 = data
-            7 -> b7 = data
-            8 -> b8 = data
-            else -> throw IllegalArgumentException("No such register: r$register")
-        }
-    }
-    fun readbreg(register: Int) = when (register) {
-        1 -> b1
-        2 -> b2
-        3 -> b3
-        4 -> b4
-        5 -> b5
-        6 -> b6
-        7 -> b7
-        8 -> b8
-        else -> throw IllegalArgumentException("No such register: r$register")
-    }
-
-    // byte registers (flags for r registers)
-    /*
-     b registers:
-
-     0 - true (1) if INT, false (0) if Number
-     1 - true (1) if Pointer (NOTE: all valid pointer will have '11' as LSB.
-                              '10' (pointer but is number) stands for NULL POINTER)
-     2, 3, 4 - Type ID
-     */
-    var b1 = 0.toByte()
-    var b2 = 0.toByte()
-    var b3 = 0.toByte()
-    var b4 = 0.toByte()
-    var b5 = 0.toByte()
-    var b6 = 0.toByte()
-    var b7 = 0.toByte()
-    var b8 = 0.toByte()
 
     // memory registers (32-bit)
     var m1 = 0 // general-use flags or variable
@@ -536,23 +507,23 @@ MTHFU
         intMathErrPtr.write(intMathFuck)
 
 
-        r1 = intOOMPtr.memAddr.toDouble()
-        r2 = INT_OUT_OF_MEMORY.toDouble() * 4
+        r1 = intOOMPtr.memAddr
+        r2 = INT_OUT_OF_MEMORY * 4
         POKEINT()
-        r1 = intSegfaultPtr.memAddr.toDouble()
-        r2 = INT_SEGFAULT.toDouble() * 4
+        r1 = intSegfaultPtr.memAddr
+        r2 = INT_SEGFAULT * 4
         POKEINT()
-        r1 = intDivZeroPtr.memAddr.toDouble()
-        r2 = INT_DIV_BY_ZERO.toDouble() * 4
+        r1 = intDivZeroPtr.memAddr
+        r2 = INT_DIV_BY_ZERO * 4
         POKEINT()
-        r1 = intIllegalOpPtr.memAddr.toDouble()
-        r2 = INT_ILLEGAL_OP.toDouble() * 4
+        r1 = intIllegalOpPtr.memAddr
+        r2 = INT_ILLEGAL_OP * 4
         POKEINT()
-        r1 = intStackOvflPtr.memAddr.toDouble()
-        r2 = INT_STACK_OVERFLOW.toDouble() * 4
+        r1 = intStackOvflPtr.memAddr
+        r2 = INT_STACK_OVERFLOW * 4
         POKEINT()
-        r1 = intMathErrPtr.memAddr.toDouble()
-        r2 = INT_MATH_ERROR.toDouble() * 4
+        r1 = intMathErrPtr.memAddr
+        r2 = INT_MATH_ERROR * 4
         POKEINT()
 
 
@@ -569,22 +540,14 @@ MTHFU
         mallocList.clear()
 
         // reset registers
-        r1 = 0.0
-        r2 = 0.0
-        r3 = 0.0
-        r4 = 0.0
-        r5 = 0.0
-        r6 = 0.0
-        r7 = 0.0
-        r8 = 0.0
-        b1 = 0.toByte()
-        b2 = 0.toByte()
-        b3 = 0.toByte()
-        b4 = 0.toByte()
-        b5 = 0.toByte()
-        b6 = 0.toByte()
-        b7 = 0.toByte()
-        b8 = 0.toByte()
+        r1 = 0
+        r2 = 0
+        r3 = 0
+        r4 = 0
+        r5 = 0
+        r6 = 0
+        r7 = 0
+        r8 = 0
         m1 = 0
         m2 = 0
         m3 = 0
@@ -786,19 +749,7 @@ MTHFU
 
     class BIOS(val vm: TerranVM) : VMPeripheralHardware {
         override fun call(arg: Int) {
-            when (arg) {
-            // memory check
-            // @return memory size in Number, saved to r1
-                0 -> {
-                    vm.r1 = vm.memory.size.toDouble()
-                }
-            // find boot device and load boot script to memory, move PC
-            // @return modified memory
-                1 -> {
 
-                }
-                else -> vm.interruptIllegalOp()
-            }
         }
     }
 
