@@ -1,7 +1,273 @@
 package net.torvald.terranvm
 
+import net.torvald.terranvm.runtime.TerranVM
+import net.torvald.terranvm.runtime.toLittleLong
+import net.torvald.terranvm.runtime.toUint
+import java.util.*
+
+
+//typealias Register = Int
+
+
 /**
  * Created by minjaesong on 2017-12-27.
  */
-class VMOpcodesRISC {
+object VMOpcodesRISC {
+
+    lateinit var vm: TerranVM
+
+    fun invoke(vm: TerranVM) {
+        this.vm = vm
+    }
+
+
+
+    fun MOV(dest: Register, src: Register) {
+        vm.writeregInt(dest, vm.readregInt(src))
+    }
+    fun XCHG(dest: Register, src: Register) {
+        val t = vm.readregInt(src)
+        vm.writeregInt(src, vm.readregInt(dest))
+        vm.writeregInt(dest, t)
+    }
+    fun INC(dest: Register) {
+        vm.writeregInt(dest, vm.readregInt(dest) + 1)
+    }
+    fun DEC(dest: Register) {
+        vm.writeregInt(dest, vm.readregInt(dest) - 1)
+    }
+
+    fun MALLOC(dest: Register, size: Register) { vm.writeregInt(dest, vm.malloc(vm.readregInt(size)).memAddr) }
+    fun RETURN() { POPWORDI(); vm.pc = vm.lr }
+    /**
+     * @param addr Address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C)
+     */
+    fun GOSUB(addr: Int) {
+        PUSHWORDI(addr ushr 2)
+        JMP(addr ushr 2)
+    }
+
+    fun HALT() { vm.terminate = true }
+
+    @Strictfp fun FTOI(dest: Register, src: Register) { vm.writeregInt(dest, vm.readregFloat(src).toInt()) }
+    @Strictfp fun ITOF(dest: Register, src: Register) { vm.writeregFloat(dest, vm.readregInt(src).toFloat()) }
+
+    @Strictfp fun ADD(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) + vm.readregFloat(m)) }
+    @Strictfp fun SUB(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) - vm.readregFloat(m)) }
+    @Strictfp fun MUL(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) * vm.readregFloat(m)) }
+    @Strictfp fun DIV(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) / vm.readregFloat(m)) }
+    @Strictfp fun POW(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) pow vm.readregFloat(m)) }
+    @Strictfp fun MOD(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) fmod vm.readregFloat(m)) }
+
+    fun SHL (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) shl  vm.readregInt(m)) }
+    fun SHR (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) shr  vm.readregInt(m)) }
+    fun USHR(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) ushr vm.readregInt(m)) }
+    fun AND (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) and  vm.readregInt(m)) }
+    fun OR  (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) or   vm.readregInt(m)) }
+    fun XOR (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) xor  vm.readregInt(m)) }
+
+    @Strictfp fun ABS(dest: Register, src: Register) { vm.writeregFloat(dest, Math.abs(vm.readregFloat(src))) }
+    @Strictfp fun SIN(dest: Register, src: Register) { vm.writeregFloat(dest, Math.sin(vm.readregFloat(src).toDouble()).toFloat()) }
+    @Strictfp fun COS(dest: Register, src: Register) { vm.writeregFloat(dest, Math.cos(vm.readregFloat(src).toDouble()).toFloat()) }
+    @Strictfp fun TAN(dest: Register, src: Register) { vm.writeregFloat(dest, Math.tan(vm.readregFloat(src).toDouble()).toFloat()) }
+    @Strictfp fun FLOOR(dest: Register, src: Register) { vm.writeregFloat(dest, Math.floor(vm.readregFloat(src).toDouble()).toFloat()) }
+    @Strictfp fun CEIL (dest: Register, src: Register) { vm.writeregFloat(dest, Math.ceil (vm.readregFloat(src).toDouble()).toFloat()) }
+    @Strictfp fun ROUND(dest: Register, src: Register) { vm.writeregFloat(dest, Math.round(vm.readregFloat(src)).toFloat()) }
+    @Strictfp fun LOG(dest: Register, src: Register) { vm.writeregFloat(dest, Math.log(vm.readregFloat(src).toDouble()).toFloat()) }
+    @Strictfp fun INT(dest: Register, src: Register) { if (vm.readregFloat(src) >= 0f) FLOOR(dest, src) else CEIL(dest, src) }
+    @Strictfp fun RND(dest: Register) { vm.writeregFloat(dest, VMRNG.nextFloat()) }
+    @Strictfp fun SGN(dest: Register, src: Register) { vm.writeregFloat(dest, Math.signum(vm.readregFloat(src))) }
+    @Strictfp fun SQRT(dest: Register, src: Register) { vm.writeregFloat(dest, Math.pow(vm.readregFloat(src).toDouble(), 2.0).toFloat()) }
+    @Strictfp fun CBRT(dest: Register, src: Register) { vm.writeregFloat(dest, Math.pow(vm.readregFloat(src).toDouble(), 3.0).toFloat()) }
+    @Strictfp fun INV(dest: Register, src: Register) { vm.writeregFloat(dest, 1f / vm.readregFloat(src)) }
+    @Strictfp fun RAD(dest: Register, src: Register) { vm.writeregFloat(dest, vm.readregFloat(src) / (180f * 3.14159265358979323f)) }
+
+    fun NOT (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src).inv()) }
+
+
+    /**
+     * @param dest register where the read value goes
+     * @param src  memory address to be read
+     * @param peri device ID (0 for main memory)
+     */
+    fun LOADBYTE(dest: Register, src: Register, peri: Register) {
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+        val index = vm.readregInt(src)
+        vm.writeregInt(dest, memspace[index].toUint())
+    }
+    fun LOADHWORD(dest: Register, src: Register, peri: Register) {
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+        val index = vm.readregInt(src)
+        vm.writeregInt(dest, memspace[index].toUint() or memspace[index + 1].toUint().shl(8))
+    }
+    fun LOADWORD(dest: Register, src: Register, peri: Register) {
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+        val index = vm.readregInt(src)
+        vm.writeregInt(dest, memspace[index].toUint() or memspace[index + 1].toUint().shl(8) or memspace[index + 1].toUint().shl(16) or memspace[index + 1].toUint().shl(24))
+    }
+    /**
+     * @param dest register that holds the memory address where the read value goes
+     * @param src  memory address to be written
+     * @param peri device ID (0 for main memory)
+     */
+    fun STOREBYTE(dest: Register, src: Register, peri: Register) {
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+        val index = vm.readregInt(src)
+        memspace[index] = vm.readregInt(dest).and(0xFF).toByte()
+    }
+    fun STOREHWORD(dest: Register, src: Register, peri: Register) {
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+        val index = vm.readregInt(src)
+        memspace[index] = vm.readregInt(dest).and(0xFF).toByte()
+        memspace[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF).toByte()
+    }
+    fun STOREWORD(dest: Register, src: Register, peri: Register) {
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+        val index = vm.readregInt(src)
+        memspace[index] = vm.readregInt(dest).and(0xFF).toByte()
+        memspace[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF).toByte()
+        memspace[index + 2] = vm.readregInt(dest).ushr(16).and(0xFF).toByte()
+        memspace[index + 3] = vm.readregInt(dest).ushr(24).and(0xFF).toByte()
+    }
+    /**
+     * @param dest device ID (0 for main memory)
+     * @param src  device ID (0 for main memory)
+     * @param len  size of the memory to copy
+     * @param fromOff memory address to read
+     * @param toOff   memory address to write
+     */
+    fun MEMCPY(dest: Register, src: Register, len: Register, fromAddr: Register, toAddr: Register) {
+        val srcMem = if (vm.readregInt(src) == 0) vm.memory else vm.peripherals[vm.readregInt(src)]!!.memory
+        val destMem = if (vm.readregInt(dest) == 0) vm.memory else vm.peripherals[vm.readregInt(dest)]!!.memory
+        val cpyLen = vm.readregInt(len)
+        val fromAddr = vm.readregInt(fromAddr)
+        val toAddr = vm.readregInt(toAddr)
+
+        System.arraycopy(srcMem, fromAddr, destMem, toAddr, cpyLen)
+    }
+
+
+
+    fun CMP(dest: Register, src: Register, lr: Int) {
+        val lhand = if (lr and 0b10 != 0) vm.readregFloat(dest) else vm.readregInt(dest).toFloat()
+        val rhand = if (lr and 0b01 != 0) vm.readregFloat(src) else vm.readregInt(src).toFloat()
+        vm.m1 = if (lhand == rhand) 0 else if (lhand > rhand) 1 else -1
+    }
+
+
+
+    fun LOADBYTEI(dest: Register, byte: Int) {
+        vm.writeregInt(dest, byte.and(0xFF))
+    }
+    fun LOADHWORDI(dest: Register, halfword: Int) {
+        vm.writeregInt(dest, halfword.and(0xFFFF))
+    }
+    fun LOADWORDI(dest: Register, word: Int, isHigh: Boolean) {
+        val originalRegisterContents = vm.readregInt(dest)
+        vm.writeregInt(dest,
+                if (isHigh)
+                    word.and(0xFFFF).shl(16) or originalRegisterContents.and(0xFFFF)
+                else
+                    word.and(0xFFFF) or originalRegisterContents.toLong().and(0xFFFF0000L).toInt()
+        )
+    }
+    fun STOREBYTEI(dest: Register, byte: Int) {
+        vm.memory[vm.readregInt(dest)] = byte.toByte()
+    }
+    fun STOREHWORDI(dest: Register, halfword: Int) {
+        vm.memory[vm.readregInt(dest)] = halfword.and(0xFF).toByte()
+        vm.memory[vm.readregInt(dest) + 1] = halfword.ushr(8).and(0xFF).toByte()
+    }
+    fun LOADWORDIMEM(dest: Register, offset: Int) {
+        val index = offset shl 2
+        vm.writeregInt(dest, vm.memory[index].toUint() or vm.memory[index + 1].toUint().shl(8) or vm.memory[index + 1].toUint().shl(16) or vm.memory[index + 1].toUint().shl(24))
+    }
+    fun STOREWORDIMEM(dest: Register, offset: Int) {
+        val index = offset shl 2
+        vm.memory[index] = vm.readregInt(dest).and(0xFF).toByte()
+        vm.memory[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF00).toByte()
+        vm.memory[index + 2] = vm.readregInt(dest).ushr(16).and(0xFF00).toByte()
+        vm.memory[index + 3] = vm.readregInt(dest).ushr(24).and(0xFF00).toByte()
+    }
+    fun PUSH(dest: Register) {
+        if (vm.sp < vm.callStack.size)
+            vm.callStack[vm.sp++] = vm.readregInt(dest)
+        else
+            vm.interruptStackOverflow()
+    }
+    fun PUSHWORDI(offset: Int) {
+        if (vm.sp < vm.callStack.size)
+            vm.callStack[vm.sp++] = offset shl 2
+        else
+            vm.interruptStackOverflow()
+    }
+    fun POP(dest: Register) {
+        vm.writeregInt(dest, vm.callStack[--vm.sp])
+    }
+    fun POPWORDI() {
+        vm.lr = vm.callStack[--vm.sp]
+    }
+
+
+
+    fun JMP(offset: Int) { vm.pc = offset shl 2 }
+    fun JZ (offset: Int) { if (vm.m1 == 0) JMP(offset) }
+    fun JNZ(offset: Int) { if (vm.m1 != 0) JMP(offset) }
+    fun JGT(offset: Int) { if (vm.m1 >  0) JMP(offset) }
+    fun JLS(offset: Int) { if (vm.m1 <  0) JMP(offset) }
+    fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + (offset shl 2), 0xFFFFFF) }
+    fun JBW(offset: Int) { vm.pc = Math.floorMod(vm.pc - (offset shl 2), 0xFFFFFF) }
+
+
+
+    fun CALL(dest: Register, irq: Int) {
+        if (irq == 255)
+            vm.bios.call(vm.readregInt(dest))
+        else
+            vm.peripherals[irq]!!.call(vm.readregInt(dest))
+    }
+
+
+
+    fun MEMSIZE(dest: Register, irq: Int) {
+        if (irq == 0)
+            vm.writeregInt(dest, vm.memory.size)
+        else if (irq == 255)
+            vm.writeregInt(dest, vm.uptime)
+        else
+            vm.writeregInt(dest, vm.peripherals[irq]!!.memory.size)
+    }
+
+
+
+    fun UPTIME(dest: Register) {
+        vm.writeregInt(dest, vm.uptime)
+    }
+
+
+
+    fun INTERRUPT(interrupt: Int) {
+        JMP(interrupt * 4)
+    }
+
+
+
+
+
+
+
+    private infix fun Float.pow(other: Float) = Math.pow(this.toDouble(), other.toDouble()).toFloat()
+    private infix fun Float.fmod(other: Float) = Math.floorMod(this.toInt(), other.toInt()).toFloat()
+
+    /**
+     * Will seed itself using RTC or uptime
+     */
+    object VMRNG : Random(vm.peripherals[TerranVM.IRQ_RTC]?.memory?.toLittleLong() ?: vm.uptime.toLong()) {
+        var s = -2208269211404306670L
+
+        override fun nextLong(): Long {
+            s = (s * 6364136223846793005) + 1442695040888963407 // knuth is the man
+            return s
+        }
+    }
 }
