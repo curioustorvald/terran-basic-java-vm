@@ -82,7 +82,7 @@ object VMOpcodesRISC {
     @Strictfp fun INV(dest: Register, src: Register) { vm.writeregFloat(dest, 1f / vm.readregFloat(src)) }
     @Strictfp fun RAD(dest: Register, src: Register) { vm.writeregFloat(dest, vm.readregFloat(src) / (180f * 3.14159265358979323f)) }
 
-    fun NOT (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src).inv()) }
+    fun NOT (dest: Register, src: Register) { vm.writeregInt(dest, vm.readregInt(src).inv()) }
 
 
     /**
@@ -237,12 +237,7 @@ object VMOpcodesRISC {
         else
             vm.writeregInt(dest, vm.peripherals[irq]!!.memory.size)
     }
-
-
-
-    fun UPTIME(dest: Register) {
-        vm.writeregInt(dest, vm.uptime)
-    }
+    fun UPTIME(dest: Register) = MEMSIZE(dest, 255)
 
 
 
@@ -251,6 +246,157 @@ object VMOpcodesRISC {
     }
 
 
+
+
+
+    fun decodeAndExecute(opcode: Int) {
+        val Rd = opcode.and(0b00000001110000000000000000000000).ushr(22)
+        val Rs = opcode.and(0b00000000001110000000000000000000).ushr(19)
+        val Rm = opcode.and(0b00000000000001110000000000000000).ushr(16)
+        val R4 = opcode.and(0b00000000000000001110000000000000).ushr(13)
+        val R5 = opcode.and(0b00000000000000000001110000000000).ushr(10)
+
+        when (opcode.ushr(25)) {
+            0b0000000 -> {
+                // Mathematical and Register data transfer
+                if (opcode.and(0b1111111111000000) == 0) {
+                    when (opcode.and(0b111111)) {
+                        0 -> HALT()
+                        1 -> ADD(Rd, Rs, Rm)
+                        2 -> SUB(Rd, Rs, Rm)
+                        3 -> MUL(Rd, Rs, Rm)
+                        4 -> DIV(Rd, Rs, Rm)
+                        5 -> POW(Rd, Rs, Rm)
+                        6 -> MOD(Rd, Rs, Rm)
+                        7 -> SHL(Rd, Rs, Rm)
+                        8 -> SHR(Rd, Rs, Rm)
+                        9 -> USHR(Rd, Rs, Rm)
+                        10 -> AND(Rd, Rs, Rm)
+                        11 -> OR(Rd, Rs, Rm)
+                        12 -> XOR(Rd, Rs, Rm)
+
+                        16 -> ABS(Rd, Rs)
+                        17 -> SIN(Rd, Rs)
+                        18 -> COS(Rd, Rs)
+                        19 -> TAN(Rd, Rs)
+                        20 -> FLOOR(Rd, Rs)
+                        21 -> CEIL(Rd, Rs)
+                        22 -> ROUND(Rd, Rs)
+                        23 -> LOG(Rd, Rs)
+                        24 -> INT(Rd, Rs)
+                        25 -> RND(Rd)
+                        26 -> SGN(Rd, Rs)
+                        27 -> SQRT(Rd, Rs)
+                        28 -> CBRT(Rd, Rs)
+                        29 -> INV(Rd, Rs)
+                        30 -> RAD(Rd, Rs)
+                        31 -> NOT(Rd, Rs)
+
+                        32 -> MOV(Rd, Rs)
+                        33 -> XCHG(Rd, Rs)
+                        34 -> INC(Rd)
+                        35 -> DEC(Rd)
+                        36 -> MALLOC(Rd, Rs)
+                        37 -> FTOI(Rd, Rs)
+                        38 -> ITOF(Rd, Rs)
+
+                        62 -> GOSUB(Rd)
+                        63 -> RETURN()
+
+                        else -> throw NullPointerException()
+                    }
+                }
+                // Load and Store to memory
+                else if (opcode.and(0xFFFF).ushr(3) == 0b1000) {
+                    val loadStoreOpcode = opcode.and(0b111)
+                    when (loadStoreOpcode) {
+                        0 -> LOADBYTE(Rd, Rs, Rm)
+                        1 -> STOREBYTE(Rd, Rs, Rm)
+                        2 -> LOADHWORD(Rd, Rs, Rm)
+                        3 -> STOREHWORD(Rd, Rs, Rm)
+                        4 -> LOADWORD(Rd, Rs, Rm)
+                        5 -> STOREWORD(Rd, Rs, Rm)
+                        else -> throw NullPointerException()
+                    }
+                }
+                // Memory copy
+                else if (opcode.and(0b1111111111) == 0b0001001000) {
+                    MEMCPY(Rd, Rs, Rm, R4, R5)
+                }
+                else {
+                    throw NullPointerException()
+                }
+            }
+            0b0000001 -> {
+                val M = opcode.ushr(16).and(1)
+                val byte = opcode.and(0xFF)
+                val halfword = opcode.and(0xFFFF)
+
+                when (opcode.and(0b1100000000000000000).ushr(16)) {
+                    // Compare
+                    0 -> CMP(Rd, Rs, opcode.and(0b11))
+                    // Load and Store byte immediate
+                    1 -> if (M == 0) LOADBYTEI(Rd, byte) else STOREBYTEI(Rd, byte)
+                    // Load and Store halfword immediate
+                    2 -> if (M == 0) LOADHWORDI(Rd, halfword) else STOREHWORDI(Rd, halfword)
+                    // Load word immediate
+                    3 -> LOADWORDI(Rd, halfword, M == 1)
+                    else -> throw NullPointerException()
+                }
+            }
+            // Load and Store a word from register to memory
+            0b0000010 -> {
+                LOADWORDIMEM(Rd, opcode.and(0x3F_FFFF))
+            }
+            0b0000011 -> {
+                STOREWORDIMEM(Rd, opcode.and(0x3F_FFFF))
+            }
+            // Push and Pop
+            0b0000100 -> {
+                val offset = opcode.and(0x3F_FFFF)
+                if (offset == 0) PUSH(Rd)
+                else             PUSHWORDI(offset)
+            }
+            0b0000101 -> {
+                val offset = opcode.and(0x3F_FFFF)
+                if (offset == 0) POP(Rd)
+                else             POPWORDI() // IntOffset is non-zero, POP to LR register
+            }
+            // Conditional jump
+            0b0000110 -> {
+                val offset = opcode.and(0x3F_FFFF)
+                when (opcode.ushr(22).and(0b111)) {
+                    0 -> JMP(offset)
+                    1 -> JZ (offset)
+                    2 -> JNZ(offset)
+                    3 -> JGT(offset)
+                    4 -> JLS(offset)
+                    5 -> JFW(offset)
+                    6 -> JBW(offset)
+                    else -> throw NullPointerException()
+                }
+            }
+            // Call peripheral; Get memory size; Get uptime; Interrupt
+            0b1111111 -> {
+                val irq = opcode.and(0xFF)
+                val cond = opcode.ushr(8).and(0x3FFF)
+
+                if (cond == 0) {
+                    CALL(Rd, irq)
+                }
+                else if (cond == 1) {
+                    MEMSIZE(Rd, irq)
+                }
+                else if (cond == 0x3FFF && Rd == 0b111) {
+                    INTERRUPT(irq)
+                }
+                else {
+                    throw NullPointerException()
+                }
+            }
+            else -> throw NullPointerException()
+        }
+    }
 
 
 
