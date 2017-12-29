@@ -18,7 +18,7 @@ typealias Register = Int
  *
  * Created by minjaesong on 2017-05-10.
  */
-object Opcodes {
+object CiscyOpcodes {
 
     private val DEBUG = false
 
@@ -287,7 +287,7 @@ object Opcodes {
 
     // INTERNAL //
 
-    fun NOP() { }
+    fun NOP() { MOV(1, 1) }
 
     fun INTERRUPT(interrupt: Int) {
         JMP(interrupt * 4)

@@ -1,8 +1,6 @@
 package net.torvald.terranvm.runtime
 
 import net.torvald.terranvm.*
-import net.torvald.terranvm.Opcodes.POKEINT
-import net.torvald.terranvm.Opcodes.getArgumentSize
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
@@ -199,7 +197,7 @@ class TerranVM(memSize: Int,
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fun memSliceBySize(from: Int, size: Int): ByteArray = memory.sliceArray(from..from + size - 1)
+    fun memSliceBySize(from: Int, size: Int): ByteArray = memory.sliceArray(from until from + size)
     fun memSlice(from: Int, to: Int): ByteArray = memory.sliceArray(from..to)
 
     private val mallocList = ArrayList<Int>(64) // can be as large as memSize
@@ -242,20 +240,20 @@ class TerranVM(memSize: Int,
      */
     fun malloc(size: Int): Pointer {
         val addr = findEmptySlotForMalloc(size)
-        addToMallocList(addr..addr + size - 1)
+        addToMallocList(addr until addr + size)
 
         return Pointer(this, addr)
     }
     fun calloc(size: Int): Pointer {
         val addr = findEmptySlotForMalloc(size)
-        addToMallocList(addr..addr + size - 1)
+        addToMallocList(addr until addr + size)
 
         (0..size - 1).forEach { memory[addr + it] = 0.toByte() }
 
         return Pointer(this, addr)
     }
     fun freeBlock(variable: TBASValue) {
-        freeBlock(variable.pointer.memAddr..variable.pointer.memAddr + variable.sizeOf() - 1)
+        freeBlock(variable.pointer.memAddr until variable.pointer.memAddr + variable.sizeOf())
     }
     fun freeBlock(range: IntRange) {
         removeFromMallocList(range)
@@ -347,7 +345,7 @@ class TerranVM(memSize: Int,
     fun getvar(name: String) = varTable[name]
     fun hasvar(name: String) = varTable.containsKey(name)
 
-    val callStack = DoubleArray(stackSize, { 0.0 })
+    val callStack = IntArray(stackSize, { 0 })
 
     val ivtSize = 4 * TerranVM.interruptCount
     var userSpaceStart: Int? = null // lateinit
@@ -393,7 +391,7 @@ class TerranVM(memSize: Int,
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
-    fun readreg(register: Int) = when (register) {
+    fun readregInt(register: Int) = when (register) {
         1 -> r1
         2 -> r2
         3 -> r3
@@ -402,6 +400,17 @@ class TerranVM(memSize: Int,
         6 -> r6
         7 -> r7
         8 -> r8
+        else -> throw IllegalArgumentException("No such register: r$register")
+    }
+    fun readregFloat(register: Int) = when (register) {
+        1 -> r1.toFloat()
+        2 -> r2.toFloat()
+        3 -> r3.toFloat()
+        4 -> r4.toFloat()
+        5 -> r5.toFloat()
+        6 -> r6.toFloat()
+        7 -> r7.toFloat()
+        8 -> r8.toFloat()
         else -> throw IllegalArgumentException("No such register: r$register")
     }
 
@@ -432,7 +441,7 @@ class TerranVM(memSize: Int,
             throw Error("VM memory size too small — minimum allowed is 256 bytes")
         }
         else if (memSize > 16.MB()) {
-            throw Error("Memory size too large -- maximum allowed is 16 MBytes. (seriously, you don't want too much memory allocation)")
+            throw Error("Memory size too large -- maximum allowed is 16 MBytes")
         }
 
     }
@@ -444,16 +453,20 @@ class TerranVM(memSize: Int,
 
         softReset()
 
-        Opcodes.invoke(this)
+        VMOpcodesRISC.invoke(this)
 
 
         System.arraycopy(opcodes, 0, memory, ivtSize, opcodes.size)
-        memory[opcodes.size + ivtSize] = Opcodes.opcodesList["HALT"]!!
+        memory[opcodes.size + ivtSize] = 0
+        memory[opcodes.size + ivtSize + 1] = 0
+        memory[opcodes.size + ivtSize + 2] = 0
+        memory[opcodes.size + ivtSize + 3] = 0
 
         pc = ivtSize
         userSpaceStart = opcodes.size + 1 + ivtSize
 
         userSpaceStart = userSpaceStart!! + setDefaultInterrepts() // renew userSpaceStart after interrupts
+        userSpaceStart = userSpaceStart!!.ushr(2).shl(2) + 4 // manually align
         mallocList.clear()
 
 
@@ -509,22 +522,22 @@ MTHFU
 
         r1 = intOOMPtr.memAddr
         r2 = INT_OUT_OF_MEMORY * 4
-        POKEINT()
+        VMOpcodesRISC.STOREWORD(2, 1, 0)
         r1 = intSegfaultPtr.memAddr
         r2 = INT_SEGFAULT * 4
-        POKEINT()
+        VMOpcodesRISC.STOREWORD(2, 1, 0)
         r1 = intDivZeroPtr.memAddr
         r2 = INT_DIV_BY_ZERO * 4
-        POKEINT()
+        VMOpcodesRISC.STOREWORD(2, 1, 0)
         r1 = intIllegalOpPtr.memAddr
         r2 = INT_ILLEGAL_OP * 4
-        POKEINT()
+        VMOpcodesRISC.STOREWORD(2, 1, 0)
         r1 = intStackOvflPtr.memAddr
         r2 = INT_STACK_OVERFLOW * 4
-        POKEINT()
+        VMOpcodesRISC.STOREWORD(2, 1, 0)
         r1 = intMathErrPtr.memAddr
         r2 = INT_MATH_ERROR * 4
-        POKEINT()
+        VMOpcodesRISC.STOREWORD(2, 1, 0)
 
 
         return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
@@ -532,7 +545,7 @@ MTHFU
 
     fun softReset() {
         varTable.clear()
-        Arrays.fill(callStack, 0.0)
+        Arrays.fill(callStack, 0)
         userSpaceStart = null
         terminate = false
 
@@ -621,41 +634,16 @@ MTHFU
                     interruptSegmentationFault()
                 }
 
-                val instruction = memory[pc]
-                val instAsm = Opcodes.opcodesListInverse[instruction] ?: throw Error("Unknown opcode: $instruction at pc $pcHex")
 
-                execDebugMain("\nExec: $instAsm, ")
-
-                val argumentsInfo = Opcodes.opcodeArgsList[instAsm] ?: arrayOf()
-
-                val arguments = argumentsInfo.mapIndexed { index, i ->
-                    if (getArgumentSize(i) > 0) {
-                        memSliceBySize(pc + 1 + (0..index - 1).map { getArgumentSize(argumentsInfo[it]) }.sum(), getArgumentSize(i))
-                    }
-                    else if (i == Opcodes.ArgType.STRING) { // READ_UNTIL_ZERO(-2) is guaranteed to be the last
-                        val indexStart = pc + 1 + (0..index - 1).map { getArgumentSize(argumentsInfo[it]) }.sum()
-                        var indexEnd = indexStart
-                        while (memory[indexEnd] != 0.toByte()) {
-                            indexEnd += 1
-                        }
-                        // indexEnd now points \0
-                        //execDebug("[varargCounter] indexStart: $indexStart, indexEnd: $indexEnd (byteat: ${memory[indexEnd]})")
-                        memSlice(indexStart, indexEnd)
-                    }
-                    else {
-                        throw InternalError("Unknown arguments flag: $i")
-                    }
-                }
-                val totalArgsSize = arguments.map { it.size }.sum()
-                execDebugMain("ArgsCount: ${arguments.size}, ArgsLen: $totalArgsSize, PC: $pcHex, r1: $r1, r2: $r2, r3: $r3, m1: $m1")
+                var opcode = memory[pc].toUint() or memory[pc + 1].toUint().shl(8) or memory[pc + 2].toUint().shl(16) or memory[pc + 3].toUint().shl(24)
 
 
                 // execute
-                pc += (1 + totalArgsSize)
-                execDebugMain(", PC-next: $pcHex\n")
+                pc += 4
+
                 // invoke function
                 try {
-                    Opcodes.opcodesFunList[instAsm]!!(arguments)
+                    VMOpcodesRISC.decodeAndExecute(opcode)
                 }
                 catch (oom: ArrayIndexOutOfBoundsException) {
                     execDebugError("[TBASRT] illegal memory address access")
@@ -663,7 +651,7 @@ MTHFU
                 }
 
 
-                if (instAsm == "HALT") {
+                if (opcode == 0) {
                     execDebugMain("HALT at PC $pcHex")
                 }
 
@@ -735,16 +723,16 @@ MTHFU
     private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
 
     // Interrupt handlers (its just JMPs) //
-    fun interruptDivByZero() { Opcodes.GOSUB(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt()) }
-    fun interruptIllegalOp() { Opcodes.GOSUB(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt()) }
-    fun interruptOutOfMem()  { Opcodes.GOSUB(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt()) }
-    fun interruptStackOverflow() { Opcodes.GOSUB(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt()) }
-    fun interruptMathError() { Opcodes.GOSUB(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt()) }
-    fun interruptSegmentationFault() { Opcodes.GOSUB(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt()) }
-    fun interruptKeyPress() { Opcodes.GOSUB(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt()) }
-    fun interruptPeripheralInput() { Opcodes.GOSUB(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt()) }
-    fun interruptPeripheralOutput() { Opcodes.GOSUB(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt()) }
-    fun interruptStopExecution() { Opcodes.GOSUB(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt()) }
+    fun interruptDivByZero() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt()) }
+    fun interruptIllegalOp() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt()) }
+    fun interruptOutOfMem()  { VMOpcodesRISC.GOSUB(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt()) }
+    fun interruptStackOverflow() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt()) }
+    fun interruptMathError() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt()) }
+    fun interruptSegmentationFault() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt()) }
+    fun interruptKeyPress() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt()) }
+    fun interruptPeripheralInput() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt()) }
+    fun interruptPeripheralOutput() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt()) }
+    fun interruptStopExecution() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt()) }
 
 
     class BIOS(val vm: TerranVM) : VMPeripheralHardware {

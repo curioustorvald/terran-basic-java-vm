@@ -26,11 +26,11 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
 
     /**
      * 0x00bb: cursorblink; 00: false, ff: true
-     * 0x01bb: text cursor X position 0-255
-     * 0x02bb: text cursor Y position 0-255
-     * 0x03bb: text scroll X (-128..127)
-     * 0x04bb: text scroll Y (-128..127)
-     * 0x05bb: change graphics mode (if supported)
+     * 0x01bb: change graphics mode (if supported)
+     * 0x02bb: text cursor X position 0-255
+     * 0x03bb: text cursor Y position 0-255
+     * 0x04bb: text scroll X (-128..127)
+     * 0x05bb: text scroll Y (-128..127)
      * 0x06bb: change foreground colour (if supported)
      * 0x07bb: change background colour (if supported)
      */
