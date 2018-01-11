@@ -473,7 +473,7 @@ class TerranVM(memSize: Int,
     }
 
     private fun setDefaultInterrepts(): Int {
-        val intOOM = Assembler("""
+        /*val intOOM = Assembler("""
 loadstrinline r1,
 NOMEM
 ; printstr; halt;
@@ -540,6 +540,9 @@ MTHFU
 
 
         return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
+        */
+
+        return 0
     }
 
     fun softReset() {

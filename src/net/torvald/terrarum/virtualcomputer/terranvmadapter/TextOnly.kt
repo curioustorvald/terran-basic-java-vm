@@ -9,7 +9,6 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import net.torvald.terranvm.Executable
 import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
@@ -35,7 +34,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 2
+        val vmDelay = 100
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -55,11 +54,12 @@ class TextOnly : Game() {
 
         val random = Assembler("""
 :loop;
-rndiz r5;
+rndi r5;
 rndi r6;
 rndi r7;
 rndi r8;
 jmp @loop;
+loadwordi r3, ffcc00ffh;
 """)
 
 

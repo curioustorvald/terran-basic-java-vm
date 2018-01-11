@@ -257,11 +257,11 @@ object VMOpcodesRISC {
 
 
     fun decodeAndExecute(opcode: Int) {
-        val Rd = opcode.and(0b00000001110000000000000000000000).ushr(22)
-        val Rs = opcode.and(0b00000000001110000000000000000000).ushr(19)
-        val Rm = opcode.and(0b00000000000001110000000000000000).ushr(16)
-        val R4 = opcode.and(0b00000000000000001110000000000000).ushr(13)
-        val R5 = opcode.and(0b00000000000000000001110000000000).ushr(10)
+        val Rd = opcode.and(0b00000001110000000000000000000000).ushr(22) + 1
+        val Rs = opcode.and(0b00000000001110000000000000000000).ushr(19) + 1
+        val Rm = opcode.and(0b00000000000001110000000000000000).ushr(16) + 1
+        val R4 = opcode.and(0b00000000000000001110000000000000).ushr(13) + 1
+        val R5 = opcode.and(0b00000000000000000001110000000000).ushr(10) + 1
         val cond = opcode.ushr(29)
 
 

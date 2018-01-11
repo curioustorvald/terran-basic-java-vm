@@ -174,10 +174,10 @@ object Assembler {
 
             "LOADBYTEI"   to 0b0001_000_000010_00000000_00000000,
             "LOADHWORDI"  to 0b0001_000_000100_0000000000000000,
-            "LOADWORDIL"  to 0b0001_000_000110_0000000000000000,
             "STOREBYTEI"  to 0b0001_000_000011_00000000_00000000,
             "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
-            "LOADWORDIH"  to 0b0001_000_000111_0000000000000000,
+
+            "LOADWORDI"  to 0b0001_000_000110_0000000000000000,
 
             // Load and Store a word from register to memory //
 
@@ -215,7 +215,7 @@ object Assembler {
     val opcodes = HashMap<String, Int>()
 
     /**
-     * @return r: register, b: byte, w: halfword, a: address offset
+     * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
      */
     fun getOpArgs(opcode: Int): String {
         val opcode = opcode.and(0x1FFFFFFF) // drop conditions
@@ -255,7 +255,8 @@ object Assembler {
                 return when (mode) {
                     0, 0b00100, 0b01000, 0b01100, 0b10000, 0b10100, 0b11000, 0b11100 -> "rr"
                     1 -> "rb"
-                    2, 3 -> "rw"
+                    2 -> "rw"
+                    3 -> "rf"
                     else -> throw IllegalArgumentException()
                 }
             }
@@ -288,7 +289,8 @@ object Assembler {
         }
 
         opcodes.putAll(mapOf(
-                "CMP" to 0b0001_000000_0000000000000000000,
+                "CMP"   to 0b0001_000000_0000000000000000000,
+                "CMPII" to 0b0001_000000_0000000000000000000,
                 "CMPIF" to 0b0001_000000_0000000000000000001,
                 "CMPFI" to 0b0001_000000_0000000000000000010,
                 "CMPFF" to 0b0001_000000_0000000000000000011,
@@ -311,7 +313,7 @@ object Assembler {
     private fun composeJMP(offset: Int) = opcodes["JMP"]!! or offset
 
 
-    private fun debug(any: Any?) { if (false) { println(any) } }
+    private fun debug(any: Any?) { if (true) { println(any) } }
 
     var flagSpecifyJMP = false
     var flagSpecifyJMPLocation = -1
@@ -396,7 +398,7 @@ object Assembler {
         labelTable.clear()
     }
 
-    fun assemblyToOpcode(line: String): Int {
+    fun assemblyToOpcode(line: String): IntArray {
         val words = line.split(delimiters)
         val cmd = words[0].toUpperCase()
 
@@ -417,20 +419,38 @@ object Assembler {
         arguments.forEachIndexed { index, c ->
             val word = words[index + 1]
 
-            resultingOpcode = resultingOpcode or when (c) {
-                'r' -> word.toRegInt().shl(22 - 3 * index)
-                'b' -> word.resolveInt().and(0xFF)
-                'w' -> word.resolveInt().and(0xFFFF)
-                'a' -> word.resolveInt().and(0x3FFFFF)
-                else -> throw IllegalArgumentException("Unknown argument type: $c")
+            if (c == 'f') { // 'f' is only used for LOADWORDI (arg: rf), which outputs TWO opcodes
+                val fullword = word.resolveInt()
+                val lowhalf = fullword.and(0xFFFF)
+                val highhalf = fullword.ushr(16)
+
+                val loadwordiOp = intArrayOf(resultingOpcode, resultingOpcode or 0x10000)
+                loadwordiOp[0] = loadwordiOp[0] or lowhalf
+                loadwordiOp[1] = loadwordiOp[1] or highhalf
+
+
+                debug("$line\t-> ${loadwordiOp[0].toString(2).padStart(32, '0')}")
+                debug("$line\t-> ${loadwordiOp[1].toString(2).padStart(32, '0')}")
+
+
+                return loadwordiOp
+            }
+            else {
+                resultingOpcode = resultingOpcode or when (c) {
+                    'r' -> word.toRegInt().shl(22 - 3 * index)
+                    'b' -> word.resolveInt().and(0xFF)
+                    'w' -> word.resolveInt().and(0xFFFF)
+                    'a' -> word.resolveInt().and(0x3FFFFF)
+                    else -> throw IllegalArgumentException("Unknown argument type: $c")
+                }
             }
         }
 
 
-        println("$line\t-> ${resultingOpcode.toString(2).padStart(32, '0')}")
+        debug("$line\t-> ${resultingOpcode.toString(2).padStart(32, '0')}")
 
 
-        return resultingOpcode
+        return intArrayOf(resultingOpcode)
     }
 
     operator fun invoke(userProgram: String): ByteArray {
@@ -442,6 +462,9 @@ object Assembler {
         fun getPC() = TerranVM.interruptCount * 4 + ret.size
         fun addBytes(i: Int) {
             i.toLittle().forEach { ret.add(it) }
+        }
+        fun addBytes(ai: IntArray) {
+            ai.forEach { addBytes(it) }
         }
         fun Int.toNextWord() = if (this % 4 == 0) this else this.ushr(2).plus(1).shl(2)
 
@@ -724,10 +747,12 @@ object Assembler {
                 throw IllegalArgumentException()
 
     private fun String.resolveInt() =
-        if (this.matches(hexLiteral))
-            this.dropLast(1).toInt(16)
-        else if (this.matches(matchInteger))
-            this.toInt()
+        if (this.startsWith(labelMarker)) // label?
+            getLabel(this).ushr(2)
+        else if (this.matches(hexLiteral)) // hex?
+            this.dropLast(1).toLong(16).toInt() // because what the fuck Kotlin?
+        else if (this.matches(matchInteger)) // number?
+            this.toLong().toInt() // because what the fuck Kotlin?
         else
             throw IllegalArgumentException("Couldn't convert this to integer: '$this'")
 
