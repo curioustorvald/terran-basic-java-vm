@@ -119,8 +119,6 @@ loadwordi r3, ffcc00ffh;
             sevensegFont.draw(batch, vm.lr.toString(16).padStart(6, ' '), 585f, height - 18 - 500f)
             // -> stack pointer
             sevensegFont.draw(batch, vm.sp.toString(16).padStart(4, ' '), 719f, height - 18 - 500f)
-            // -> string counter
-            sevensegFont.draw(batch, vm.rCMP.toString().padStart(4, ' '), 851f, height - 18 - 500f)
         }
 
 

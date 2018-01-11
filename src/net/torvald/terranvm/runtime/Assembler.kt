@@ -163,12 +163,13 @@ object Assembler {
 
             "MEMCPY" to 0b0000_000000000000000_0001001000,
 
-            // Compare (WARNING: USES CUSTOM CONDITION HANDLER!) //
+            // Compare //
 
-            /*"CMP" to 0b0001_000000_0000000000000000000,
+            "CMP" to 0b0001_000000_0000000000000000000,
+            "CMPII" to 0b0001_000000_0000000000000000000,
             "CMPIF" to 0b0001_000000_0000000000000000001,
             "CMPFI" to 0b0001_000000_0000000000000000010,
-            "CMPFF" to 0b0001_000000_0000000000000000011,*/
+            "CMPFF" to 0b0001_000000_0000000000000000011,
 
             // Load and Store byte/halfword/word immediate //
 
@@ -289,12 +290,6 @@ object Assembler {
         }
 
         opcodes.putAll(mapOf(
-                "CMP"   to 0b0001_000000_0000000000000000000,
-                "CMPII" to 0b0001_000000_0000000000000000000,
-                "CMPIF" to 0b0001_000000_0000000000000000001,
-                "CMPFI" to 0b0001_000000_0000000000000000010,
-                "CMPFF" to 0b0001_000000_0000000000000000011,
-
                 "JMP" to 0b000_1000.shl(25),
                 "JZ"  to 0b001_1000.shl(25),
                 "JNZ" to 0b010_1000.shl(25),
