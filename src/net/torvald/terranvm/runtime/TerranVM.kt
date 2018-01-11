@@ -415,11 +415,10 @@ class TerranVM(memSize: Int,
     }
 
     // memory registers (32-bit)
-    var m1 = 0 // general-use flags or variable
-    var m2 = 0 // general-use flags or variable
-    var m3 = 0 // general-use flags or variable
-    var m4 = 0 // general-use flags or variable
-    var strCntr = 0
+    var rCMP = 0 // compare register
+    var m2 = 0 // string counter?
+    //var m3 = 0 // general-use flags or variable
+    //var m4 = 0 // general-use flags or variable
     var pc = 0 // program counter
     var sp = 0 // stack pointer
     var lr = 0 // link register
@@ -437,7 +436,7 @@ class TerranVM(memSize: Int,
         if (memSize > 4.MB()) {
             warn("VM memory size might be too large — recommended max is 4 MBytes")
         }
-        else if (memSize < 256) { // arbitrary unit (note - ATtiny has at least 2K Flash + 128 EEPROM + 128 SRAM. Atari 2600 had 128)
+        else if (memSize < 256) { // arbitrary amount (note - ATtiny has at least 2K Flash + 128 EEPROM + 128 SRAM. Atari 2600 had 128)
             throw Error("VM memory size too small — minimum allowed is 256 bytes")
         }
         else if (memSize > 16.MB()) {
@@ -561,11 +560,11 @@ MTHFU
         r6 = 0
         r7 = 0
         r8 = 0
-        m1 = 0
+        rCMP = 0
         m2 = 0
-        m3 = 0
-        m4 = 0
-        strCntr = 0
+        //m3 = 0
+        //m4 = 0
+        //strCntr = 0
         pc = 0
         sp = 0
         lr = 0
@@ -765,6 +764,7 @@ fun Long.toLittle() = byteArrayOf(
         this.ushr(56).and(0xFF).toByte()
 )
 fun Double.toLittle() = java.lang.Double.doubleToRawLongBits(this).toLittle()
+fun Float.toLittle() = java.lang.Float.floatToRawIntBits(this).toLittle()
 fun Boolean.toLittle() = byteArrayOf(if (this) 0xFF.toByte() else 0.toByte())
 
 fun ByteArray.toLittleInt() =

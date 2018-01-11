@@ -81,7 +81,7 @@ object VMOpcodesRISC {
     @Strictfp fun CEIL (dest: Register, src: Register) { vm.writeregFloat(dest, Math.ceil (vm.readregFloat(src).toDouble()).toFloat()) }
     @Strictfp fun ROUND(dest: Register, src: Register) { vm.writeregFloat(dest, Math.round(vm.readregFloat(src)).toFloat()) }
     @Strictfp fun LOG(dest: Register, src: Register) { vm.writeregFloat(dest, Math.log(vm.readregFloat(src).toDouble()).toFloat()) }
-    @Strictfp fun INT(dest: Register, src: Register) { if (vm.readregFloat(src) >= 0f) FLOOR(dest, src) else CEIL(dest, src) }
+    @Strictfp fun RNDI(dest: Register) { vm.writeregInt(dest, VMRNG.nextInt()) }
     @Strictfp fun RND(dest: Register) { vm.writeregFloat(dest, VMRNG.nextFloat()) }
     @Strictfp fun SGN(dest: Register, src: Register) { vm.writeregFloat(dest, Math.signum(vm.readregFloat(src))) }
     @Strictfp fun SQRT(dest: Register, src: Register) { vm.writeregFloat(dest, Math.pow(vm.readregFloat(src).toDouble(), 2.0).toFloat()) }
@@ -158,7 +158,7 @@ object VMOpcodesRISC {
     fun CMP(dest: Register, src: Register, lr: Int) {
         val lhand = if (lr and 0b10 != 0) vm.readregFloat(dest) else vm.readregInt(dest).toFloat()
         val rhand = if (lr and 0b01 != 0) vm.readregFloat(src) else vm.readregInt(src).toFloat()
-        vm.m1 = if (lhand == rhand) 0 else if (lhand > rhand) 1 else -1
+        vm.rCMP = if (lhand == rhand) 0 else if (lhand > rhand) 1 else -1
     }
 
 
@@ -218,10 +218,10 @@ object VMOpcodesRISC {
 
 
     fun JMP(offset: Int) { vm.pc = offset shl 2 }
-    fun JZ (offset: Int) { if (vm.m1 == 0) JMP(offset) }
-    fun JNZ(offset: Int) { if (vm.m1 != 0) JMP(offset) }
-    fun JGT(offset: Int) { if (vm.m1 >  0) JMP(offset) }
-    fun JLS(offset: Int) { if (vm.m1 <  0) JMP(offset) }
+    fun JZ (offset: Int) { if (vm.rCMP == 0) JMP(offset) }
+    fun JNZ(offset: Int) { if (vm.rCMP != 0) JMP(offset) }
+    fun JGT(offset: Int) { if (vm.rCMP >  0) JMP(offset) }
+    fun JLS(offset: Int) { if (vm.rCMP <  0) JMP(offset) }
     fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + (offset shl 2), 0xFFFFFF) }
     fun JBW(offset: Int) { vm.pc = Math.floorMod(vm.pc - (offset shl 2), 0xFFFFFF) }
 
@@ -268,10 +268,10 @@ object VMOpcodesRISC {
         fun execInCond(action: () -> Unit) {
             when (cond) {
                 0 -> action()
-                1 -> if (vm.m1 == 0) action()
-                2 -> if (vm.m1 != 0) action()
-                3 -> if (vm.m1 >  0) action()
-                4 -> if (vm.m1 <  0) action()
+                1 -> if (vm.rCMP == 0) action()
+                2 -> if (vm.rCMP != 0) action()
+                3 -> if (vm.rCMP >  0) action()
+                4 -> if (vm.rCMP <  0) action()
                 else -> throw NullPointerException()
             }
         }
@@ -305,7 +305,7 @@ object VMOpcodesRISC {
                             21 -> CEIL(Rd, Rs)
                             22 -> ROUND(Rd, Rs)
                             23 -> LOG(Rd, Rs)
-                            24 -> INT(Rd, Rs)
+                            24 -> RNDI(Rd)
                             25 -> RND(Rd)
                             26 -> SGN(Rd, Rs)
                             27 -> SQRT(Rd, Rs)
@@ -376,21 +376,19 @@ object VMOpcodesRISC {
             }
             // Push and Pop
             0b0100 -> {
-                execInCond {
-                    val offset = opcode.and(0x3F_FFFF)
-                    if (offset == 0) PUSH(Rd)
-                    else PUSHWORDI(offset)
-                }
+                execInCond { PUSH(Rd) }
             }
             0b0101 -> {
-                execInCond {
-                    val offset = opcode.and(0x3F_FFFF)
-                    if (offset == 0) POP(Rd)
-                    else POPWORDI() // IntOffset is non-zero, POP to LR register
-                }
+                execInCond { POP(Rd) }
+            }
+            0b0110 -> {
+                execInCond { val offset = opcode.and(0x3F_FFFF); PUSHWORDI(offset) }
+            }
+            0b0111 -> {
+                execInCond { POPWORDI() }
             }
             // Conditional jump
-            0b0110 -> {
+            0b1000 -> {
                 val offset = opcode.and(0x3F_FFFF)
                 when (cond) {
                     0 -> JMP(offset)
@@ -444,16 +442,6 @@ object VMOpcodesRISC {
         }
     }
 
-
-
-    fun condSuffixToOpcode(suffix: String?): Int = when (suffix) {
-        "", null -> 0
-        "Z"  -> 1
-        "NZ" -> 2
-        "GT" -> 3
-        "LS" -> 4
-        else -> throw IllegalArgumentException()
-    }
 
 
 

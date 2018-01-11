@@ -53,85 +53,18 @@ class TextOnly : Game() {
 
 
 
-        val programEchoKeyPress = Assembler("""
-.func;
-:keyboardint;
-loadnum r3, 1; # peripheral IRQ 1
-loadnum r2, 0; # memaddr of 0
-loadperi; # r1 <- keycode in Number
-putchar;
-
-return;
-
-.code;
-
-# install the interrupt
-loadnum r2, 24;
-loadptr r1, @keyboardint;
-pokeint;
-
-# main loop
+        val random = Assembler("""
 :loop;
-nop;
-jmp @loop;
-
-""")
-
-        val programScanf = Assembler("""
-.func;
-:scanfstr;
-readstr;
-
-return;
-
-.code;
-gosub @scanfstr;
-printstr;
-
-""")
-
-
-        val randommaze = Assembler("""
-.func;
-:left;
-loadnum r1, 47;
-putchar;
-return;
-
-:right;
-loadnum r1, 92;
-putchar;
-return;
-
-.code;
-:loop;
-
-rnd;
-mov r1, r3;
-loadnum r2, 0.5;
-
-cmp;
-
-jgt @p1;
-jls @p2;
-jmp @loop;
-
-:p1;
-gosub @left;
-jmp @loop;
-
-:p2;
-gosub @right;
+rndiz r5;
+rndi r6;
+rndi r7;
+rndi r8;
 jmp @loop;
 """)
 
 
-        val yunornd = Assembler("""
-            :loop; rnd; jmp @loop;
-        """.trimIndent())
 
-
-        vm.loadProgram(randommaze)
+        vm.loadProgram(random)
         vm.delayInMills = vmDelay
 
 
@@ -187,7 +120,7 @@ jmp @loop;
             // -> stack pointer
             sevensegFont.draw(batch, vm.sp.toString(16).padStart(4, ' '), 719f, height - 18 - 500f)
             // -> string counter
-            sevensegFont.draw(batch, vm.strCntr.toString().padStart(4, ' '), 851f, height - 18 - 500f)
+            sevensegFont.draw(batch, vm.rCMP.toString().padStart(4, ' '), 851f, height - 18 - 500f)
         }
 
 

@@ -1,6 +1,5 @@
 package net.torvald.terrarum.virtualcomputer.terranvmadapter
 
-import net.torvald.terranvm.Opcodes
 import net.torvald.terranvm.runtime.TerranVM
 import net.torvald.terranvm.runtime.toUint
 import java.awt.BorderLayout
@@ -23,61 +22,27 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         val sb = StringBuilder()
 
         /*
-        r1: 0.000000000 (Number)
+        r1: 00000000h; 0; 0.0f
+        rCMP: -1
         000000 : 00 00 00 00 00 00 00 48 00 00 00 50 00 00 00 58 | .......H...P...X
          */
 
         // registers
         for (r in 1..8) {
-            val rreg = vm.readreg(r)
-            val breg = vm.readbreg(r).toInt()
+            val rI = vm.readregInt(r)
+            val rF = vm.readregFloat(r)
 
-            val rregtype = breg.ushr(2).and(7)
-            val rregtypeStr = when (rregtype) {
-                0 -> "Nil"
-                1 -> "Boolean"
-                2 -> "Number"
-                3 -> "Bytes"
-                4 -> "String"
-                else -> "Undefined--$rregtype"
-            }
-            val isInt = breg.and(1) != 0
-            val isPtr = breg.and(2) != 0
-
-            sb.append("r$r: ")
-
-            if (!isInt && !isPtr) {
-                if (rregtype == Opcodes.TYPE_NUMBER) {
-                    sb.append("$rreg ($rregtypeStr)")
-                }
-                else {
-                    sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h ($rregtypeStr)")
-                }
-            }
-            else if (isInt && !isPtr) {
-                sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Int)")
-            }
-            else if (isInt && isPtr) {
-                sb.append("${rreg.toInt().toString(16).padStart(8, '0').toUpperCase()}h (Pointer)")
-            }
-            else {
-                sb.append("${java.lang.Double.doubleToRawLongBits(rreg).toString(16).toUpperCase()}h (Null Pointer)")
-            }
-
-            sb.append('\n')
+            sb.append("r$r: " +
+                    "${rI.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase()}h; " +
+                    "$rI; ${rF}f\n"
+            )
         }
 
-        for (m in 1..4) {
-            val mreg = when (m) {
-                1 -> vm.m1
-                2 -> vm.m2
-                3 -> vm.m3
-                4 -> vm.m4
-                else -> throw InternalError("Your RAM just got hit by gamma radiation.")
-            }
+        sb.append("rCMP: " +
+                "${vm.rCMP.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase()}h; " +
+                "${vm.rCMP}\n"
+        )
 
-            sb.append("m$m: ${mreg.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase()}h ($mreg)\n")
-        }
 
         sb.append("uptime: ${vm.uptime} ms\n")
 

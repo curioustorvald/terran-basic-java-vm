@@ -1,7 +1,8 @@
 package net.torvald.terranvm.runtime
 
-import net.torvald.terranvm.Opcodes
-import net.torvald.terranvm.Opcodes.SIZEOF_POINTER
+import net.torvald.terranvm.runtime.Assembler.resolveInt
+import net.torvald.terranvm.runtime.Assembler.toRegInt
+
 
 /**
  * ## Syntax
@@ -41,17 +42,17 @@ import net.torvald.terranvm.Opcodes.SIZEOF_POINTER
  * Label names are case insensitive.
  * Available types:
  * - STRING
- * - NUMBER
+ * - FLOAT
  * - INT
  * - BYTES (byte literals, along with pointer label -- pointer label ONLY!)
  *
  * You use your label in code by '@label_name', just like line labels.
  *
  *
- * ### Label
- * Predefined labels:
- * - r1..r8
- * - m1..m4
+ * ### Literals
+ * - Register literals: r1, r2, r3, r4, r5, r6, r7, r8
+ * - Hex literals: CAFEBABEh
+ * - Integer literals: 80085
  *
  * Defining labels:
  * :label_name;
@@ -80,6 +81,9 @@ object Assembler {
 
     private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
 
+    private val registerLiteral = Regex("""r[1-8]""")
+    private val hexLiteral = Regex("""[0-9A-Fa-f]+h""")
+
     private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
 
     private var currentSection = ".CODE"
@@ -87,12 +91,230 @@ object Assembler {
     val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
 
 
-    private val ASM_JMP = Opcodes.opcodesList["JMP"]!!
+
+
+    val bitmaskRd = 0b00000001110000000000000000000000
+    val bitmaskRs = 0b00000000001110000000000000000000
+    val bitmaskRm = 0b00000000000001110000000000000000
+    val bitmaskR4 = 0b00000000000000001110000000000000
+    val bitmaskR5 = 0b00000000000000000001110000000000
+    val bitmaskCond = 0b11100000000000000000000000000000
+    val conditions: HashMap<String, Int> = hashMapOf(
+            "" to 0,
+            "Z"  to 0x20000000,
+            "NZ" to 0x40000000,
+            "GT" to 0x60000000,
+            "LS" to 0x80000000L.toInt()
+    )
+    private val primitiveOpcodes: HashMap<String, Int> = hashMapOf(
+            // Mathematical and Register data transfer //
+
+            "MOV" to 0b100000,
+            "XCHG" to 0b100001,
+            "INC"  to 0b100010,
+            "DEC"  to 0b100011,
+            "MALLOC" to 0b100100,
+            "FTOI" to 0b100101,
+            "ITOF" to 0b100110,
+            "GOSUB" to 0b111110,
+            "RETURN" to 0b111111,
+
+            "ADD"  to 0b000001,
+            "SUB"  to 0b000010,
+            "MUL"  to 0b000011,
+            "DIV"  to 0b000100,
+            "POW"  to 0b000101,
+            "MOD"  to 0b000110,
+            "SHL"  to 0b000111,
+            "SHR"  to 0b001000,
+            "USHR" to 0b001001,
+            "AND"  to 0b001010,
+            "OR"   to 0b001011,
+            "XOR"  to 0b001100,
+            "ABS"  to 0b010000,
+            "SIN"  to 0b010001,
+            "COS"  to 0b010010,
+            "TAN"  to 0b010011,
+            "FLOOR" to 0b010100,
+            "CEIL" to 0b010101,
+            "ROUND" to 0b010110,
+            "LOG"  to 0b010111,
+            "RNDI" to 0b011000,
+            "RND"  to 0b011001,
+            "SGN"  to 0b011010,
+            "SQRT" to 0b011011,
+            "CBRT" to 0b011100,
+            "INV"  to 0b011101,
+            "RAD"  to 0b011110,
+            "NOT"  to 0b011111,
+
+            "HALT" to 0,
+
+            // Load and Store to memory //
+
+            "LOADBYTE"  to 0b0000_000000000_0000000001000_00_0,
+            "LOADHWORD" to 0b0000_000000000_0000000001000_01_0,
+            "LOADWORD"  to 0b0000_000000000_0000000001000_10_0,
+            "STOREBYTE"  to 0b0000_000000000_0000000001000_00_1,
+            "STOREHWORD" to 0b0000_000000000_0000000001000_01_1,
+            "STOREWORD"  to 0b0000_000000000_0000000001000_10_1,
+
+            // Memory copy //
+
+            "MEMCPY" to 0b0000_000000000000000_0001001000,
+
+            // Compare (WARNING: USES CUSTOM CONDITION HANDLER!) //
+
+            /*"CMP" to 0b0001_000000_0000000000000000000,
+            "CMPIF" to 0b0001_000000_0000000000000000001,
+            "CMPFI" to 0b0001_000000_0000000000000000010,
+            "CMPFF" to 0b0001_000000_0000000000000000011,*/
+
+            // Load and Store byte/halfword/word immediate //
+
+            "LOADBYTEI"   to 0b0001_000_000010_00000000_00000000,
+            "LOADHWORDI"  to 0b0001_000_000100_0000000000000000,
+            "LOADWORDIL"  to 0b0001_000_000110_0000000000000000,
+            "STOREBYTEI"  to 0b0001_000_000011_00000000_00000000,
+            "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
+            "LOADWORDIH"  to 0b0001_000_000111_0000000000000000,
+
+            // Load and Store a word from register to memory //
+
+            "LOADWORDIMEM" to 0b0010.shl(25),
+            "STOREWORDIMEM" to 0b0011.shl(25),
+
+            // Push and Pop //
+
+            "PUSH" to 0b0100.shl(25),
+            "POP"  to 0b0101.shl(25),
+            "PUSHWORDI" to 0b0110.shl(25),
+            "POPWORDI"  to 0b0111.shl(25),
+
+            // Conditional jump (WARNING: USES CUSTOM CONDITION HANDLER!) //
+
+            /*"JMP" to 0b000_1000.shl(25),
+            "JZ"  to 0b001_1000.shl(25),
+            "JNZ" to 0b010_1000.shl(25),
+            "JGT" to 0b011_1000.shl(25),
+            "JLS" to 0b100_1000.shl(25),
+            "JFW" to 0b101_1000.shl(25),
+            "JBW" to 0b110_1000.shl(25),*/
+
+            // Call peripheral //
+
+            "CALL" to 0b1111_000_00000000000000_00000000,
+            "MEMSIZE" to 0b1111_000_00000000000001_00000000,
+            "UPTIME"  to 0b1111_000_00000000000001_11111111,
+            "INT" to 0b111111111111111111111_00000000,
+
+            // Assembler-specific commands //
+
+            "NOP" to 0b000_0000_000_000_000_0000000000_100000 // MOV r1, r1
+    )
+    val opcodes = HashMap<String, Int>()
+
+    /**
+     * @return r: register, b: byte, w: halfword, a: address offset
+     */
+    fun getOpArgs(opcode: Int): String {
+        val opcode = opcode.and(0x1FFFFFFF) // drop conditions
+        return when (opcode.ushr(25).and(0xF)) {
+            0 -> {
+                val mathOp = opcode.and(127)
+                if (mathOp == 0) {
+                    ""
+                }
+                else if (mathOp == 0b011000 || mathOp == 0b011001) { // random number
+                    "r"
+                }
+                else if (mathOp in 0b000001..0b001111) {
+                    "rrr"
+                }
+                else if (mathOp in 0b010000..0b011111) {
+                    "rr"
+                }
+                else if (mathOp == 0b100000 || mathOp == 0b100001 || mathOp == 0b100100) { // MOV and XCHG; MALLOC
+                    "rr"
+                }
+                else if (mathOp == 0b100010 || mathOp == 0b100011 || mathOp == 0b100101 || mathOp == 0b100110) {
+                    "r"
+                }
+                else if (mathOp == 0b1000000) { // load/store
+                    "rrr"
+                }
+                else if (mathOp == 0b1001000) { // memcpy
+                    "rrrrr"
+                }
+                else {
+                    ""
+                }
+            }
+            1 -> {
+                val mode = opcode.ushr(17).and(0b11111)
+                return when (mode) {
+                    0, 0b00100, 0b01000, 0b01100, 0b10000, 0b10100, 0b11000, 0b11100 -> "rr"
+                    1 -> "rb"
+                    2, 3 -> "rw"
+                    else -> throw IllegalArgumentException()
+                }
+            }
+            2, 3 -> "ra" // loadi/storei
+            4, 5 -> "r"  // push/pop
+            6 -> "a" // pushwordi
+            7 -> ""  // popwordi
+            8 -> "a" // conditional jump
+            15 -> {
+                val cond = opcode.ushr(8).and(0x3FFF)
+
+                if (cond <= 1) {
+                    "rb"
+                }
+                else if (cond == 0x3FFF) {
+                    "b"
+                }
+                else throw IllegalArgumentException()
+            }
+            else -> throw IllegalArgumentException()
+        }
+    }
+
+    init {
+        // fill up opcodes with conditions
+        conditions.forEach { suffix, bits ->
+            primitiveOpcodes.forEach { mnemo, opcode ->
+                opcodes[mnemo + suffix] = bits or opcode
+            }
+        }
+
+        opcodes.putAll(mapOf(
+                "CMP" to 0b0001_000000_0000000000000000000,
+                "CMPIF" to 0b0001_000000_0000000000000000001,
+                "CMPFI" to 0b0001_000000_0000000000000000010,
+                "CMPFF" to 0b0001_000000_0000000000000000011,
+
+                "JMP" to 0b000_1000.shl(25),
+                "JZ"  to 0b001_1000.shl(25),
+                "JNZ" to 0b010_1000.shl(25),
+                "JGT" to 0b011_1000.shl(25),
+                "JLS" to 0b100_1000.shl(25),
+                "JFW" to 0b101_1000.shl(25),
+                "JBW" to 0b110_1000.shl(25)
+        ))
+    }
+
+
+
+
+
+
+    private fun composeJMP(offset: Int) = opcodes["JMP"]!! or offset
 
 
     private fun debug(any: Any?) { if (false) { println(any) } }
 
     var flagSpecifyJMP = false
+    var flagSpecifyJMPLocation = -1
 
 
     private fun putLabel(name: String, pointer: Int) {
@@ -174,6 +396,43 @@ object Assembler {
         labelTable.clear()
     }
 
+    fun assemblyToOpcode(line: String): Int {
+        val words = line.split(delimiters)
+        val cmd = words[0].toUpperCase()
+
+
+        if (opcodes[cmd] == null) {
+            throw Error("Invalid assembly: $cmd")
+        }
+
+        var resultingOpcode = opcodes[cmd]!!
+        val arguments = getOpArgs(resultingOpcode)
+
+        // check if user had provided right number of arguments
+        if (words.size != arguments.length + 1) {
+            throw IllegalArgumentException("Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1}")
+        }
+
+        // for each arguments the operation requires... (e.g. "rrr", "rb")
+        arguments.forEachIndexed { index, c ->
+            val word = words[index + 1]
+
+            resultingOpcode = resultingOpcode or when (c) {
+                'r' -> word.toRegInt().shl(22 - 3 * index)
+                'b' -> word.resolveInt().and(0xFF)
+                'w' -> word.resolveInt().and(0xFFFF)
+                'a' -> word.resolveInt().and(0x3FFFFF)
+                else -> throw IllegalArgumentException("Unknown argument type: $c")
+            }
+        }
+
+
+        println("$line\t-> ${resultingOpcode.toString(2).padStart(32, '0')}")
+
+
+        return resultingOpcode
+    }
+
     operator fun invoke(userProgram: String): ByteArray {
         resetStatus()
 
@@ -181,6 +440,10 @@ object Assembler {
         val ret = ArrayList<Byte>()
 
         fun getPC() = TerranVM.interruptCount * 4 + ret.size
+        fun addBytes(i: Int) {
+            i.toLittle().forEach { ret.add(it) }
+        }
+        fun Int.toNextWord() = if (this % 4 == 0) this else this.ushr(2).plus(1).shl(2)
 
 
         // pass 1: pre-scan for labels
@@ -212,7 +475,8 @@ object Assembler {
 
                     // insert JMP instruction that jumps to .code section
                     if (!flagSpecifyJMP) {
-                        virtualPC += (SIZEOF_POINTER + 1)
+                        // write opcode
+                        virtualPC += 4
                         flagSpecifyJMP = true
                     }
 
@@ -235,47 +499,48 @@ object Assembler {
 
                             val data = line.substring(start, end)
 
+                            // write bytes
                             virtualPC += data.toCString().size
+                            virtualPC = virtualPC.toNextWord()
                         }
-                        "NUMBER" -> {
-                            val number = words[2].toDouble()
-
-                            //debug("--> Number payload: [$number]")
-
-                            virtualPC += number.toLittle().size
-                        }
-                        "INT" -> {
-                            val int = words[2].toInt()
-
-                            //debug("--> Int payload: [$int]")
-
-                            int.toLittle().forEach { virtualPC += 1 }
+                        "INT", "FLOAT" -> {
+                            // write bytes
+                            virtualPC += 4
                         }
                         "BYTES" -> {
                             (2..words.lastIndex).forEach {
-                                if (words[it].matches(matchInteger) && words[it].toInt() in 0..255) { // byte literal
+                                if (words[it].matches(matchInteger) && words[it].resolveInt() in 0..255) { // byte literal
                                     //debug("--> Byte literal payload: ${words[it].toInt()}")
+                                    // write bytes
                                     virtualPC += 1
                                 }
                                 else if (words[it].startsWith(labelMarker)) {
                                     //debug("--> Byte literal payload (label): ${words[it]}")
-                                    virtualPC += SIZEOF_POINTER
+                                    // write bytes
+                                    virtualPC += 4
                                 }
                                 else {
                                     throw IllegalArgumentException("Illegal byte literal ${words[it]}")
                                 }
                             }
+
+
+                            virtualPC = virtualPC.toNextWord()
                         }
                         else -> throw IllegalArgumentException("Unsupported data type: '$type' (or you missed a semicolon?)")
                     }
 
                 }
                 else if (currentSection == ".CODE" || currentSection == ".FUNC") { // interpret codes
-
-                    if (currentSection == ".FUNC" && !flagSpecifyJMP) {
+                    if (flagSpecifyJMP && currentSection == ".CODE") {
+                        flagSpecifyJMP = false
+                        // write dest (this PC) at flagSpecifyJMPLocation
+                        virtualPC += 4
+                    }
+                    else if (!flagSpecifyJMP && currentSection == ".FUNC") {
                         // insert JMP instruction that jumps to .code section
-                        virtualPC += (SIZEOF_POINTER + 1)
                         flagSpecifyJMP = true
+                        virtualPC += 4
                     }
 
                     if (cmd.startsWith(labelDefinitionMarker)) {
@@ -284,66 +549,17 @@ object Assembler {
                     }
                     else {
                         // sanitise input
-                        if (Opcodes.opcodesList[cmd] == null) {
+                        if (opcodes[cmd] == null) {
                             throw Error("Invalid opcode: $cmd")
                         }
-                        // filter arg count mismatch
-                        val argCount = Opcodes.opcodeArgsList[cmd]?.size ?: 0
-                        if (argCount + 1 != words.size && (!(Opcodes.opcodeArgsList[cmd]?.contains(Opcodes.ArgType.STRING) ?: false))) {
-                            throw Error("Opcode $cmd -- Number of argument(s) are mismatched; requires $argCount, got ${words.size - 1}. Perhaps semicolon not placed?")
-                        }
 
-                        virtualPC += 1
-
-                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: arrayOf()
-
-                        // By the definition, "string argument" is always the last, and only one should exist.
-                        if (argumentInfo.isNotEmpty()) {
-                            argumentInfo.forEachIndexed { index, it ->
-
-                                //debug("[TBASASM] argsInfo index: $index, size: $it")
-
-                                try {
-                                    when (it) {
-                                        Opcodes.ArgType.BYTE, Opcodes.ArgType.REGISTER -> {
-                                            virtualPC += 1
-                                        }
-                                        Opcodes.ArgType.NUMBER -> {
-                                            virtualPC += 8
-                                        }
-                                        Opcodes.ArgType.POINTER, Opcodes.ArgType.INT32 -> {
-                                            virtualPC += 4
-                                        }
-                                        Opcodes.ArgType.STRING -> {
-                                            if (words[index + 1].startsWith(labelMarker)) {
-                                                throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
-                                            }
-                                            else {
-                                                val strStart = line.indexOf(words[index + 1], ignoreCase = false)
-                                                val strEnd = line.length
-
-                                                val strArg = line.substring(strStart, strEnd)
-
-                                                //debug("--> strArg: $strArg")
-
-                                                virtualPC += strArg.toCString().size
-                                                // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
-                                            }
-                                        }
-                                        else -> throw IllegalArgumentException("Unknown argument type/size")
-                                    }
-                                }
-                                catch (e: ArrayIndexOutOfBoundsException) {
-                                    e.printStackTrace()
-                                    throw Error("Argument #${index + 1} is missing for $cmd")
-                                }
-                            }
-                        }
+                        // write opcode
+                        virtualPC += 4
                     }
                 }
             }
             else {
-                TODO("ASM label 1")
+                throw IllegalArgumentException("Invalid line: $line")
             }
 
         }
@@ -381,9 +597,9 @@ object Assembler {
 
                     // insert JMP instruction that jumps to .code section
                     if (!flagSpecifyJMP) {
-                        ret.add(ASM_JMP)
-                        repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
                         flagSpecifyJMP = true
+                        flagSpecifyJMPLocation = getPC()
+                        addBytes(composeJMP(0x3FFFFF))
                     }
 
 
@@ -412,11 +628,17 @@ object Assembler {
 
                             data.toCString().forEach { ret.add(it) }
                             // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
-                        }
-                        "NUMBER" -> {
-                            val number = words[2].toDouble()
 
-                            debug("--> Number payload: '$number'")
+                            // zero filler
+                            // 1 -> 3; 3 -> 1; else -> else
+                            if (data.length and 1 == 1) {
+                                repeat(data.length.and(3) xor 2) { ret.add(0.toByte()) }
+                            }
+                        }
+                        "FLOAT" -> {
+                            val number = words[2].toFloat()
+
+                            debug("--> Float payload: '$number'")
 
                             number.toLittle().forEach { ret.add(it) }
                         }
@@ -428,10 +650,11 @@ object Assembler {
                             int.toLittle().forEach { ret.add(it) }
                         }
                         "BYTES" -> {
+                            val addedBytesSize = words.lastIndex - 2 + 1
                             (2..words.lastIndex).forEach {
-                                if (words[it].matches(matchInteger) && words[it].toInt() in 0..255) { // byte literal
-                                    debug("--> Byte literal payload: ${words[it].toInt()}")
-                                    ret.add(words[it].toInt().toByte())
+                                if (words[it].matches(matchInteger) && words[it].resolveInt() in 0..255) { // byte literal
+                                    debug("--> Byte literal payload: ${words[it].resolveInt()}")
+                                    addBytes(words[it].resolveInt())
                                 }
                                 else if (words[it].startsWith(labelMarker)) {
                                     debug("--> Byte literal payload (label): ${words[it]}")
@@ -443,6 +666,13 @@ object Assembler {
                                     throw IllegalArgumentException("Illegal byte literal ${words[it]}")
                                 }
                             }
+
+
+                            // zero filler
+                            // 1 -> 3; 3 -> 1; else -> else
+                            if (addedBytesSize and 1 == 1) {
+                                repeat(addedBytesSize.and(3) xor 2) { ret.add(0.toByte()) }
+                            }
                         }
                         else -> throw IllegalArgumentException("Unsupported data type: '$type' (or you missed a semicolon?)")
                     }
@@ -450,15 +680,19 @@ object Assembler {
                 }
                 else if (currentSection == ".CODE" || currentSection == ".FUNC") { // interpret codes
                     if (flagSpecifyJMP && currentSection == ".CODE") {
-                        val pcLittle = getPC().toLittle()
-                        pcLittle.forEachIndexed { index, byte -> ret[1 + index] = byte }
                         flagSpecifyJMP = false
+                        // write dest (this PC) at flagSpecifyJMPLocation
+                        val newASM = composeJMP(flagSpecifyJMPLocation.ushr(2)).toLittle()
+                        newASM.forEachIndexed { index, byte ->
+                            ret[flagSpecifyJMPLocation + index] = byte
+                        }
                     }
                     else if (!flagSpecifyJMP && currentSection == ".FUNC") {
                         // insert JMP instruction that jumps to .code section
-                        ret.add(ASM_JMP)
-                        repeat(SIZEOF_POINTER) { ret.add(0xFF.toByte()) } // temporary values, must be specified by upcoming .code section
                         flagSpecifyJMP = true
+                        addBytes(composeJMP(flagSpecifyJMPLocation.ushr(2)))
+                        // set new jmp location
+                        flagSpecifyJMPLocation = getPC()
                     }
 
 
@@ -467,95 +701,12 @@ object Assembler {
                         // will continue to next statements
                     }
                     else {
-                        if (Opcodes.opcodesList[cmd] == null) {
-                            throw Error("Invalid assembly: $cmd")
-                        }
-
-                        ret.add(Opcodes.opcodesList[cmd]!!)
-
-                        val argumentInfo = Opcodes.opcodeArgsList[cmd] ?: arrayOf()
-
-                        // By the definition, "string argument" is always the last, and only one should exist.
-                        if (argumentInfo.isNotEmpty()) {
-                            argumentInfo.forEachIndexed { index, it ->
-
-                                debug("[TBASASM] argsInfo index: $index, size: $it")
-
-                                try {
-                                    when (it) {
-                                        Opcodes.ArgType.REGISTER -> {
-                                            if (words[index + 1].startsWith(labelMarker)) {
-                                                Error("label that points to Register (${words[index + 1]})")
-                                            }
-                                            else {
-                                                if (words[index + 1].startsWith("r", ignoreCase = true)) {
-                                                    ret.add(words[index + 1].drop(1).toInt().toByte())
-                                                }
-                                                else {
-                                                    throw Error("Register expected, got something else (${words[index + 1]})")
-                                                }
-                                            }
-                                        }
-                                        Opcodes.ArgType.BYTE -> {
-                                            if (words[index + 1].startsWith(labelMarker)) {
-                                                TODO("label that points to Byte (${words[index + 1]})")
-                                            }
-                                            else {
-                                                ret.add(words[index + 1].toInt().toByte())
-                                            }
-                                        }
-                                        Opcodes.ArgType.NUMBER -> {
-                                            if (words[index + 1].startsWith(labelMarker)) {
-                                                TODO("label that points to Number (${words[index + 1]})")
-                                            }
-                                            else {
-                                                words[index + 1].toDouble().toLittle().forEach {
-                                                    ret.add(it)
-                                                }
-                                            }
-                                        }
-                                        Opcodes.ArgType.POINTER, Opcodes.ArgType.INT32 -> {
-                                            if (words[index + 1].startsWith(labelMarker)) { // label for PC or Pointer number
-                                                getLabel(words[index + 1]).toLittle().forEach {
-                                                    ret.add(it)
-                                                }
-                                            }
-                                            else {
-                                                words[index + 1].toInt().toLittle().forEach {
-                                                    ret.add(it)
-                                                }
-                                            }
-                                        }
-                                        Opcodes.ArgType.STRING -> {
-                                            if (words[index + 1].startsWith(labelMarker)) {
-                                                throw Error("Labels are supposed to be used as Pointer, not substitute for in-line String\nIf you are using LOADSTRINLINE, what you will want to use is LOADPTR.")
-                                            }
-                                            else {
-                                                val strStart = line.indexOf(words[index + 1], ignoreCase = false)
-                                                val strEnd = line.length
-
-                                                val strArg = line.substring(strStart, strEnd)
-
-                                                debug("--> strArg: $strArg")
-
-                                                strArg.toCString().forEach { ret.add(it) }
-                                                // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
-                                            }
-                                        }
-                                        else -> throw IllegalArgumentException("Unknown argument type/size")
-                                    }
-                                }
-                                catch (e: ArrayIndexOutOfBoundsException) {
-                                    e.printStackTrace()
-                                    throw Error("Argument #${index + 1} is missing for $cmd")
-                                }
-                            }
-                        }
+                        addBytes(assemblyToOpcode(line))
                     }
                 }
             }
             else {
-                TODO("ASM label")
+                throw IllegalArgumentException("Invalid line: $line")
             }
 
         }
@@ -565,5 +716,19 @@ object Assembler {
 
         return ret.toByteArray()
     }
+
+    private fun String.toRegInt() =
+            if (this.matches(registerLiteral))
+                this[1].toInt() - 49 // "r1" -> 0
+            else
+                throw IllegalArgumentException()
+
+    private fun String.resolveInt() =
+        if (this.matches(hexLiteral))
+            this.dropLast(1).toInt(16)
+        else if (this.matches(matchInteger))
+            this.toInt()
+        else
+            throw IllegalArgumentException("Couldn't convert this to integer: '$this'")
 
 }

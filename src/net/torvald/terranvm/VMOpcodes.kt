@@ -18,7 +18,7 @@ typealias Register = Int
  *
  * Created by minjaesong on 2017-05-10.
  */
-object CiscyOpcodes {
+/*object CiscyOpcodes {
 
     private val DEBUG = false
 
@@ -134,10 +134,10 @@ object CiscyOpcodes {
     fun JFW(offset: Number) { vm.pc = Math.floorMod(vm.pc + offset.toInt(), 0x7FFFFFFF) }
     fun JBW(offset: Number) { vm.pc = Math.floorMod(vm.pc - offset.toInt(), 0x7FFFFFFF) }
 
-    fun JZ(addr: Int) { if (vm.m1 == 0) JMP(addr) }
-    fun JNZ(addr: Int) { if (vm.m1 != 0) JMP(addr) }
-    fun JGT(addr: Int) { if (vm.m1 > 0) JMP(addr) }
-    fun JLS(addr: Int) { if (vm.m1 < 0) JMP(addr) }
+    fun JZ(addr: Int) { if (vm.rCMP == 0) JMP(addr) }
+    fun JNZ(addr: Int) { if (vm.rCMP != 0) JMP(addr) }
+    fun JGT(addr: Int) { if (vm.rCMP > 0) JMP(addr) }
+    fun JLS(addr: Int) { if (vm.rCMP < 0) JMP(addr) }
 
     fun RETURN() { POPINT(); vm.pc = vm.lr }
     fun GOSUB(addr: Int) { PUSHINT(vm.pc); JMP(addr) }
@@ -239,7 +239,7 @@ object CiscyOpcodes {
     fun OR()   { vm.r1 = (vm.r2.toInt() or   vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
     fun XOR()  { vm.r1 = (vm.r2.toInt() xor  vm.r3.toInt()).toDouble(); vm.b1 = (TYPE_NUMBER shl 2).toByte() }
 
-    fun CMP()  { vm.m1 = if (vm.r2 == vm.r3) 0 else if (vm.r2 > vm.r3) 1 else -1 }
+    fun CMP()  { vm.rCMP = if (vm.r2 == vm.r3) 0 else if (vm.r2 > vm.r3) 1 else -1 }
 
     /**
      * r1 <- r2 (no vararg)
@@ -271,7 +271,7 @@ object CiscyOpcodes {
     fun INC6() { vm.r6 += 1.0 }
     fun INC7() { vm.r7 += 1.0 }
     fun INC8() { vm.r8 += 1.0 }
-    fun INCM() { vm.m1 += 1 }
+    fun INCM() { vm.rCMP += 1 }
 
     fun DEC1() { vm.r1 -= 1.0 }
     fun DEC2() { vm.r2 -= 1.0 }
@@ -281,7 +281,7 @@ object CiscyOpcodes {
     fun DEC6() { vm.r6 -= 1.0 }
     fun DEC7() { vm.r7 -= 1.0 }
     fun DEC8() { vm.r8 -= 1.0 }
-    fun DECM() { vm.m1 -= 1 }
+    fun DECM() { vm.rCMP -= 1 }
     
     
 
@@ -374,11 +374,11 @@ object CiscyOpcodes {
     }
     
     fun LOADMNUM(number: Int) {
-        vm.m1 = number
+        vm.rCMP = number
     }
 
     fun REGTOM() {
-        vm.m1 = vm.r1.toInt()
+        vm.rCMP = vm.r1.toInt()
     }
 
     /**
@@ -864,4 +864,4 @@ object CiscyOpcodes {
             "PUSHINT" to arrayOf(ArgType.POINTER),
             "CALL" to arrayOf(ArgType.BYTE, ArgType.INT32)
     )
-}
+}*/
