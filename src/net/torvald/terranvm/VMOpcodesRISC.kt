@@ -178,10 +178,10 @@ object VMOpcodesRISC {
                     word.and(0xFFFF) or originalRegisterContents.toLong().and(0xFFFF0000L).toInt()
         )
     }
-    fun STOREBYTEI(dest: Register, byte: Int) {
+    fun STOREBYTEI(dest: Register, peri: Register, byte: Int) {
         vm.memory[vm.readregInt(dest)] = byte.toByte()
     }
-    fun STOREHWORDI(dest: Register, halfword: Int) {
+    fun STOREHWORDI(dest: Register, peri: Register, halfword: Int) {
         vm.memory[vm.readregInt(dest)] = halfword.and(0xFF).toByte()
         vm.memory[vm.readregInt(dest) + 1] = halfword.ushr(8).and(0xFF).toByte()
     }
@@ -248,7 +248,7 @@ object VMOpcodesRISC {
 
 
 
-    fun INTERRUPT(interrupt: Int) {
+    fun INT(interrupt: Int) {
         JMP(interrupt * 4)
     }
 
@@ -357,9 +357,9 @@ object VMOpcodesRISC {
                     // Compare
                     0 -> CMP(Rd, Rs, opcode.and(0b11))
                     // Load and Store byte immediate
-                    1 -> if (M == 0) LOADBYTEI(Rd, byte) else STOREBYTEI(Rd, byte)
+                    1 -> if (M == 0) LOADBYTEI(Rd, byte) else STOREBYTEI(Rd, Rs, byte)
                     // Load and Store halfword immediate
-                    2 -> if (M == 0) LOADHWORDI(Rd, halfword) else STOREHWORDI(Rd, halfword)
+                    2 -> if (M == 0) LOADHWORDI(Rd, halfword) else STOREHWORDI(Rd, Rs, halfword)
                     // Load word immediate
                     3 -> LOADWORDI(Rd, halfword, M == 1)
                     else -> throw NullPointerException()
@@ -411,7 +411,7 @@ object VMOpcodesRISC {
                     MEMSIZE(Rd, irq)
                 }
                 else if (cond2 == 0x3FFF && Rd == 0b111) {
-                    INTERRUPT(irq)
+                    INT(irq)
                 }
                 else {
                     throw NullPointerException()
@@ -421,6 +421,119 @@ object VMOpcodesRISC {
         } }
     }
 
+
+    fun getArgumentCount(command: String): Int {
+        return if (command.endsWith("NZ") || command.endsWith("GT") || command.endsWith("LS")) {
+            argumentCount[command.dropLast(2)] ?: 0
+        }
+        else if (command.endsWith("Z")) {
+            argumentCount[command.dropLast(1)] ?: 0
+        }
+        else {
+            argumentCount[command] ?: 0
+        }
+    }
+
+    private val argumentCount = hashMapOf(
+            "LOADBYTE" to 3,
+            "LOADHWORD" to 3,
+            "LOADWORD" to 3,
+            "LOADBYTEI" to 2,
+            "LOADHWORDI" to 2,
+            "LOADWORDI" to 2,
+            "LOADWORDIMEM" to 2,
+
+            "STOREBYTE" to 3,
+            "STOREHWORD" to 3,
+            "STOREWORD" to 3,
+            "STOREBYTEI" to 2,
+            "STOREHWORDI" to 2,
+            "STOREWORDIMEM" to 2,
+
+            "ADD" to 3,
+            "SUB" to 3,
+            "MUL" to 3,
+            "DIV" to 3,
+            "POW" to 3,
+            "MOD" to 3,
+            "SHL" to 3,
+            "SHR" to 3,
+            "USHR" to 3,
+            "AND" to 3,
+            "OR" to 3,
+            "XOR" to 3,
+
+            "ABS" to 2,
+            "SIN" to 2,
+            "COS" to 2,
+            "TAN" to 2,
+            "FLOOR" to 2,
+            "CEIL" to 2,
+            "ROUND" to 2,
+            "LOG" to 2,
+            "SGN" to 2,
+            "SQRT" to 2,
+            "CBRT" to 2,
+            "INV" to 2,
+            "RAD" to 2,
+            "NOT" to 2,
+
+            "MOV" to 2,
+            "XCHG" to 2,
+            "MALLOC" to 2,
+            "FTOI" to 2,
+            "ITOF" to 2,
+
+            "INC" to 1,
+            "DEC" to 1,
+
+            "MEMCPY" to 5,
+            "CMP" to 2,
+            "CMPII" to 2,
+            "CMPIF" to 2,
+            "CMPFI" to 2,
+            "CMPFF" to 2,
+
+            "PUSH" to 1,
+            "PUSHWORDI" to 1,
+            "POP" to 1,
+            "POPWORDI" to 0,
+
+            "JMP" to 1,
+            "JZ" to 1,
+            "JNZ" to 1,
+            "JGT" to 1,
+            "JLS" to 1,
+            "JFW" to 1,
+            "JBW" to 1,
+
+            "CALL" to 2,
+            "MEMSIZE" to 2,
+            "UPTIME" to 1,
+            "INT" to 1
+    )
+
+    val threeArgsCmd = hashSetOf<String>()
+    val twoArgsCmd = hashSetOf<String>()
+
+    init {
+        argumentCount.forEach { t, u ->
+            if (3 == u) {
+                threeArgsCmd.add(t)
+                threeArgsCmd.add(t + "Z")
+                threeArgsCmd.add(t + "NZ")
+                threeArgsCmd.add(t + "GT")
+                threeArgsCmd.add(t + "LS")
+            }
+            else if (2 == u) {
+                twoArgsCmd.add(t)
+                twoArgsCmd.add(t + "Z")
+                twoArgsCmd.add(t + "NZ")
+                twoArgsCmd.add(t + "GT")
+                twoArgsCmd.add(t + "LS")
+            }
+        }
+    }
 
 
     private infix fun Float.pow(other: Float) = Math.pow(this.toDouble(), other.toDouble()).toFloat()

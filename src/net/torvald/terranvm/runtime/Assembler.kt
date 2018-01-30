@@ -37,13 +37,13 @@ import net.torvald.terranvm.runtime.Assembler.toRegInt
  * ### Data
  * Data section has following syntax:
  * ```
- * type label_name payload
+ * type label_name (payload)
  * ```
  * Label names are case insensitive.
  * Available types:
- * - STRING
- * - FLOAT
- * - INT
+ * - STRING (BYTES but will use quotes in the ASM line)
+ * - FLOAT (WORD; payload is interpreted as float)
+ * - INT (WORD; payload is interpreted as int)
  * - BYTES (byte literals, along with pointer label -- pointer label ONLY!)
  *
  * You use your label in code by '@label_name', just like line labels.

@@ -1,1 +1,1 @@
-[Terran BASIC](https://github.com/minjaesong/terran-basic-lua) runtime intended for virtual computer
+Virtual computer with well-defined RISCy instruction set, with an assembler and a compiler for some sort of C-lookalike language.

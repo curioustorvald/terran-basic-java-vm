@@ -1,5 +1,10 @@
 package net.torvald.terranvm.runtime.compiler.simplec
 
+import net.torvald.terranvm.VMOpcodesRISC
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+
 /**
  * A compiler for SimpleC language that compiles into TBASOpcode.
  *
@@ -11,11 +16,11 @@ package net.torvald.terranvm.runtime.compiler.simplec
  *
  * # About SimpleC
  *
- * SimpleC is an simplified version of C. It adapts Java's philosophy that thinks unsigned math is crystal meth.
+ * SimpleC is a stupid version of C. It has no type annotation and adapts Java's philosophy that thinks unsigned math is crystal meth.
  *
  * ## New Features
  *
- * - New data type ```bool```
+ * - No data types, non-zero is truthy and zero is falsy
  * - Infinite loop using ```forever``` block. You can still use ```for (;;)```, ```while (true)```
  * - Counted simple loop (without loop counter ref) using ```repeat``` block
  *
@@ -38,7 +43,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
  *
  * Created by minjaesong on 2017-06-04.
  */
-/*object SimpleC {
+object SimpleC {
 
     private val structOpen = '{'
     private val structClose = '}'
@@ -46,7 +51,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
     private val parenOpen = '('
     private val parenClose = ')'
 
-    private val genericTokenSeparator = Regex("""[ \t]+""")
+    private val preprocessorTokenSep = Regex("""[ \t]+""")
 
     private val nullchar = 0.toChar()
 
@@ -61,6 +66,11 @@ package net.torvald.terranvm.runtime.compiler.simplec
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""")
     private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""")
     private val regexIntWhole = Regex("""^([0-9_]+[Ll]?)$""")
+
+    private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
+    private fun makeTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
+    private fun makeSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "\$\$l${lineNum}_${inst}_${arg1}_$arg2"
+
 
     private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
 
@@ -90,8 +100,8 @@ package net.torvald.terranvm.runtime.compiler.simplec
             "auto","break","case","char","const","continue","default","do","double","else","enum","extern","float",
             "for","goto","if","int","long","register","return","short","signed","static","struct","switch","sizeof", // is an operator
             "typedef","union","unsigned","void","volatile","while",
-            // SimpleC bool
-            "bool","true","false",
+
+
             // SimpleC code blocks
             "forever","repeat"
 
@@ -105,7 +115,8 @@ package net.torvald.terranvm.runtime.compiler.simplec
     )
     private val unsupportedKeywords = hashSetOf(
             "auto","register","signed","unsigned","volatile","static",
-            "extern"
+            "extern",
+            "long", "short", "double", "bool"
     )
     private val operatorsHierarchyInternal = arrayOf(
             // opirator precedence in internal format (#_nameinlowercase)  PUT NO PARENS HERE!   TODO [ ] are allowed? pls chk
@@ -169,7 +180,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
             "register" // not used in SimpleC
     )
     private val varTypes = hashSetOf(
-            "struct", "char", "short", "int", "long", "float", "double", "bool"
+            "struct", "char", "short", "int", "long", "float", "double", "bool", "var", "val"
     )
     private val validFuncPreword = (funcAnnotations + funcTypes).toHashSet()
     private val validVariablePreword = (varAnnotations + varTypes).toHashSet()
@@ -208,6 +219,13 @@ package net.torvald.terranvm.runtime.compiler.simplec
     )
 
 
+    /* Error messages */
+
+    val errorUndeclaredVariable = "Undeclared variable"
+    val errorIncompatibleType = "Incompatible type(s)"
+    val errorRedeclaration = "Redeclaration"
+
+
     fun sizeofPrimitive(type: String) = when (type) {
         "char" -> 1
         "short" -> 2
@@ -219,6 +237,22 @@ package net.torvald.terranvm.runtime.compiler.simplec
         "void" -> 1 // GCC feature
         else -> throw IllegalArgumentException("Unknown primitive type: $type")
     }
+
+
+    private val exprToIR = hashMapOf(
+            "#_declarevar" to "DECLARE",
+            "+" to "ADD",
+            "-" to "SUB",
+            "*" to "MUL",
+            "/" to "DIV",
+
+            "=" to "MOV"
+    )
+
+
+
+
+
 
     // compiler options
     var useDigraph = false
@@ -237,7 +271,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
         this.errorIncompatibles = errorIncompatible
 
 
-        val tree = tokenise(preprocess(program))
+        //val tree = tokenise(preprocess(program))
         TODO()
     }
 
@@ -273,29 +307,46 @@ package net.torvald.terranvm.runtime.compiler.simplec
                 //.replace(regexIndents, "") // must come before regexWhitespaceNoSP
                 //.replace(regexWhitespaceNoSP, "")
 
+        var out = StringBuilder()
+
         if (useTrigraph) {
             trigraphs.forEach { from, to ->
                 program = program.replace(from, to)
             }
         }
 
+        val rules = PreprocessorRules()
 
+
+        // Scan thru line by line (assuming single command per line...?)
         program.lines().forEach {
             if (it.startsWith('#')) {
-                val tokens = it.split(genericTokenSeparator)
-                val cmd = tokens[0]
+                val tokens = it.split(preprocessorTokenSep)
+                val cmd = tokens[0].drop(1).toLowerCase()
 
-                if (!preprocessorKeywords.contains(cmd)) {
-                    throw UndefinedStatement("Preprocessor macro $cmd is not supported.")
+
+                when (cmd) {
+                    "include" -> TODO("Preprocessor keyword 'include'")
+                    "define" -> rules.addDefinition(tokens[1], tokens.subList(2, tokens.size).joinToString(" "))
+                    "undef" -> rules.removeDefinition(tokens[1])
+                    else -> throw UndefinedStatement("Preprocessor macro '$cmd' is not supported.")
                 }
-                else {
-                    TODO()
+            }
+            else {
+                // process each line according to rules
+                var line = it
+                rules.forEachKeywordForTokens { replaceRegex, replaceWord ->
+                    line = line.replace(replaceRegex, " $replaceWord ")
                 }
+
+                out.append("$line\n")
             }
         }
 
 
-        return program
+        println(out.toString())
+
+        return out.toString()
     }
 
     /** No preprocessor should exist at this stage! */
@@ -542,7 +593,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
         // STEP 1. Create a tree //
         ///////////////////////////
 
-        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.VOID, name = "root", isRoot = true, lineNumber = 1)
+        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.NOTHING, name = "root", isRoot = true, lineNumber = 1)
 
         val workingNodes = Stack<SyntaxTreeNode>()
         workingNodes.push(ASTroot)
@@ -591,8 +642,8 @@ package net.torvald.terranvm.runtime.compiler.simplec
         return ASTroot
     }
 
-    fun traverseAST(root: SyntaxTreeNode): String? {
-        // make postfix
+    fun treeToProperNotation(root: SyntaxTreeNode): List<String> {
+        // turn into ASM-ique notation
         // strat:
         //  visitNode() -- ".func; :funcName;"
         //  for each statements: recurse;
@@ -601,73 +652,207 @@ package net.torvald.terranvm.runtime.compiler.simplec
         //  (return)
 
 
-        val pileOfLeaves = Stack<SyntaxTreeNode>()
-        val assembly = StringBuilder()
-        //var currentFunctionDef: CFunction
+        fun SyntaxTreeNode.getReadableNodeName(): String {
+            if (this.name != null && this.literalValue != null) {
+                return ("${this.name} ${this.literalValue}")
+            }
+            else if (this.name != null) {
+                return (this.name ?: "null")
+            }
+            else if (this.literalValue != null) {
+                return (this.literalValue?.toString() ?: "null")
+            }
+            else {
+                throw NullPointerException()
+            }
+        }
+
+
+        val stack = Stack<SyntaxTreeNode>()
+        val testString = StringBuilder()
+        val testProgramOut = ArrayList<String>() // contains all the strings; should be array of strings (with extra info like line number?)
+
 
         fun traverse1(node: SyntaxTreeNode) {
-
             // visit 1
-            when (node.expressionType) {
-                ExpressionType.FUNCTION_DEF -> {
-                    if (funcNameDict.contains(node.name!!)) {
-                        throw DuplicatedDefinition("at line ${node.lineNumber} -- function '${node.name}' already defined")
-                    }
+            node.statements.forEach { traverse1(it) }
+            node.arguments.reversed().forEach { traverse1(it) }
 
-                    currentFunctionDef = CFunction(node.name!!, node.returnType!!)
-                    funcDict.add(currentFunctionDef)
-                    funcNameDict.add(node.name!!)
 
-                    assembly.append(".func;\n:${node.name!!};\n")
+            // test print
+            print(node.getReadableNodeName())
+            println("; ${node.expressionType}")
+
+
+            if (node.isLeaf) {
+                stack.push(node)
+            }
+            else if (node.expressionType == ExpressionType.FUNCTION_CALL) {
+                stack.push(node)
+
+                while (stack.isNotEmpty()) {
+                    testString.append("${stack.pop().getReadableNodeName()}\t")
                 }
-                ExpressionType.FUNCTION_CALL -> {
-                    if (funcNameDict.contains(node.name!!)) {
-                        val args = ArrayList<SyntaxTreeNode>()
-                        repeat(node.arguments.size) { args.add(pileOfLeaves.pop()) }
-                        getFuncByName(node.name!!)!!.call(args.toTypedArray())
+
+                testProgramOut.add("${node.lineNumber}\t$testString")
+                testString.delete(0, testString.length)
+            }
+
+        }
+
+
+
+        traverse1(root)
+
+
+        println("========\n   OP   \n========")
+        testProgramOut.forEach { println(it) }
+        println("========")
+
+
+
+        return testProgramOut
+    }
+
+    /**
+    Intermediate Representation:
+
+    int a; a = 42; would be:
+        DECLARE $a
+        MOV $a, 42
+
+    This will be converted as actual assembly, like:
+        .data;
+            int a;
+            (...)
+        .code:
+            loadwordi r0, 42;
+            storewordimem r0, @a;
+
+     */
+    fun notationToIR(notatedProgram: List<String>): List<IntermediateRepresentation> {
+        fun String.toIRVar() = if (this.matchesNumberLiteral()) this else "$" + this
+
+
+        val IRs = ArrayList<IntermediateRepresentation>()
+        notatedProgram.forEachIndexed { index, it ->
+            val words = it. split('\t')
+            val newcmd = IntermediateRepresentation(words[0].toInt(), exprToIR[words[1]]!!)
+
+            // convert internal notation into IR command
+            when (newcmd.instruction) {
+                "DECLARE" -> {
+                    newcmd.instruction = when (words[3]) {
+                        "int" -> "DECLAREI"
+                        "float" -> "DECLAREF"
+                        else -> "DECLARE"
                     }
-                    else {
-                        throw UnresolvedReference("at line ${node.lineNumber} -- function '${node.name}'")
-                    }
+                    newcmd.arg1 = "$" + words[2]
                 }
-                ExpressionType.FUNC_ARGUMENT_DEF -> {
-                    try {
-                        val arg = if (node.returnType!! == ReturnType.STRUCT || node.returnType == ReturnType.STRUCT_PTR) {
-                            TODO()
-                            //structSearchByName(node)
-                        }
-                        else {
-                            CPrimitive(node.name!!, node.returnType, null)
-                        }
-                    }
-                    catch (e: KotlinNullPointerException) {
-                        throw UnresolvedReference("at line ${node.lineNumber} -- struct '${node.name}' as function argument")
-                    }
+                "MOV" -> {
+                    newcmd.arg1 = words[2].toIRVar()
+                    newcmd.arg2 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
                 }
-                else -> pileOfLeaves.push(node)
+                in VMOpcodesRISC.threeArgsCmd -> {
+                    newcmd.arg2 = words[2].toIRVar()
+                    newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
+                    newcmd.arg1 = makeTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
+                }
             }
 
 
-            node.arguments.forEach { traverse1(it) }
-            node.statements.forEach { traverse1(it) }
+            IRs.add(newcmd)
+        }
 
 
-            // visit 2
-            when (node.expressionType) {
-                ExpressionType.FUNCTION_DEF -> {
-                    assembly.append("return;\n")
+
+        println("========\n   IR   \n========")
+        IRs.forEach { println(it) }
+        println("========")
+
+
+
+        return IRs
+    }
+
+
+    fun preprocessIR(ir: List<IntermediateRepresentation>): List<IntermediateRepresentation> {
+        val newIR = ArrayList<IntermediateRepresentation>()
+
+
+        var i = 0
+        while (i < ir.size) {
+            val it = ir[i]
+            val next = ir.getOrNull(i + 1)
+
+
+            if (next != null) {
+                if (it.arg1 == next.arg2) {
+                    val newIRline = IntermediateRepresentation(next.lineNum, it.instruction, next.arg1, it.arg2, it.arg3)
+                    newIR.add(newIRline)
+                    i++
                 }
+                else {
+                    newIR.add(it)
+                }
+            }
+            else {
+                newIR.add(it)
+            }
 
-                else -> {}
+
+            i++
+        }
+
+
+        println("=========\n  NEWIR  \n=========")
+        newIR.forEach { println(it) }
+        println("=========")
+
+
+        return newIR
+    }
+
+
+    fun IRtoASM(ir: List<IntermediateRepresentation>): List<String> {
+
+
+        fun String.isVar() = this.startsWith('$')
+        fun String.asProperAsmData() = if (this.isVar()) "@${this.drop(1)}" else this
+
+
+        val ASMs = ArrayList<String>()
+        ir.forEachIndexed { index, it ->
+            when (it.instruction) {
+                "MOV" -> {
+                    if (it.arg2!!.isVar()) {
+                        ASMs.add("LOADWORDI r0, ${it.arg2!!.asProperAsmData()}")
+                    }
+                    else {
+                        ASMs.add("LOADWORDI r0, ${it.arg2!!.asProperAsmData()}")
+                    }
+
+
+                    ASMs.add("STOREWORDIMEM r0, ${it.arg1!!.asProperAsmData()}")
+                }
+                in VMOpcodesRISC.threeArgsCmd -> {
+                    ASMs.add("LOADWORDIMEM r0, ${it.arg2!!.asProperAsmData()}")
+                    ASMs.add("LOADWORDIMEM r1, ${it.arg3!!.asProperAsmData()}")
+                    ASMs.add("${it.instruction} r2, r0, r1")
+                    ASMs.add("STOREWORDIMEM r2, ${it.arg1!!.asProperAsmData()}")
+                }
             }
         }
 
 
 
+        println("=========\n   ASM   \n=========")
+        ASMs.forEach { println(it) }
+        println("=========")
 
 
 
-        return null
+        return ASMs
     }
 
 
@@ -678,10 +863,10 @@ package net.torvald.terranvm.runtime.compiler.simplec
     ///////////////////////////////////////////////////
 
     fun resolveTypeString(type: String, isPointer: Boolean = false): ReturnType {
-        val isPointer = type.endsWith('*') or type.endsWith("_ptr") or isPointer
+        /*val isPointer = type.endsWith('*') or type.endsWith("_ptr") or isPointer
 
         return when (type) {
-            "void" -> if (isPointer) ReturnType.VOID_PTR else ReturnType.VOID
+            "void" -> if (isPointer) ReturnType.NOTHING_PTR else ReturnType.NOTHING
             "char" -> if (isPointer) ReturnType.CHAR_PTR else ReturnType.CHAR
             "short" -> if (isPointer) ReturnType.SHORT_PTR else ReturnType.SHORT
             "int" -> if (isPointer) ReturnType.INT_PTR else ReturnType.INT
@@ -690,6 +875,10 @@ package net.torvald.terranvm.runtime.compiler.simplec
             "double" -> if (isPointer) ReturnType.DOUBLE_PTR else ReturnType.DOUBLE
             "bool" -> if (isPointer) ReturnType.BOOL_PTR else ReturnType.BOOL
             else -> if (isPointer) ReturnType.STRUCT_PTR else ReturnType.STRUCT
+        }*/
+        return when (type) {
+            "void" -> ReturnType.NOTHING
+            else -> ReturnType.SOMETHING
         }
     }
 
@@ -788,9 +977,9 @@ package net.torvald.terranvm.runtime.compiler.simplec
 
 
             val funcDefNode = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, returnType, funcName, lineNumber)
-            if (returnType == ReturnType.STRUCT || returnType == ReturnType.STRUCT_PTR) {
-                funcDefNode.structName = actualFuncType
-            }
+            //if (returnType == ReturnType.STRUCT || returnType == ReturnType.STRUCT_PTR) {
+            //    funcDefNode.structName = actualFuncType
+            //}
 
             argTypeNamePair.forEach { val (type, name) = it
                 // TODO struct and structName
@@ -889,13 +1078,13 @@ package net.torvald.terranvm.runtime.compiler.simplec
 
                 // filtered String literals
                 if (word.startsWith('"') && word.endsWith('"')) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null, lineNumber)
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.DATABASE, null, lineNumber)
                     leafNode.literalValue = tokens[0].substring(1, tokens[0].lastIndex) + nullchar
                     return leafNode
                 }
                 // bool literals
                 else if (word.matches(regexBooleanWhole)) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.BOOL, null, lineNumber)
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.SOMETHING, null, lineNumber)
                     leafNode.literalValue = word == "true"
                     return leafNode
                 }
@@ -904,7 +1093,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            ReturnType.SOMETHING,
                             null, lineNumber
                     )
                     try {
@@ -924,7 +1113,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            ReturnType.SOMETHING,
                             null, lineNumber
                     )
                     try {
@@ -944,7 +1133,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            ReturnType.SOMETHING,
                             null, lineNumber
                     )
                     try {
@@ -964,7 +1153,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            if (isLong) ReturnType.LONG else ReturnType.INT,
+                            ReturnType.SOMETHING,
                             null, lineNumber
                     )
                     try {
@@ -983,7 +1172,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
                 else if (word.matches(regexFPWhole)) {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            ReturnType.DOUBLE, // DOUBLE used for SimpleC  //if (word.endsWith('F', true)) ReturnType.FLOAT else ReturnType.DOUBLE,
+                            ReturnType.SOMETHING,
                             null, lineNumber
                     )
                     try {
@@ -1068,7 +1257,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
 
                             //#_assignvar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype, SyntaxTreeNode value)
 
-                            val returnNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.VOID, "#_assignvar", lineNumber)
+                            val returnNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.NOTHING, "#_assignvar", lineNumber)
                             returnNode.addArgument(tokensWithoutType.first().toRawTreeNode(lineNumber))
                             returnNode.addArgument(typeStr.toRawTreeNode(lineNumber))
                             returnNode.addArgument(infixNode)
@@ -1078,7 +1267,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
                         else {
                             // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
 
-                            val leafNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.VOID, "#_declarevar", lineNumber)
+                            val leafNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.NOTHING, "#_declarevar", lineNumber)
                             leafNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
                             leafNode.addArgument(tokens[0].toRawTreeNode(lineNumber))
 
@@ -1255,9 +1444,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
             val lines = arrayListOf(
                     header,
                     "│ ".repeat(depth+1) + "ExprType : $expressionType",
-                    "│ ".repeat(depth+1) + "RetnType : $returnType" +
-                            if (returnType == ReturnType.STRUCT_PTR || returnType == ReturnType.STRUCT) " '$structName'"
-                            else "",
+                    "│ ".repeat(depth+1) + "RetnType : $returnType",
                     "│ ".repeat(depth+1) + "LiteralV : '$literalValue'"
             )
 
@@ -1281,7 +1468,7 @@ package net.torvald.terranvm.runtime.compiler.simplec
     }
 
     private fun String.toRawTreeNode(lineNumber: Int): SyntaxTreeNode {
-        val node = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.CHAR_PTR, null, lineNumber)
+        val node = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.DATABASE, null, lineNumber)
         node.literalValue = this
         return node
     }
@@ -1300,14 +1487,55 @@ package net.torvald.terranvm.runtime.compiler.simplec
         VARIABLE_LEAF // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
     }
     enum class ReturnType {
-        VOID, BOOL, CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, STRUCT,
-        VOID_PTR, BOOL_PTR, CHAR_PTR, SHORT_PTR, INT_PTR, LONG_PTR, FLOAT_PTR, DOUBLE_PTR, STRUCT_PTR,
-
-        VARARG, ANY
+        NOTHING, // null
+        SOMETHING, // any var/val
+        DATABASE // array of bytes, also could be String
     }
 
 
-}*/
+    class PreprocessorRules {
+        private val kwdRetPair = HashMap<String, String>()
+
+        fun addDefinition(keyword: String, ret: String) {
+            kwdRetPair[keyword] = ret
+        }
+        fun removeDefinition(keyword: String) {
+            kwdRetPair.remove(keyword)
+        }
+        fun forEachKeywordForTokens(action: (String, String) -> Unit) {
+            kwdRetPair.forEach { key, value ->
+                action("""[ \t\n]+""" + key + """(?=[ \t\n;]+)""", value)
+            }
+        }
+    }
+
+    /**
+     * Notation rules:
+     * - Variable: prepend with '$' (e.g. $duplicantsCount)
+     * - Register: prepend with 'r' (e.g. r3)
+     */
+    data class IntermediateRepresentation(
+            var lineNum: Int,
+            var instruction: String = "DUMMY",
+            var arg1: String? = null,
+            var arg2: String? = null,
+            var arg3: String? = null,
+            var arg4: String? = null,
+            var arg5: String? = null
+    ) {
+        override fun toString(): String {
+            val sb = StringBuilder()
+            sb.append(instruction)
+            arg1?.let { sb.append(" $it") }
+            arg2?.let { sb.append(", $it") }
+            arg3?.let { sb.append(", $it") }
+            arg4?.let { sb.append(", $it") }
+            arg5?.let { sb.append(", $it") }
+            sb.append(" (at line $lineNum);")
+            return sb.toString()
+        }
+    }
+}
 
 open class SyntaxError(msg: String? = null) : Exception(msg)
 class IllegalTokenException(msg: String? = null) : SyntaxError(msg)

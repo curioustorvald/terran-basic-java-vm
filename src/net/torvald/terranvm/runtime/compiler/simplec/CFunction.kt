@@ -4,7 +4,11 @@ package net.torvald.terranvm.runtime.compiler.simplec
  * Created by minjaesong on 2017-06-15.
  */
 
-abstract class CFunction(val name: String, val argCount: Int)
+class CFunction(val name: String, val returnType: SimpleC.ReturnType) {
+    fun call(args: Array<SimpleC.SyntaxTreeNode>) {
+
+    }
+}
 
 
 /*abstract class CBuiltinFunction(name: String, argCount: Int) : CFunction(name, argCount) {

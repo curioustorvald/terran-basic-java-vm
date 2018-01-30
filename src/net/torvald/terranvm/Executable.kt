@@ -1,17 +1,30 @@
 package net.torvald.terranvm
 
 import net.torvald.terranvm.runtime.*
+import net.torvald.terranvm.runtime.compiler.simplec.SimpleC
 
 /**
  * Created by minjaesong on 2017-05-25.
  */
 object Executable {
 
-    val vm = TerranVM(2048, tbasic_remove_string_dupes = true)
+    val testProgram = """
+        float x;
+        float y;
+        float z;
+
+        x = 255;
+        y = 69;
+        z = x - y;
+    """.trimIndent()
 
 
     fun main() {
-
+        val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
+        val notatedProgram = SimpleC.treeToProperNotation(program)
+        val programInIR = SimpleC.notationToIR(notatedProgram)
+        val programInNewIR = SimpleC.preprocessIR(programInIR)
+        val programASM = SimpleC.IRtoASM(programInNewIR)
     }
 
 
