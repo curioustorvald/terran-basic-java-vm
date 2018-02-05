@@ -71,7 +71,7 @@ class TextOnly : Game() {
         println(program)
 
         val notatedProgram = SimpleC.treeToProperNotation(program)
-        //val programInIR = SimpleC.notationToIR(notatedProgram)
+        val programInIR = SimpleC.notationToIR(notatedProgram)
         //val programInNewIR = SimpleC.preprocessIR(programInIR)
         //val programASM = SimpleC.IRtoASM(programInNewIR)
         //val code = Assembler(programASM.joinToString("\n"))

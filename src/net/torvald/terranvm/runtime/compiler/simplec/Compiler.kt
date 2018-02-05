@@ -69,7 +69,7 @@ object SimpleC {
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
     private fun makeTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
-    private fun makeSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "\$\$l${lineNum}_${inst}_${arg1}_$arg2"
+    private fun makeSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_${arg2}_\$l$lineNum"
 
 
     private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
@@ -125,7 +125,7 @@ object SimpleC {
             hashSetOf("#_preinc","#_predec","#_unaryplus","#_unaryminus","!","~","#_ptrderef","#_addressof","sizeof","(char *)","(short *)","(int *)","(long *)","(float *)","(double *)","(bool *)","(void *)", "(char)","(short)","(int)","(long)","(float)","(double)","(bool)"),
             hashSetOf("*","/","%"),
             hashSetOf("+","-"),
-            hashSetOf("<<",">>"),
+            hashSetOf("<<",">>",">>>"),
             hashSetOf("<","<=",">",">="),
             hashSetOf("==","!="),
             hashSetOf("&"),
@@ -245,8 +245,22 @@ object SimpleC {
             "-" to "SUB",
             "*" to "MUL",
             "/" to "DIV",
+            "<<" to "SHL",
+            ">>" to "SHR",
+            ">>>" to "USHR",
 
-            "=" to "MOV"
+            "=" to "MOV",
+
+            "==" to "ISEQ",
+            "!=" to "ISNEQ",
+            ">" to "ISGT",
+            "<" to "ISLS",
+            ">=" to "ISGTEQ",
+            "<=" to "ISLSEQ",
+
+            "if" to "IF",
+            "else" to "ELSE",
+            "endif" to "ENDIF"
     )
 
 
@@ -697,7 +711,7 @@ object SimpleC {
                 testString.delete(0, testString.length)
             }
 
-            
+
             node.statements.forEach { traverse1(it) }
 
         }
@@ -737,9 +751,21 @@ object SimpleC {
 
 
         val IRs = ArrayList<IntermediateRepresentation>()
+        val nestedStatementsCommonLabelName = Stack<String>()
+
         notatedProgram.forEachIndexed { index, it ->
             val words = it. split('\t')
-            val newcmd = IntermediateRepresentation(words[0].toInt(), exprToIR[words[1]]!!)
+
+            val lineNumber = words[0].toInt()
+
+            val newcmds = ArrayList<IntermediateRepresentation>()
+            newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]] ?: throw NullPointerException("Unknown expression: '${words[1]}'")))
+            val newcmd = newcmds[0]
+
+            fun addNextNewCmd() {
+                newcmds.add(IntermediateRepresentation(lineNumber))
+            }
+
 
             // convert internal notation into IR command
             when (newcmd.instruction) {
@@ -760,10 +786,73 @@ object SimpleC {
                     newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
                     newcmd.arg1 = makeTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
                 }
+                "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
+                    newcmd.arg1 = words[2].toIRVar()
+                    newcmd.arg2 = words[3].toIRVar()
+                    nestedStatementsCommonLabelName.add(
+                            makeSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", words[2].toIRVar(), words[3].toIRVar())
+                    )
+
+                    // test
+                    println(nestedStatementsCommonLabelName.peek())
+                }
+                "IF" -> {
+                    val sourceExpr = nestedStatementsCommonLabelName.peek() // $$IFISEQ_42_$x_$l5
+                    val sourceCmpCmd = sourceExpr.split('_')[0].drop(4)
+
+                    repeat(3) { addNextNewCmd() }
+                    val newcmd2 = newcmds[1] // jump
+                    val newcmd3 = newcmds[2] // jump
+                    val newcmd4 = newcmds[3] // label for IF_TRUE
+
+                    when (sourceCmpCmd) {
+                        "ISEQ" -> {
+                            newcmd.instruction = "JZ"
+                            newcmd.arg1 = "${sourceExpr}_TRUE"
+
+                            newcmd2.instruction = "JNZ"
+                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+
+                            newcmd3.instruction = "NOP"
+                        }
+                        "ISNEQ" -> {
+                            newcmd.instruction = "JZ"
+                            newcmd.arg1 = "${sourceExpr}_FALSE"
+
+                            newcmd2.instruction = "JNZ"
+                            newcmd2.arg1 = "${sourceExpr}_TRUE"
+
+                            newcmd3.instruction = "NOP"
+                        }
+                        else -> throw InternalError("Unknown comparison operator: $sourceCmpCmd")
+                    }
+
+
+                    newcmd4.instruction = "LABEL"
+                    newcmd4.arg1 = "${sourceExpr}_TRUE"
+                }
+                "ELSE" -> {
+                    val sourceExpr = nestedStatementsCommonLabelName.peek() // $$IFISEQ_42_$x_$l5
+
+                    addNextNewCmd()
+                    val newcmd2 = newcmds[1] // label for IF_FALSE
+
+                    newcmd.instruction = "JMP"
+                    newcmd.arg1 = "${sourceExpr}_EXIT" // ENDIF
+
+                    newcmd2.instruction = "LABEL"
+                    newcmd2.arg1 = "${sourceExpr}_FALSE"
+                }
+                "ENDIF" -> {
+                    val sourceExpr = nestedStatementsCommonLabelName.pop() // POP DA FUGGER
+
+                    newcmd.instruction = "LABEL"
+                    newcmd.arg1 = "${sourceExpr}_EXIT"
+                }
             }
 
 
-            IRs.add(newcmd)
+            newcmds.forEach { IRs.add(it) }
         }
 
 
