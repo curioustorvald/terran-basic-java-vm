@@ -180,8 +180,8 @@ object Assembler {
             "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
 
             "LOADWORDI"  to 0b0001_000_000110_0000000000000000,
-            "LOADWORDILO"  to 0b0001_000_000110_0000000000000000,
-            "LOADWORDIHI"  to 0b0001_000_000111_0000000000000000,
+            "LOADWORDILO"  to 0b0001_000_000110_0000000000000000, // used in Int.toReadableOpcode()
+            "LOADWORDIHI"  to 0b0001_000_000111_0000000000000000, // used in Int.toReadableOpcode()
 
             // Load and Store a word from register to memory //
 
@@ -406,40 +406,48 @@ object Assembler {
         }
 
         var resultingOpcode = opcodes[cmd]!!
-        val arguments = getOpArgs(resultingOpcode)
 
-        // check if user had provided right number of arguments
-        if (words.size != arguments.length + 1) {
-            throw IllegalArgumentException("Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1}")
+
+        if (line == "NOP") {
+            return assemblyToOpcode("MOV r1, r1")
         }
+        else {
 
-        // for each arguments the operation requires... (e.g. "rrr", "rb")
-        arguments.forEachIndexed { index, c ->
-            val word = words[index + 1]
+            val arguments = getOpArgs(resultingOpcode)
 
-            if (c == 'f') { // 'f' is only used for LOADWORDI (arg: rf), which outputs TWO opcodes
-                val fullword = word.toFloatOrNull()?.toRawBits() ?: word.resolveInt()
-                val lowhalf = fullword.and(0xFFFF)
-                val highhalf = fullword.ushr(16)
-
-                val loadwordiOp = intArrayOf(resultingOpcode, resultingOpcode or 0x10000)
-                loadwordiOp[0] = loadwordiOp[0] or lowhalf
-                loadwordiOp[1] = loadwordiOp[1] or highhalf
-
-
-                debug("$line\t-> ${loadwordiOp[0].toReadableBin()}")
-                debug("$line\t-> ${loadwordiOp[1].toReadableBin()}")
-
-
-                return loadwordiOp
+            // check if user had provided right number of arguments
+            if (words.size != arguments.length + 1) {
+                throw IllegalArgumentException("Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1}")
             }
-            else {
-                resultingOpcode = resultingOpcode or when (c) {
-                    'r' -> word.toRegInt().shl(22 - 3 * index)
-                    'b' -> word.resolveInt().and(0xFF)
-                    'w' -> word.resolveInt().and(0xFFFF)
-                    'a' -> word.resolveInt().and(0x3FFFFF)
-                    else -> throw IllegalArgumentException("Unknown argument type: $c")
+
+            // for each arguments the operation requires... (e.g. "rrr", "rb")
+            arguments.forEachIndexed { index, c ->
+                val word = words[index + 1]
+
+                if (c == 'f') { // 'f' is only used for LOADWORDI (arg: rf), which outputs TWO opcodes
+                    val fullword = word.toFloatOrNull()?.toRawBits() ?: word.resolveInt()
+                    val lowhalf = fullword.and(0xFFFF)
+                    val highhalf = fullword.ushr(16)
+
+                    val loadwordiOp = intArrayOf(resultingOpcode, resultingOpcode or 0x10000)
+                    loadwordiOp[0] = loadwordiOp[0] or lowhalf
+                    loadwordiOp[1] = loadwordiOp[1] or highhalf
+
+
+                    debug("$line\t-> ${loadwordiOp[0].toReadableBin()}")
+                    debug("$line\t-> ${loadwordiOp[1].toReadableBin()}")
+
+
+                    return loadwordiOp
+                }
+                else {
+                    resultingOpcode = resultingOpcode or when (c) {
+                        'r' -> word.toRegInt().shl(22 - 3 * index)
+                        'b' -> word.resolveInt().and(0xFF)
+                        'w' -> word.resolveInt().and(0xFFFF)
+                        'a' -> word.resolveInt().and(0x3FFFFF)
+                        else -> throw IllegalArgumentException("Unknown argument type: $c")
+                    }
                 }
             }
         }

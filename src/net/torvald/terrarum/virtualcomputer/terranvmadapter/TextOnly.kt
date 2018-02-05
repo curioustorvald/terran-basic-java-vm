@@ -35,7 +35,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 100
+        val vmDelay = 200
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -85,6 +85,23 @@ loadwordi r3, ffcc00ffh;
         val programInNewIR = SimpleC.preprocessIR(programInIR)
         val programASM = SimpleC.IRtoASM(programInNewIR)
         val code = Assembler(programASM.joinToString("\n"))
+
+
+        val testProgramTest = Assembler("""
+            JMP 00000014h;
+            NOP;
+            NOP;
+            NOP;
+            LOADWORDI r1, 42C80000h;
+            STOREWORDIMEM r1, 00000011h;
+            LOADWORDI r1, 428A0000h;
+            STOREWORDIMEM r1, 00000012h;
+            LOADWORDIMEM r1, 00000011h;
+            LOADWORDIMEM r2, 00000012h;
+            ADD r3, r1, r2;
+            STOREWORDIMEM r3, 00000013h;
+            HALT;
+        """.trimIndent())
 
 
         vm.loadProgram(code)

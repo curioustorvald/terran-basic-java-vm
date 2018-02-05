@@ -223,7 +223,7 @@ object VMOpcodesRISC {
     fun LOADWORD(dest: Register, src: Register, peri: Register) {
         val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
         val index = vm.readregInt(src)
-        vm.writeregInt(dest, memspace[index].toUint() or memspace[index + 1].toUint().shl(8) or memspace[index + 1].toUint().shl(16) or memspace[index + 1].toUint().shl(24))
+        vm.writeregInt(dest, memspace[index].toUint() or memspace[index + 1].toUint().shl(8) or memspace[index + 2].toUint().shl(16) or memspace[index + 3].toUint().shl(24))
     }
     /**
      * @param dest register that holds the memory address where the read value goes
@@ -300,14 +300,14 @@ object VMOpcodesRISC {
     }
     fun LOADWORDIMEM(dest: Register, offset: Int) {
         val index = offset shl 2
-        vm.writeregInt(dest, vm.memory[index].toUint() or vm.memory[index + 1].toUint().shl(8) or vm.memory[index + 1].toUint().shl(16) or vm.memory[index + 1].toUint().shl(24))
+        vm.writeregInt(dest, vm.memory[index].toUint() or vm.memory[index + 1].toUint().shl(8) or vm.memory[index + 2].toUint().shl(16) or vm.memory[index + 3].toUint().shl(24))
     }
     fun STOREWORDIMEM(dest: Register, offset: Int) {
         val index = offset shl 2
         vm.memory[index] = vm.readregInt(dest).and(0xFF).toByte()
-        vm.memory[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF00).toByte()
-        vm.memory[index + 2] = vm.readregInt(dest).ushr(16).and(0xFF00).toByte()
-        vm.memory[index + 3] = vm.readregInt(dest).ushr(24).and(0xFF00).toByte()
+        vm.memory[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF).toByte()
+        vm.memory[index + 2] = vm.readregInt(dest).ushr(16).and(0xFF).toByte()
+        vm.memory[index + 3] = vm.readregInt(dest).ushr(24).and(0xFF).toByte()
     }
     fun PUSH(dest: Register) {
         if (vm.sp < vm.callStack.size)
