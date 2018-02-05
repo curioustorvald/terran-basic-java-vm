@@ -25,6 +25,28 @@ object Executable {
         val programInIR = SimpleC.notationToIR(notatedProgram)
         val programInNewIR = SimpleC.preprocessIR(programInIR)
         val programASM = SimpleC.IRtoASM(programInNewIR)
+        val code = Assembler(programASM.joinToString("\n"))
+
+
+        val vm = TerranVM(1024)
+        vm.loadProgram(code)
+
+
+        // test print mem
+        for (i in 64..255 step 4) {
+            val opcode = vm.memory[i].toUint() or
+                    vm.memory[i + 1].toUint().shl(8) or
+                    vm.memory[i + 2].toUint().shl(16) or
+                    vm.memory[i + 3].toUint().shl(24)
+
+            println("${i.toString().padStart(4, '0')}  ${opcode.toReadableBin()}")
+        }
+
+
+
+
+
+        vm.execute()
     }
 
 

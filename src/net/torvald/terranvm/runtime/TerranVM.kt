@@ -27,7 +27,7 @@ class TerranVM(memSize: Int,
          // following is an options for TerranVM's micro operation system
                val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC TODO: turning this on makes it run faster?!
 ) : Runnable {
-    private val DEBUG = false
+    private val DEBUG = true
     private val ERROR = true
 
     class Pointer(val parent: TerranVM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
@@ -367,14 +367,14 @@ class TerranVM(memSize: Int,
 
     fun writeregFloat(register: Int, data: Float) {
         when (register) {
-            1 -> r1 = java.lang.Float.floatToIntBits(data)
-            2 -> r2 = java.lang.Float.floatToIntBits(data)
-            3 -> r3 = java.lang.Float.floatToIntBits(data)
-            4 -> r4 = java.lang.Float.floatToIntBits(data)
-            5 -> r5 = java.lang.Float.floatToIntBits(data)
-            6 -> r6 = java.lang.Float.floatToIntBits(data)
-            7 -> r7 = java.lang.Float.floatToIntBits(data)
-            8 -> r8 = java.lang.Float.floatToIntBits(data)
+            1 -> r1 = data.toRawBits()
+            2 -> r2 = data.toRawBits()
+            3 -> r3 = data.toRawBits()
+            4 -> r4 = data.toRawBits()
+            5 -> r5 = data.toRawBits()
+            6 -> r6 = data.toRawBits()
+            7 -> r7 = data.toRawBits()
+            8 -> r8 = data.toRawBits()
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
@@ -403,14 +403,14 @@ class TerranVM(memSize: Int,
         else -> throw IllegalArgumentException("No such register: r$register")
     }
     fun readregFloat(register: Int) = when (register) {
-        1 -> r1.toFloat()
-        2 -> r2.toFloat()
-        3 -> r3.toFloat()
-        4 -> r4.toFloat()
-        5 -> r5.toFloat()
-        6 -> r6.toFloat()
-        7 -> r7.toFloat()
-        8 -> r8.toFloat()
+        1 -> java.lang.Float.intBitsToFloat(r1)
+        2 -> java.lang.Float.intBitsToFloat(r2)
+        3 -> java.lang.Float.intBitsToFloat(r3)
+        4 -> java.lang.Float.intBitsToFloat(r4)
+        5 -> java.lang.Float.intBitsToFloat(r5)
+        6 -> java.lang.Float.intBitsToFloat(r6)
+        7 -> java.lang.Float.intBitsToFloat(r7)
+        8 -> java.lang.Float.intBitsToFloat(r8)
         else -> throw IllegalArgumentException("No such register: r$register")
     }
 
@@ -610,9 +610,13 @@ MTHFU
 
     val lock = java.lang.Object()
 
-    val pcHex: String; get() = pc.toString(16) + "h"
+    val pcHex: String; get() = pc.toLong().and(0xffffffff).toString(16).toUpperCase() + "h"
+
+    //private var runcnt = 0
 
     fun execute() {
+
+        execDebugMain("Execution stanted; PC: $pcHex")
 
         if (userSpaceStart != null) {
 
@@ -621,8 +625,12 @@ MTHFU
 
 
             while (!terminate) {
-                //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
+                //if (DEBUG && runcnt >= 500) break
+                //runcnt++
 
+
+
+                //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
 
 
                 if (pc >= memory.size) {
@@ -638,6 +646,9 @@ MTHFU
 
 
                 var opcode = memory[pc].toUint() or memory[pc + 1].toUint().shl(8) or memory[pc + 2].toUint().shl(16) or memory[pc + 3].toUint().shl(24)
+
+
+                execDebugMain("pc: $pcHex; opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
 
 
                 // execute
@@ -747,6 +758,8 @@ MTHFU
 
 fun Int.KB() = this shl 10
 fun Int.MB() = this shl 20
+
+fun Int.to8HexString() = this.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase() + "h"
 
 /** Turn string into byte array with null terminator */
 fun String.toCString() = this.toByteArray(TerranVM.charset) + 0

@@ -1,6 +1,7 @@
 package net.torvald.terrarum.virtualcomputer.terranvmadapter
 
 import net.torvald.terranvm.runtime.TerranVM
+import net.torvald.terranvm.runtime.to8HexString
 import net.torvald.terranvm.runtime.toUint
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -18,6 +19,8 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
     var columns = 16
 
+
+
     fun composeMemText() {
         val sb = StringBuilder()
 
@@ -33,13 +36,13 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
             val rF = vm.readregFloat(r)
 
             sb.append("r$r: " +
-                    "${rI.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase()}h; " +
+                    "${rI.to8HexString()}; " +
                     "$rI; ${rF}f\n"
             )
         }
 
         sb.append("rCMP: " +
-                "${vm.rCMP.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase()}h; " +
+                "${vm.rCMP.to8HexString()}; " +
                 "${vm.rCMP}\n"
         )
 
@@ -83,7 +86,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         // stack
         sb.append("stack size: ${vm.sp}/${vm.callStack.size}\n")
         for (i in 0 until vm.sp) {
-            sb.append("s${i.toString().padStart(4, '0')} : ${vm.callStack[i].toInt().toString(16).padStart(8, '0').toUpperCase()}h\n")
+            sb.append("s${i.toString().padStart(4, '0')} : ${vm.callStack[i].to8HexString()}\n")
         }
 
 

@@ -642,7 +642,7 @@ object SimpleC {
         return ASTroot
     }
 
-    fun treeToProperNotation(root: SyntaxTreeNode): List<String> {
+    fun treeToProperNotation(root: SyntaxTreeNode): MutableList<String> {
         // turn into ASM-ique notation
         // strat:
         //  visitNode() -- ".func; :funcName;"
@@ -726,11 +726,11 @@ object SimpleC {
             int a;
             (...)
         .code:
-            loadwordi r0, 42;
-            storewordimem r0, @a;
+            loadwordi r1, 42;
+            storewordimem r1, @a;
 
      */
-    fun notationToIR(notatedProgram: List<String>): List<IntermediateRepresentation> {
+    fun notationToIR(notatedProgram: MutableList<String>): MutableList<IntermediateRepresentation> {
         fun String.toIRVar() = if (this.matchesNumberLiteral()) this else "$" + this
 
 
@@ -776,7 +776,29 @@ object SimpleC {
     }
 
 
-    fun preprocessIR(ir: List<IntermediateRepresentation>): List<IntermediateRepresentation> {
+    fun preprocessIR(initialIR: MutableList<IntermediateRepresentation>): MutableList<IntermediateRepresentation> {
+        val irDeclaresOnly = ArrayList<IntermediateRepresentation>()
+        // copy DECLAREs into the new 'ir'
+        initialIR.forEach {
+            if (it.instruction.startsWith("DECLARE")) {
+                irDeclaresOnly.add(it)
+            }
+        }
+        // remove all the DECLAREs from the copied initialIR
+        initialIR.removeAll { it.instruction.startsWith("DECLARE") }
+
+
+        // define our new IR list that has all the DECLARES at its head
+        val ir = irDeclaresOnly + initialIR
+
+
+        // TODO: do I need to declare temporary variables that exist in un-processed IRs?
+
+
+        // test print
+        println(ir)
+
+
         val newIR = ArrayList<IntermediateRepresentation>()
 
 
@@ -814,7 +836,10 @@ object SimpleC {
     }
 
 
-    fun IRtoASM(ir: List<IntermediateRepresentation>): List<String> {
+    /**
+     * All the DECLAREs are expected to be at the head of the list
+     */
+    fun IRtoASM(ir: MutableList<IntermediateRepresentation>): List<String> {
 
 
         fun String.isVar() = this.startsWith('$')
@@ -822,28 +847,65 @@ object SimpleC {
 
 
         val ASMs = ArrayList<String>()
+
+
+        val irDeclares = ir.filter { it.instruction.startsWith("DECLARE") }
+        // remove DECLAREs from the 'ir' list
+        ir.removeAll { it.instruction.startsWith("DECLARE") }
+
+
+        ASMs.add(".data;")
+
+        irDeclares.forEach {
+            when (it.instruction) {
+                "DECLAREI" -> {
+                    ASMs.add("INT ${it.arg1!!.drop(1)} 0;")
+                }
+                "DECLAREF" -> {
+                    ASMs.add("FLOAT ${it.arg1!!.drop(1)} 0.0;")
+                }
+                else -> TODO("Other declaration types (e.g. STRING, BYTES)")
+            }
+        }
+
+        ASMs.add(".code;")
+
         ir.forEachIndexed { index, it ->
             when (it.instruction) {
                 "MOV" -> {
                     if (it.arg2!!.isVar()) {
-                        ASMs.add("LOADWORDI r0, ${it.arg2!!.asProperAsmData()}")
+                        ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
                     }
                     else {
-                        ASMs.add("LOADWORDI r0, ${it.arg2!!.asProperAsmData()}")
+                        ASMs.add("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
                     }
 
 
-                    ASMs.add("STOREWORDIMEM r0, ${it.arg1!!.asProperAsmData()}")
+                    ASMs.add("STOREWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
-                    ASMs.add("LOADWORDIMEM r0, ${it.arg2!!.asProperAsmData()}")
-                    ASMs.add("LOADWORDIMEM r1, ${it.arg3!!.asProperAsmData()}")
-                    ASMs.add("${it.instruction} r2, r0, r1")
-                    ASMs.add("STOREWORDIMEM r2, ${it.arg1!!.asProperAsmData()}")
+                    if (it.arg2!!.isVar()) {
+                        ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
+                    }
+                    else {
+                        ASMs.add("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
+                    }
+
+                    if (it.arg3!!.isVar()) {
+                        ASMs.add("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
+                    }
+                    else {
+                        ASMs.add("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
+                    }
+
+
+                    ASMs.add("${it.instruction} r3, r1, r2;")
+                    ASMs.add("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
                 }
             }
         }
 
+        ASMs.add("HALT;")
 
 
         println("=========\n   ASM   \n=========")

@@ -1,15 +1,128 @@
 package net.torvald.terranvm
 
-import net.torvald.terranvm.runtime.TerranVM
-import net.torvald.terranvm.runtime.toLittleLong
-import net.torvald.terranvm.runtime.toUint
+import net.torvald.terranvm.runtime.*
 import java.util.*
 
 
 //typealias Register = Int
 
 
+fun Int.toReadableBin() =
+        this.ushr(29).toString(2).padStart(3, '0') + "_" +
+        this.ushr(25).and(0b1111).toString(2).padStart(4, '0') + "_" +
+                this.ushr(22).and(0b111).toString(2).padStart(3, '0') + "_" +
+                this.ushr(16).and(0x3F).toString(2).padStart(6, '0') + "_" +
+                this.and(0xFFFF).toString(2).padStart(16, '0')
+
+
 /**
+ * Conducts linear search for the hashmap for a value, returns matching key if found, null otherwise.
+ *
+ * Will not work if multiple keys are pointing to the same value.
+ *
+ * @param value value to search for in the hashmap
+ * @return matching key for the value parameter, `null` if not found
+ */
+fun HashMap<out Any, out Any>.searchFor(value: Any): Any? {
+    var ret: Any? = null
+
+    this.forEach { k, v ->
+        if (v == value) ret = k
+    }
+
+    return ret
+}
+
+
+fun Int.toReadableOpcode(): String {
+    val Rd = this.and(0b00000001110000000000000000000000).ushr(22) + 1
+    val Rs = this.and(0b00000000001110000000000000000000).ushr(19) + 1
+    val Rm = this.and(0b00000000000001110000000000000000).ushr(16) + 1
+    val R4 = this.and(0b00000000000000001110000000000000).ushr(13) + 1
+    val R5 = this.and(0b00000000000000000001110000000000).ushr(10) + 1
+    val regArray = arrayOf(Rd, Rs, Rm, R4, R5)
+    val cond = when (this.ushr(29)) {
+        0 -> ""
+        1 -> "Z"
+        2 -> "NZ"
+        3 -> "GT"
+        4 -> "LS"
+        // JMP only
+        5 -> "FW"
+        6 -> "BW"
+        else -> throw NullPointerException("Illegal condition: ${this.ushr(29)}")
+    }
+
+    val mode = this.and(0b00011110000000000000000000000000).ushr(25)
+
+    var opString = when (mode) {
+        0 -> {
+            Assembler.opcodes.searchFor(this.and(0b1111111)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+        }
+        1 -> {
+            Assembler.opcodes.searchFor(1.shl(25) or this.ushr(16).and(0b111).shl(16)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+        }
+        2 -> "LOADWORDIMEM"
+        3 -> "STOREWORDIMEM"
+        4 -> "PUSH"
+        5 -> "POP"
+        6 -> "PUSHWORDI"
+        7 -> "POPWORDI"
+        8 -> if (cond.isEmpty()) "JMP" else "J"
+        9 -> if (Rs == 0) "SETBANK" else "INQFEATURE"
+        15 -> {
+            if (this.and(0x100) == 0) {
+                "CALL"
+            }
+            else {
+                if (this.and(0x1FFFFF00) == 0x1FFFFF00) {
+                    "INT"
+                }
+                else if (this.and(0xFF) == 0xFF) {
+                    "UPTIME"
+                }
+                else {
+                    "MEMSIZE"
+                }
+            }
+        }
+        else -> throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+    }
+
+    // manual replace
+    if (opString == "LOADWORDI") opString = "LOADWORDILO"
+
+
+    val argInfo = Assembler.getOpArgs(this)
+    val args = Array(5, { "" })
+    val argStr = StringBuilder()
+
+    argInfo.forEachIndexed { index, c ->
+        when (c) {
+            'r' -> args[index] = "r${regArray[index]}"
+            'a' -> args[index] = this.and(0x3FFFFF).to8HexString()
+            'b' -> args[index] = this.and(0xFF).to8HexString().drop(6)
+            'w', 'f' -> args[index] = this.and(0xFFFF).to8HexString().drop(4)
+
+        }
+    }
+
+
+    args.forEachIndexed { index, s ->
+        if (index == 0) {
+            argStr.append(" $s")
+        }
+        else if (s.isNotEmpty()) {
+            argStr.append(", $s")
+        }
+    }
+
+
+    return "$opString$argStr"
+}
+
+
+                /**
  * Created by minjaesong on 2017-12-27.
  */
 object VMOpcodesRISC {
@@ -353,7 +466,7 @@ object VMOpcodesRISC {
                 val byte = opcode.and(0xFF)
                 val halfword = opcode.and(0xFFFF)
 
-                when (opcode.and(0b1100000000000000000).ushr(16)) {
+                when (opcode.and(0b1100000000000000000).ushr(17)) {
                     // Compare
                     0 -> CMP(Rd, Rs, opcode.and(0b11))
                     // Load and Store byte immediate

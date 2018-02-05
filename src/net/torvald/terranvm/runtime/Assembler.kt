@@ -2,6 +2,7 @@ package net.torvald.terranvm.runtime
 
 import net.torvald.terranvm.runtime.Assembler.resolveInt
 import net.torvald.terranvm.runtime.Assembler.toRegInt
+import net.torvald.terranvm.toReadableBin
 
 
 /**
@@ -50,7 +51,7 @@ import net.torvald.terranvm.runtime.Assembler.toRegInt
  *
  *
  * ### Literals
- * - Register literals: r1, r2, r3, r4, r5, r6, r7, r8
+ * - Register literals: r1, r2, r3, r4, r5, r6, r7, r8 (starts at 1)
  * - Hex literals: CAFEBABEh
  * - Integer literals: 80085
  *
@@ -179,6 +180,8 @@ object Assembler {
             "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
 
             "LOADWORDI"  to 0b0001_000_000110_0000000000000000,
+            "LOADWORDILO"  to 0b0001_000_000110_0000000000000000,
+            "LOADWORDIHI"  to 0b0001_000_000111_0000000000000000,
 
             // Load and Store a word from register to memory //
 
@@ -415,7 +418,7 @@ object Assembler {
             val word = words[index + 1]
 
             if (c == 'f') { // 'f' is only used for LOADWORDI (arg: rf), which outputs TWO opcodes
-                val fullword = word.resolveInt()
+                val fullword = word.toFloatOrNull()?.toRawBits() ?: word.resolveInt()
                 val lowhalf = fullword.and(0xFFFF)
                 val highhalf = fullword.ushr(16)
 
@@ -424,8 +427,8 @@ object Assembler {
                 loadwordiOp[1] = loadwordiOp[1] or highhalf
 
 
-                debug("$line\t-> ${loadwordiOp[0].toString(2).padStart(32, '0')}")
-                debug("$line\t-> ${loadwordiOp[1].toString(2).padStart(32, '0')}")
+                debug("$line\t-> ${loadwordiOp[0].toReadableBin()}")
+                debug("$line\t-> ${loadwordiOp[1].toReadableBin()}")
 
 
                 return loadwordiOp
@@ -442,7 +445,7 @@ object Assembler {
         }
 
 
-        debug("$line\t-> ${resultingOpcode.toString(2).padStart(32, '0')}")
+        debug("$line\t-> ${resultingOpcode.toReadableBin()}")
 
 
         return intArrayOf(resultingOpcode)
@@ -454,7 +457,8 @@ object Assembler {
 
         val ret = ArrayList<Byte>()
 
-        fun getPC() = TerranVM.interruptCount * 4 + ret.size
+        val programSpaceStart = TerranVM.interruptCount * 4
+        fun getPC() = programSpaceStart + ret.size
         fun addBytes(i: Int) {
             i.toLittle().forEach { ret.add(it) }
         }
@@ -700,9 +704,10 @@ object Assembler {
                     if (flagSpecifyJMP && currentSection == ".CODE") {
                         flagSpecifyJMP = false
                         // write dest (this PC) at flagSpecifyJMPLocation
-                        val newASM = composeJMP(flagSpecifyJMPLocation.ushr(2)).toLittle()
-                        newASM.forEachIndexed { index, byte ->
-                            ret[flagSpecifyJMPLocation + index] = byte
+                        debug("[TBASASM] inserting JMP at $flagSpecifyJMPLocation that points to ${getPC()}")
+                        val newASM = composeJMP(getPC().ushr(2)).toLittle()
+                        for (i in 0..3) {
+                            ret[flagSpecifyJMPLocation - programSpaceStart + i] = newASM[i]
                         }
                     }
                     else if (!flagSpecifyJMP && currentSection == ".FUNC") {
@@ -739,7 +744,7 @@ object Assembler {
             if (this.matches(registerLiteral))
                 this[1].toInt() - 49 // "r1" -> 0
             else
-                throw IllegalArgumentException()
+                throw IllegalArgumentException("Illegal register literal: '$this'")
 
     private fun String.resolveInt() =
         if (this.startsWith(labelMarker)) // label?

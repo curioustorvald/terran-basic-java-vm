@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
+import net.torvald.terranvm.runtime.compiler.simplec.SimpleC
 
 /**
  * Created by minjaesong on 2017-11-17.
@@ -62,9 +63,31 @@ jmp @loop;
 loadwordi r3, ffcc00ffh;
 """)
 
+        val tst = Assembler("""
+            loadwordi r1, 100f; # 42c80000h;
+            loadwordi r2, 69f; # 428a0000h;
+            add r3, r1, r2;
+        """.trimIndent())
 
 
-        vm.loadProgram(random)
+        val testProgram = """
+            float x;
+            float y;
+            float z;
+
+            x = 100f;
+            y = 69f;
+            z = x + y;
+        """.trimIndent()
+        val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
+        val notatedProgram = SimpleC.treeToProperNotation(program)
+        val programInIR = SimpleC.notationToIR(notatedProgram)
+        val programInNewIR = SimpleC.preprocessIR(programInIR)
+        val programASM = SimpleC.IRtoASM(programInNewIR)
+        val code = Assembler(programASM.joinToString("\n"))
+
+
+        vm.loadProgram(code)
         vm.delayInMills = vmDelay
 
 
