@@ -675,7 +675,6 @@ object SimpleC {
 
         fun traverse1(node: SyntaxTreeNode) {
             // visit 1
-            node.statements.forEach { traverse1(it) }
             node.arguments.reversed().forEach { traverse1(it) }
 
 
@@ -697,6 +696,9 @@ object SimpleC {
                 testProgramOut.add("${node.lineNumber}\t$testString")
                 testString.delete(0, testString.length)
             }
+
+            
+            node.statements.forEach { traverse1(it) }
 
         }
 

@@ -52,24 +52,6 @@ class TextOnly : Game() {
         vm.peripherals[3] = peripheral
 
 
-
-        val random = Assembler("""
-:loop;
-rndi r5;
-rndi r6;
-rndi r7;
-rndi r8;
-jmp @loop;
-loadwordi r3, ffcc00ffh;
-""")
-
-        val tst = Assembler("""
-            loadwordi r1, 100f; # 42c80000h;
-            loadwordi r2, 69f; # 428a0000h;
-            add r3, r1, r2;
-        """.trimIndent())
-
-
         val testProgram = """
             float x;
             float y;
@@ -77,14 +59,25 @@ loadwordi r3, ffcc00ffh;
 
             x = 100f;
             y = 69f;
-            z = x + y;
+
+            if (42 == x) {
+                z = 1569;
+            } else {
+                x = 422; {
+            }
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
+
+        println(program)
+
         val notatedProgram = SimpleC.treeToProperNotation(program)
-        val programInIR = SimpleC.notationToIR(notatedProgram)
-        val programInNewIR = SimpleC.preprocessIR(programInIR)
-        val programASM = SimpleC.IRtoASM(programInNewIR)
-        val code = Assembler(programASM.joinToString("\n"))
+        //val programInIR = SimpleC.notationToIR(notatedProgram)
+        //val programInNewIR = SimpleC.preprocessIR(programInIR)
+        //val programASM = SimpleC.IRtoASM(programInNewIR)
+        //val code = Assembler(programASM.joinToString("\n"))
+
+
+        System.exit(0)
 
 
         val testProgramTest = Assembler("""
@@ -104,7 +97,7 @@ loadwordi r3, ffcc00ffh;
         """.trimIndent())
 
 
-        vm.loadProgram(code)
+        vm.loadProgram(byteArrayOf())
         vm.delayInMills = vmDelay
 
 
