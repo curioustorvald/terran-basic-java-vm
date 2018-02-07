@@ -416,7 +416,7 @@ class TerranVM(memSize: Int,
 
     // memory registers (32-bit)
     var rCMP = 0 // compare register
-    var m2 = 0 // string counter?
+    //var m2 = 0 // string counter?
     //var m3 = 0 // general-use flags or variable
     //var m4 = 0 // general-use flags or variable
     var pc = 0 // program counter
@@ -564,7 +564,7 @@ MTHFU
         r7 = 0
         r8 = 0
         rCMP = 0
-        m2 = 0
+        //m2 = 0
         //m3 = 0
         //m4 = 0
         //strCntr = 0

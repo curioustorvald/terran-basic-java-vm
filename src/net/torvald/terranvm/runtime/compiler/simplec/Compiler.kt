@@ -238,6 +238,9 @@ object SimpleC {
         else -> throw IllegalArgumentException("Unknown primitive type: $type")
     }
 
+    private val functionsImplicitEnd = hashSetOf(
+            "if", "else", "for", "while", "switch"
+    )
 
     private val exprToIR = hashMapOf(
             "#_declarevar" to "DECLARE",
@@ -259,8 +262,9 @@ object SimpleC {
             "<=" to "ISLSEQ",
 
             "if" to "IF",
+            "endif" to "ENDIF",
             "else" to "ELSE",
-            "endif" to "ENDIF"
+            "endelse" to "ENDELSE"
     )
 
 
@@ -666,6 +670,10 @@ object SimpleC {
         //  (return)
 
 
+        root.expandImplicitEnds()
+        root.updateDepth()
+
+
         fun SyntaxTreeNode.getReadableNodeName(): String {
             if (this.name != null && this.literalValue != null) {
                 return ("${this.name} ${this.literalValue}")
@@ -682,52 +690,80 @@ object SimpleC {
         }
 
 
-        val stack = Stack<SyntaxTreeNode>()
-        val testString = StringBuilder()
-        val testProgramOut = ArrayList<String>() // contains all the strings; should be array of strings (with extra info like line number?)
+        val commands = Stack<SyntaxTreeNode>()
+        val string = StringBuilder()
+        val programOut = ArrayList<String>()
+            // contains all the strings; should be array of strings (with extra info like line number?)
+            // format: ARG${lineNumber}\t${cmd}\t${otherCmd}\t ...
+            // format: STA${lineNumber}\t${cmd}\t${otherCmd}\t ...
+
+        var cmdRightB4 = ""
 
 
-        fun traverse1(node: SyntaxTreeNode) {
-            // visit 1
-            node.arguments.reversed().forEach { traverse1(it) }
+        // pre-traverse to get the last element of the traverse
 
+        val traversedNodes = ArrayList<SyntaxTreeNode>()
+        fun preTraverse(node: SyntaxTreeNode) {
+            node.arguments.reversed().forEach { preTraverse(it) }
+            traversedNodes.add(node)
+            node.statements.forEach { preTraverse(it) }
+        }
+        preTraverse(root)
+
+        // pop out root from the traversed list
+        traversedNodes.removeAt(0)
+
+        fun isLastOfTraverse(node: SyntaxTreeNode) = node == traversedNodes.last()
+
+
+
+        // process using pre-traversed list
+
+        traversedNodes.forEach { node ->
 
             // test print
-            print(node.getReadableNodeName())
-            println("; ${node.expressionType}")
+            print("${node.getReadableNodeName()}")
+            print("; ${node.expressionType}")
+            println()
 
 
-            if (node.isLeaf) {
-                stack.push(node)
-            }
-            else if (node.expressionType == ExpressionType.FUNCTION_CALL) {
-                stack.push(node)
+            commands.push(node)
 
-                while (stack.isNotEmpty()) {
-                    testString.append("${stack.pop().getReadableNodeName()}\t")
+
+            if (node.expressionType == ExpressionType.FUNCTION_CALL) {
+
+                while (commands.isNotEmpty()) {
+                    string.append("${commands.pop().getReadableNodeName()}\t")
                 }
 
-                testProgramOut.add("${node.lineNumber}\t$testString")
-                testString.delete(0, testString.length)
+                programOut.add("${node.lineNumber}\t$string")
+                string.delete(0, string.length)
             }
-
-
-            node.statements.forEach { traverse1(it) }
-
         }
 
 
 
-        traverse1(root)
+        var i = 0
+        while (i < programOut.size - 1) {
+            val it = programOut[i]
+            val next = programOut[i + 1]
+
+            if (it.split('\t')[1] == "it") {
+
+            }
+
+            i++
+        }
+
 
 
         println("========\n   OP   \n========")
-        testProgramOut.forEach { println(it) }
+        programOut.forEach { println(it) }
         println("========")
 
 
 
-        return testProgramOut
+        return programOut
     }
 
     /**
@@ -756,7 +792,7 @@ object SimpleC {
         notatedProgram.forEachIndexed { index, it ->
             val words = it. split('\t')
 
-            val lineNumber = words[0].toInt()
+            val lineNumber = words[0].drop(3).toInt()
 
             val newcmds = ArrayList<IntermediateRepresentation>()
             newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]] ?: throw NullPointerException("Unknown expression: '${words[1]}'")))
@@ -823,6 +859,46 @@ object SimpleC {
                             newcmd2.arg1 = "${sourceExpr}_TRUE"
 
                             newcmd3.instruction = "NOP"
+                        }
+                        "ISGT" -> {
+                            newcmd.instruction = "JGT"
+                            newcmd.arg1 = "${sourceExpr}_TRUE"
+
+                            newcmd2.instruction = "JLS"
+                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+
+                            newcmd3.instruction = "JEQ"
+                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+                        }
+                        "ISLS" -> {
+                            newcmd.instruction = "JGT"
+                            newcmd.arg1 = "${sourceExpr}_FALSE"
+
+                            newcmd2.instruction = "JLS"
+                            newcmd2.arg1 = "${sourceExpr}_TRUE"
+
+                            newcmd3.instruction = "JEQ"
+                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+                        }
+                        "ISGTEQ" -> {
+                            newcmd.instruction = "JGT"
+                            newcmd.arg1 = "${sourceExpr}_TRUE"
+
+                            newcmd2.instruction = "JLS"
+                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+
+                            newcmd3.instruction = "JEQ"
+                            newcmd2.arg1 = "${sourceExpr}_TRUE"
+                        }
+                        "ISLSEQ" -> {
+                            newcmd.instruction = "JGT"
+                            newcmd.arg1 = "${sourceExpr}_FALSE"
+
+                            newcmd2.instruction = "JLS"
+                            newcmd2.arg1 = "${sourceExpr}_TRUE"
+
+                            newcmd3.instruction = "JEQ"
+                            newcmd2.arg1 = "${sourceExpr}_TRUE"
                         }
                         else -> throw InternalError("Unknown comparison operator: $sourceCmpCmd")
                     }
@@ -1568,8 +1644,8 @@ object SimpleC {
             val returnType: ReturnType?, // STATEMENT, LITERAL_LEAF: valid ReturnType; VAREABLE_LEAF: always null
             var name: String?,
             val lineNumber: Int, // used to generate error message
-            val isRoot: Boolean = false,
-            val derefDepth: Int = 0 // how many ***s are there for pointer
+            val isRoot: Boolean = false
+            //val derefDepth: Int = 0 // how many ***s are there for pointer
     ) {
 
         var literalValue: Any? = null // for LITERALs only
@@ -1578,6 +1654,8 @@ object SimpleC {
         val arguments = ArrayList<SyntaxTreeNode>() // for FUNCTION, CODE_BLOCK
         val statements = ArrayList<SyntaxTreeNode>()
 
+        var depth: Int? = null
+
         fun addArgument(node: SyntaxTreeNode) {
             arguments.add(node)
         }
@@ -1585,6 +1663,36 @@ object SimpleC {
             statements.add(node)
         }
 
+
+        fun updateDepth() {
+            if (!isRoot) throw Error("Updating depth only make sense when used as root")
+
+            this.depth = 0
+
+            arguments.forEach { it._updateDepth(1) }
+            statements.forEach { it._updateDepth(1) }
+        }
+
+        private fun _updateDepth(recursiveDepth: Int) {
+            this.depth = recursiveDepth
+
+            arguments.forEach { it._updateDepth(recursiveDepth + 1) }
+            statements.forEach { it._updateDepth(recursiveDepth + 1) }
+        }
+
+        fun expandImplicitEnds() {
+            if (!isRoot) throw Error("Expanding implicit 'end's only make sense when used as root")
+
+            statements.forEach { it._expandImplicitEnds() }
+        }
+
+        private fun _expandImplicitEnds() {
+            if (this.name in functionsImplicitEnd) {
+                this.statements.add(SyntaxTreeNode(
+                        ExpressionType.FUNCTION_CALL, null, "end${this.name}", this.lineNumber, this.isRoot
+                ))
+            }
+        }
 
         val isLeaf: Boolean
             get() = expressionType.toString().endsWith("_LEAF") ||
