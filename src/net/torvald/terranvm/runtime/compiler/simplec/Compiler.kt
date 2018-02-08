@@ -745,14 +745,17 @@ object SimpleC {
 
         var i = 0
         while (i < programOut.size - 1) {
-            val it = programOut[i]
-            val next = programOut[i + 1]
+            val it = programOut[i].split('\t')
+            val next = programOut[i + 1].split('\t')
 
-            if (it.split('\t')[1] == "it") {
-
+            // 1. remove ENDIF if it's accompanied by ELSE (don't want to have both ENDIF and ENDELSE at the same time)
+            if (it[1] == "endif" && next[1] == "else") {
+                programOut.removeAt(i)
+                i++ // we skip ELSE
             }
-
-            i++
+            else {
+                i++
+            }
         }
 
 
@@ -792,7 +795,7 @@ object SimpleC {
         notatedProgram.forEachIndexed { index, it ->
             val words = it. split('\t')
 
-            val lineNumber = words[0].drop(3).toInt()
+            val lineNumber = words[0].toInt()
 
             val newcmds = ArrayList<IntermediateRepresentation>()
             newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]] ?: throw NullPointerException("Unknown expression: '${words[1]}'")))
@@ -821,20 +824,24 @@ object SimpleC {
                     newcmd.arg2 = words[2].toIRVar()
                     newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
                     newcmd.arg1 = makeTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
+
+                    nestedStatementsCommonLabelName.push(newcmd.arg1)
                 }
                 "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
                     newcmd.arg1 = words[2].toIRVar()
                     newcmd.arg2 = words[3].toIRVar()
-                    nestedStatementsCommonLabelName.add(
-                            makeSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", words[2].toIRVar(), words[3].toIRVar())
-                    )
 
-                    // test
-                    println(nestedStatementsCommonLabelName.peek())
+                    if (newcmd.arg2!!.drop(1).isEmpty()) {
+                        newcmd.arg2 = nestedStatementsCommonLabelName.pop()
+                    }
+
+                    nestedStatementsCommonLabelName.push(
+                            makeSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", newcmd.arg1!!, newcmd.arg2!!)
+                    )
                 }
                 "IF" -> {
                     val sourceExpr = nestedStatementsCommonLabelName.peek() // $$IFISEQ_42_$x_$l5
-                    val sourceCmpCmd = sourceExpr.split('_')[0].drop(4)
+                    val sourceCmpCmd = sourceExpr.split('_')[0].drop(2)
 
                     repeat(3) { addNextNewCmd() }
                     val newcmd2 = newcmds[1] // jump
@@ -842,7 +849,7 @@ object SimpleC {
                     val newcmd4 = newcmds[3] // label for IF_TRUE
 
                     when (sourceCmpCmd) {
-                        "ISEQ" -> {
+                        "IFISEQ" -> {
                             newcmd.instruction = "JZ"
                             newcmd.arg1 = "${sourceExpr}_TRUE"
 
@@ -851,7 +858,7 @@ object SimpleC {
 
                             newcmd3.instruction = "NOP"
                         }
-                        "ISNEQ" -> {
+                        "IFISNEQ" -> {
                             newcmd.instruction = "JZ"
                             newcmd.arg1 = "${sourceExpr}_FALSE"
 
@@ -860,7 +867,7 @@ object SimpleC {
 
                             newcmd3.instruction = "NOP"
                         }
-                        "ISGT" -> {
+                        "IFISGT" -> {
                             newcmd.instruction = "JGT"
                             newcmd.arg1 = "${sourceExpr}_TRUE"
 
@@ -870,7 +877,7 @@ object SimpleC {
                             newcmd3.instruction = "JEQ"
                             newcmd2.arg1 = "${sourceExpr}_FALSE"
                         }
-                        "ISLS" -> {
+                        "IFISLS" -> {
                             newcmd.instruction = "JGT"
                             newcmd.arg1 = "${sourceExpr}_FALSE"
 
@@ -880,7 +887,7 @@ object SimpleC {
                             newcmd3.instruction = "JEQ"
                             newcmd2.arg1 = "${sourceExpr}_FALSE"
                         }
-                        "ISGTEQ" -> {
+                        "IFISGTEQ" -> {
                             newcmd.instruction = "JGT"
                             newcmd.arg1 = "${sourceExpr}_TRUE"
 
@@ -890,7 +897,7 @@ object SimpleC {
                             newcmd3.instruction = "JEQ"
                             newcmd2.arg1 = "${sourceExpr}_TRUE"
                         }
-                        "ISLSEQ" -> {
+                        "IFISLSEQ" -> {
                             newcmd.instruction = "JGT"
                             newcmd.arg1 = "${sourceExpr}_FALSE"
 
@@ -914,7 +921,7 @@ object SimpleC {
                     val newcmd2 = newcmds[1] // label for IF_FALSE
 
                     newcmd.instruction = "JMP"
-                    newcmd.arg1 = "${sourceExpr}_EXIT" // ENDIF
+                    newcmd.arg1 = "${sourceExpr}_ENDE" // ENDELSE
 
                     newcmd2.instruction = "LABEL"
                     newcmd2.arg1 = "${sourceExpr}_FALSE"
@@ -923,7 +930,13 @@ object SimpleC {
                     val sourceExpr = nestedStatementsCommonLabelName.pop() // POP DA FUGGER
 
                     newcmd.instruction = "LABEL"
-                    newcmd.arg1 = "${sourceExpr}_EXIT"
+                    newcmd.arg1 = "${sourceExpr}_FALSE"
+                }
+                "ENDELSE" -> {
+                    val sourceExpr = nestedStatementsCommonLabelName.pop() // POP DA FUGGER
+
+                    newcmd.instruction = "LABEL"
+                    newcmd.arg1 = "${sourceExpr}_ENDE"
                 }
             }
 
