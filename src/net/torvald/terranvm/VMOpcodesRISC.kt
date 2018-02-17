@@ -68,7 +68,7 @@ fun Int.toReadableOpcode(): String {
         5 -> "POP"
         6 -> "PUSHWORDI"
         7 -> "POPWORDI"
-        8 -> if (cond.isEmpty()) "JMP" else "J"
+        8 -> if (cond.isEmpty()) "JMP" else "J$cond"
         9 -> if (Rs == 0) "SETBANK" else "INQFEATURE"
         15 -> {
             if (this.and(0x100) == 0) {

@@ -68,6 +68,8 @@ object SimpleC {
     private val regexIntWhole = Regex("""^([0-9_]+[Ll]?)$""")
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
+    private fun String.matchesFloatLiteral() = this.matches(regexFPWhole)
+    private fun String.matchesIntLiteral() = this.matchesNumberLiteral() && !this.matchesFloatLiteral()
     private fun makeTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
     private fun makeSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_${arg2}_\$l$lineNum"
 
@@ -265,6 +267,14 @@ object SimpleC {
             "endif" to "ENDIF",
             "else" to "ELSE",
             "endelse" to "ENDELSE"
+    )
+
+    private val irCmpInst = hashSetOf(
+            "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ"
+    )
+
+    private val jmpCommands = hashSetOf(
+            "JMP", "JZ", "JNZ", "JGT", "JLS"
     )
 
 
@@ -989,10 +999,17 @@ object SimpleC {
 
 
             if (next != null) {
-                if (it.arg1 == next.arg2) {
+                if (next.instruction == "MOV" && it.arg1 == next.arg2) {
                     val newIRline = IntermediateRepresentation(next.lineNum, it.instruction, next.arg1, it.arg2, it.arg3)
                     newIR.add(newIRline)
-                    i++
+                    i++ // skip next instruction
+                }
+                else if (next.instruction in irCmpInst && it.arg1 == next.arg2) {
+                    val newIR1 = IntermediateRepresentation(it.lineNum, it.instruction, "r4", it.arg2, it.arg3)
+                    val newIR2 = IntermediateRepresentation(next.lineNum, next.instruction, next.arg1, "r4")
+                    newIR.add(newIR1)
+                    newIR.add(newIR2)
+                    i++ // skip next instruction
                 }
                 else {
                     newIR.add(it)
@@ -1028,6 +1045,7 @@ object SimpleC {
 
         val ASMs = ArrayList<String>()
 
+        val varTable = HashMap<String, String>()
 
         val irDeclares = ir.filter { it.instruction.startsWith("DECLARE") }
         // remove DECLAREs from the 'ir' list
@@ -1036,13 +1054,16 @@ object SimpleC {
 
         ASMs.add(".data;")
 
+
         irDeclares.forEach {
             when (it.instruction) {
                 "DECLAREI" -> {
                     ASMs.add("INT ${it.arg1!!.drop(1)} 0;")
+                    varTable.put(it.arg1!!.drop(1), "INT")
                 }
                 "DECLAREF" -> {
                     ASMs.add("FLOAT ${it.arg1!!.drop(1)} 0.0;")
+                    varTable.put(it.arg1!!.drop(1), "FLOAT")
                 }
                 else -> TODO("Other declaration types (e.g. STRING, BYTES)")
             }
@@ -1081,6 +1102,57 @@ object SimpleC {
 
                     ASMs.add("${it.instruction} r3, r1, r2;")
                     ASMs.add("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
+                }
+                in jmpCommands -> {
+                    ASMs.add("${it.instruction} @${it.arg1!!.drop(1)};")
+                }
+                "LABEL" -> {
+                    ASMs.add(":${it.arg1!!.drop(1)};")
+                }
+                in irCmpInst -> {
+                    val lhand = it.arg1!!
+                    val rhand = it.arg2!!
+
+                    val lhandType = if (lhand.isVar())
+                        varTable[lhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
+                    else if (lhand.matchesFloatLiteral())
+                        "FLOATLITERAL"
+                    else if (lhand.matchesIntLiteral())
+                        "INTLITERAL"
+                    else
+                        throw IllegalArgumentException("Unknown literal type: $lhand at line ${it.lineNum}")
+
+                    val rhandType = if (rhand.isVar())
+                        varTable[rhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
+                    else if (rhand.matchesFloatLiteral())
+                        "FLOATLITERAL"
+                    else if (rhand.matchesIntLiteral())
+                        "INTLITERAL"
+                    else
+                        throw IllegalArgumentException("Unknown literal type: $rhand at line ${it.lineNum}")
+
+                    val lIsLiteral = lhandType.endsWith("LITERAL")
+                    val rIsLiteral = rhandType.endsWith("LITERAL")
+
+                    val cmpInst = "CMP${lhandType[0]}${rhandType[0]}"
+
+
+
+                    if (lIsLiteral) {
+                        ASMs.add("LOADWORDI r1, $lhand;")
+                    }
+                    else {
+                        ASMs.add("LOADWORDIMEM r1, ${lhand.asProperAsmData()};")
+                    }
+
+                    if (rIsLiteral) {
+                        ASMs.add("LOADWORDI r2, $rhand;")
+                    }
+                    else {
+                        ASMs.add("LOADWORDIMEM r2, ${rhand.asProperAsmData()};")
+                    }
+
+                    ASMs.add("$cmpInst r1, r2;")
                 }
             }
         }

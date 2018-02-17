@@ -218,6 +218,8 @@ object Assembler {
     )
     val opcodes = HashMap<String, Int>()
 
+    val twoLiners = hashSetOf("LOADWORDI")
+
     /**
      * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
      */
@@ -320,7 +322,7 @@ object Assembler {
     private fun putLabel(name: String, pointer: Int) {
         val name = labelMarker + name.toLowerCase()
         if (labelTable[name] != null && labelTable[name] != pointer) {
-            throw Error("Labeldef conflict for $name -- old: ${labelTable[name]}, new: $pointer")
+            throw InternalError("Labeldef conflict for $name -- old: ${labelTable[name]}, new: $pointer")
         }
         else {
             if (labelTable[name] == null) debug("->> put label '$name' with pc $pointer")
@@ -330,7 +332,7 @@ object Assembler {
 
     private fun getLabel(marked_labelname: String): Int {
         val name = marked_labelname.toLowerCase()
-        return labelTable[name] ?: throw Error("Label '$name' not defined")
+        return labelTable[name] ?: throw InternalError("Label '$name' not defined")
     }
 
     private fun splitLines(program: String): List<String> {
@@ -402,7 +404,7 @@ object Assembler {
 
 
         if (opcodes[cmd] == null) {
-            throw Error("Invalid assembly: $cmd")
+            throw InternalError("Invalid assembly: $cmd")
         }
 
         var resultingOpcode = opcodes[cmd]!!
@@ -479,6 +481,9 @@ object Assembler {
         // pass 1: pre-scan for labels
         debug("\n\n== Pass 1 ==\n\n")
         var virtualPC = TerranVM.interruptCount * 4
+
+        debug("*** Start PC: $virtualPC ***")
+
         splitLines(userProgram).forEach { lline ->
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker
@@ -565,11 +570,12 @@ object Assembler {
                     if (flagSpecifyJMP && currentSection == ".CODE") {
                         flagSpecifyJMP = false
                         // write dest (this PC) at flagSpecifyJMPLocation
-                        virtualPC += 4
+                        debug("->> CODE section; vPC: $virtualPC")
                     }
                     else if (!flagSpecifyJMP && currentSection == ".FUNC") {
                         // insert JMP instruction that jumps to .code section
                         flagSpecifyJMP = true
+                        debug("->> FUNC section; vPC: $virtualPC")
                         virtualPC += 4
                     }
 
@@ -580,11 +586,16 @@ object Assembler {
                     else {
                         // sanitise input
                         if (opcodes[cmd] == null) {
-                            throw Error("Invalid opcode: $cmd")
+                            throw InternalError("Invalid opcode: $cmd")
                         }
+
+                        debug("->> Accepted command $cmd; vPC: $virtualPC")
 
                         // write opcode
                         virtualPC += 4
+                        if (cmd in twoLiners) {
+                            virtualPC += 4
+                        }
                     }
                 }
             }
@@ -601,6 +612,9 @@ object Assembler {
         flagSpecifyJMP = false
         // <-- end of reset flags
         debug("\n\n== Pass 2 ==\n\n")
+
+        debug("*** Start PC: ${getPC()} ***")
+
         splitLines(userProgram).forEach { lline ->
 
             var line = lline.replace(Regex("""^ ?[\n]+"""), "") // do not remove  ?, this takes care of spaces prepended on comment marker

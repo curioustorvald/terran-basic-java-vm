@@ -60,20 +60,12 @@ class TextOnly : Game() {
             x = 100f;
             y = 69f;
 
-            if (x == 42 + k) {
-                z = 1569;
-            } else {
-                x = 422;
-                y = 649.35429f;
+            if (x == 144f) {
+                z = 65535;
             }
-
-            after_if_else = 4;
-
-            if (999 == y) {
-                z = 9999999;
+            else {
+                z = 255;
             }
-
-            after_yiff = 0;
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
@@ -81,20 +73,20 @@ class TextOnly : Game() {
 
         val notatedProgram = SimpleC.treeToProperNotation(program)
         val programInIR = SimpleC.notationToIR(notatedProgram)
-        //val programInNewIR = SimpleC.preprocessIR(programInIR)
-        //val programASM = SimpleC.IRtoASM(programInNewIR)
-        //val code = Assembler(programASM.joinToString("\n"))
+        val programInNewIR = SimpleC.preprocessIR(programInIR)
+        val programASM = SimpleC.IRtoASM(programInNewIR)
+        val code = Assembler(programASM.joinToString("\n"))
 
 
-        System.exit(0)
+        //System.exit(0)
 
 
-        val testProgramTest = Assembler("""
+        /*val testProgramTest = Assembler("""
             JMP 00000014h;
             NOP;
             NOP;
             NOP;
-            LOADWORDI r1, 42C80000h;
+            LOADWORDI r1, 128.0;
             STOREWORDIMEM r1, 00000011h;
             LOADWORDI r1, 428A0000h;
             STOREWORDIMEM r1, 00000012h;
@@ -103,10 +95,10 @@ class TextOnly : Game() {
             ADD r3, r1, r2;
             STOREWORDIMEM r3, 00000013h;
             HALT;
-        """.trimIndent())
+        """.trimIndent())*/
 
 
-        vm.loadProgram(byteArrayOf())
+        vm.loadProgram(code)
         vm.delayInMills = vmDelay
 
 
