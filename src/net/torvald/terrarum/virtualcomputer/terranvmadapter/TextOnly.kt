@@ -35,7 +35,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 200
+        val vmDelay = 20
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -53,28 +53,21 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            int x;
-            int y;
-            int z;
+            asm("
+                loadbytei r1, 0;
+                loadbytei r2, 3;
 
-            x = 100;
-            y = 69;
+                :loope;
 
-        comefrom hell;
+                inc r1;
+                storebyte r1, r1, r2;
 
-            if (x == 100) {
-                z = 65535;
-            }
-            else {
-                z = 255;
-                goto hell;
-            }
-
-            if (y <= 128) {
-                z = 6969;
-            }
+                jmp @loope;
+            ");
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
+
+        val mdaFiller = Assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
 
         println(program)
 
@@ -83,26 +76,6 @@ class TextOnly : Game() {
         val programInNewIR = SimpleC.preprocessIR(programInIR)
         val programASM = SimpleC.IRtoASM(programInNewIR)
         val code = Assembler(programASM.joinToString("\n"))
-
-
-        //System.exit(0)
-
-
-        /*val testProgramTest = Assembler("""
-            JMP 00000014h;
-            NOP;
-            NOP;
-            NOP;
-            LOADWORDI r1, 128.0;
-            STOREWORDIMEM r1, 00000011h;
-            LOADWORDI r1, 428A0000h;
-            STOREWORDIMEM r1, 00000012h;
-            LOADWORDIMEM r1, 00000011h;
-            LOADWORDIMEM r2, 00000012h;
-            ADD r3, r1, r2;
-            STOREWORDIMEM r3, 00000013h;
-            HALT;
-        """.trimIndent())*/
 
 
         vm.loadProgram(code)

@@ -269,7 +269,9 @@ object SimpleC {
             "endelse" to "ENDELSE",
 
             "goto" to "GOTOLABEL",
-            "comefrom" to "DEFLABEL"
+            "comefrom" to "DEFLABEL",
+
+            "asm" to "INLINEASM"
     )
 
     private val irCmpInst = hashSetOf(
@@ -440,7 +442,9 @@ object SimpleC {
                 if (isLineComment) isLineComment = false
             }
             else if (char == '\n' && isLiteralMode) {
-                throw SyntaxError("at line $currentProgramLineNumber -- line break used inside of string literal")
+                //throw SyntaxError("at line $currentProgramLineNumber -- line break used inside of string literal")
+
+                // ignore \n by doing nothing
             }
             else if (lookahead2 == "//" && !isLineComment) {
                 isLineComment = true
@@ -959,6 +963,9 @@ object SimpleC {
                     newcmd.instruction = "JMP"
                     newcmd.arg1 = "$" + words[2]
                 }
+                "INLINEASM" -> {
+                    newcmd.arg1 = words[2].trimIndent().dropLast(1) // drop null terminator
+                }
                 else -> {
                     throw InternalError("Unknown instruction: ${newcmd.instruction}")
                 }
@@ -1172,6 +1179,9 @@ object SimpleC {
                     }
 
                     ASMs.add("$cmpInst r1, r2;")
+                }
+                "INLINEASM" -> {
+                    ASMs.add(it.arg1!!)
                 }
                 else -> throw InternalError("Unknown IR: ${it.instruction}")
             }
