@@ -356,14 +356,14 @@ class TerranVM(memSize: Int,
         private set
 
     // number registers (32 bit)
-    var r1 = 0
-    var r2 = 0
-    var r3 = 0
-    var r4 = 0
-    var r5 = 0
-    var r6 = 0
-    var r7 = 0
-    var r8 = 0
+    var r1: Int = 0
+    var r2: Int = 0
+    var r3: Int = 0
+    var r4: Int = 0
+    var r5: Int = 0
+    var r6: Int = 0
+    var r7: Int = 0
+    var r8: Int = 0
 
     fun writeregFloat(register: Int, data: Float) {
         when (register) {

@@ -60,11 +60,15 @@ class TextOnly : Game() {
             x = 100f;
             y = 69f;
 
-            if (x == 144f) {
+            if (x == 100f) {
                 z = 65535;
             }
             else {
                 z = 255;
+            }
+
+            if (y <= 128f) {
+                z = 6969;
             }
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))

@@ -884,8 +884,8 @@ object SimpleC {
                             newcmd2.instruction = "JLS"
                             newcmd2.arg1 = "${sourceExpr}_FALSE"
 
-                            newcmd3.instruction = "JEQ"
-                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+                            newcmd3.instruction = "JZ"
+                            newcmd3.arg1 = "${sourceExpr}_FALSE"
                         }
                         "IFISLS" -> {
                             newcmd.instruction = "JGT"
@@ -894,8 +894,8 @@ object SimpleC {
                             newcmd2.instruction = "JLS"
                             newcmd2.arg1 = "${sourceExpr}_TRUE"
 
-                            newcmd3.instruction = "JEQ"
-                            newcmd2.arg1 = "${sourceExpr}_FALSE"
+                            newcmd3.instruction = "JZ"
+                            newcmd3.arg1 = "${sourceExpr}_FALSE"
                         }
                         "IFISGTEQ" -> {
                             newcmd.instruction = "JGT"
@@ -904,8 +904,8 @@ object SimpleC {
                             newcmd2.instruction = "JLS"
                             newcmd2.arg1 = "${sourceExpr}_FALSE"
 
-                            newcmd3.instruction = "JEQ"
-                            newcmd2.arg1 = "${sourceExpr}_TRUE"
+                            newcmd3.instruction = "JZ"
+                            newcmd3.arg1 = "${sourceExpr}_TRUE"
                         }
                         "IFISLSEQ" -> {
                             newcmd.instruction = "JGT"
@@ -914,8 +914,8 @@ object SimpleC {
                             newcmd2.instruction = "JLS"
                             newcmd2.arg1 = "${sourceExpr}_TRUE"
 
-                            newcmd3.instruction = "JEQ"
-                            newcmd2.arg1 = "${sourceExpr}_TRUE"
+                            newcmd3.instruction = "JZ"
+                            newcmd3.arg1 = "${sourceExpr}_TRUE"
                         }
                         else -> throw InternalError("Unknown comparison operator: $sourceCmpCmd")
                     }

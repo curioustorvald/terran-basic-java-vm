@@ -91,6 +91,13 @@ fun Int.toReadableOpcode(): String {
 
     // manual replace
     if (opString == "LOADWORDI") opString = "LOADWORDILO"
+    else if (opString == "CMP") opString = "CMP" + when (this.and(0b11)) {
+        0b00 -> "II"
+        0b01 -> "IF"
+        0b10 -> "FI"
+        0b11 -> "FF"
+        else -> throw InternalError()
+    }
 
 
     val argInfo = Assembler.getOpArgs(this)
@@ -269,8 +276,8 @@ object VMOpcodesRISC {
 
 
     fun CMP(dest: Register, src: Register, lr: Int) {
-        val lhand = if (lr and 0b10 != 0) vm.readregFloat(dest) else vm.readregInt(dest).toFloat()
-        val rhand = if (lr and 0b01 != 0) vm.readregFloat(src) else vm.readregInt(src).toFloat()
+        val lhand = if (lr and 0b10 != 0) vm.readregFloat(dest).toDouble() else vm.readregInt(dest).toDouble()
+        val rhand = if (lr and 0b01 != 0) vm.readregFloat(src).toDouble() else vm.readregInt(src).toDouble()
         vm.rCMP = if (lhand == rhand) 0 else if (lhand > rhand) 1 else -1
     }
 
