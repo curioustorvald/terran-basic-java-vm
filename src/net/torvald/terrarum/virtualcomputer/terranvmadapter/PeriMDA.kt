@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
+import net.torvald.terranvm.runtime.toUint
 import java.io.OutputStream
 import java.io.PrintStream
 import java.util.*
@@ -89,8 +90,8 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
         memory[x.plus(scrollX).rem(W) + y.plus(scrollY).rem(H) * W] = byte
     }
 
-    private fun getByte(x: Int, y: Int): Byte =
-            memory[x.plus(scrollX).rem(W) + y.plus(scrollY).rem(H) * W]
+    private fun getByte(x: Int, y: Int): Int =
+            memory[x.plus(scrollX).rem(W) + y.plus(scrollY).rem(H) * W].toUint()
 
     // will make display adapter run as if it was a dumb terminal
     val printStream = object : PrintStream(object : OutputStream() {

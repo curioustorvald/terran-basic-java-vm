@@ -69,7 +69,7 @@ object SimpleC {
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
     private fun String.matchesFloatLiteral() = this.matches(regexFPWhole)
-    private fun String.matchesIntLiteral() = this.matchesNumberLiteral() && !this.matchesFloatLiteral()
+    private fun String.matchesIntLiteral() = this.matchesNumberLiteral()
     private fun makeTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
     private fun makeSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_${arg2}_\$l$lineNum"
 
@@ -1130,21 +1130,25 @@ object SimpleC {
 
                     val lhandType = if (lhand.isVar())
                         varTable[lhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
-                    else if (lhand.matchesFloatLiteral())
-                        "FLOATLITERAL"
                     else if (lhand.matchesIntLiteral())
                         "INTLITERAL"
+                    else if (lhand.matchesFloatLiteral())
+                        "FLOATLITERAL"
                     else
                         throw IllegalArgumentException("Unknown literal type: $lhand at line ${it.lineNum}")
 
                     val rhandType = if (rhand.isVar())
                         varTable[rhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
-                    else if (rhand.matchesFloatLiteral())
-                        "FLOATLITERAL"
                     else if (rhand.matchesIntLiteral())
                         "INTLITERAL"
+                    else if (rhand.matchesFloatLiteral())
+                        "FLOATLITERAL"
                     else
                         throw IllegalArgumentException("Unknown literal type: $rhand at line ${it.lineNum}")
+
+
+                    //println("LH: $lhand, RH: $rhand, LHT: $lhandType, RHT: $rhandType")
+
 
                     val lIsLiteral = lhandType.endsWith("LITERAL")
                     val rIsLiteral = rhandType.endsWith("LITERAL")

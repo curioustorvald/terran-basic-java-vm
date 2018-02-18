@@ -246,7 +246,7 @@ object Assembler {
                 else if (mathOp == 0b100010 || mathOp == 0b100011 || mathOp == 0b100101 || mathOp == 0b100110) {
                     "r"
                 }
-                else if (mathOp == 0b1000000) { // load/store
+                else if (mathOp in 0b1000000..0b1000111) { // load/store
                     "rrr"
                 }
                 else if (mathOp == 0b1001000) { // memcpy
@@ -419,7 +419,7 @@ object Assembler {
 
             // check if user had provided right number of arguments
             if (words.size != arguments.length + 1) {
-                throw IllegalArgumentException("Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1}")
+                throw IllegalArgumentException("'$cmd': Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1}")
             }
 
             // for each arguments the operation requires... (e.g. "rrr", "rb")
