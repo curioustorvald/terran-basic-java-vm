@@ -217,7 +217,7 @@ object SimpleC {
             "#_declarevar" // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
     )
     private val functionWithSingleArgNoParen = hashSetOf(
-            "return", "goto"
+            "return", "goto", "comefrom"
     )
 
 
@@ -266,7 +266,10 @@ object SimpleC {
             "if" to "IF",
             "endif" to "ENDIF",
             "else" to "ELSE",
-            "endelse" to "ENDELSE"
+            "endelse" to "ENDELSE",
+
+            "goto" to "GOTOLABEL",
+            "comefrom" to "DEFLABEL"
     )
 
     private val irCmpInst = hashSetOf(
@@ -948,6 +951,17 @@ object SimpleC {
                     newcmd.instruction = "LABEL"
                     newcmd.arg1 = "${sourceExpr}_ENDE"
                 }
+                "DEFLABEL" -> {
+                    newcmd.instruction = "LABEL"
+                    newcmd.arg1 = "$" + words[2]
+                }
+                "GOTOLABEL" -> {
+                    newcmd.instruction = "JMP"
+                    newcmd.arg1 = "$" + words[2]
+                }
+                else -> {
+                    throw InternalError("Unknown instruction: ${newcmd.instruction}")
+                }
             }
 
 
@@ -1073,6 +1087,7 @@ object SimpleC {
 
         ir.forEachIndexed { index, it ->
             when (it.instruction) {
+                "NOP" -> ASMs.add("NOP;")
                 "MOV" -> {
                     if (it.arg2!!.isVar()) {
                         ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
@@ -1154,6 +1169,7 @@ object SimpleC {
 
                     ASMs.add("$cmpInst r1, r2;")
                 }
+                else -> throw InternalError("Unknown IR: ${it.instruction}")
             }
         }
 
@@ -1371,7 +1387,7 @@ object SimpleC {
                     // code block without argumenets; give it proper parens and redirect
                     val newTokens = tokens.toMutableList()
                     if (newTokens.size != 1) {
-                        throw SyntaxError("Number of tokens is not 1; I have no idea on this level.")
+                        throw SyntaxError("Number of tokens is not 1 (got size of ${newTokens.size}): ${newTokens}")
                     }
 
                     newTokens.add("("); newTokens.add(")")
@@ -1514,15 +1530,15 @@ object SimpleC {
                 /////////////////////////////////////////////////
                 // return something; goto somewhere (keywords) //
                 /////////////////////////////////////////////////
-                if (tokens[0] == "goto") {
-                    val gotoNode = SyntaxTreeNode(
+                if (tokens[0] == "goto" || tokens[0] == "comefrom") {
+                    val nnode = SyntaxTreeNode(
                             ExpressionType.FUNCTION_CALL,
                             null,
-                            "goto",
+                            tokens[0],
                             lineNumber
                     )
-                    gotoNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
-                    return gotoNode
+                    nnode.addArgument(tokens[1].toRawTreeNode(lineNumber))
+                    return nnode
                 }
                 else if (tokens[0] == "return") {
                     val returnNode = SyntaxTreeNode(

@@ -53,21 +53,24 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            float x;
-            float y;
-            float z;
+            int x;
+            int y;
+            int z;
 
-            x = 100f;
-            y = 69f;
+            x = 100;
+            y = 69;
 
-            if (x == 100f) {
+        comefrom hell;
+
+            if (x == 100) {
                 z = 65535;
             }
             else {
                 z = 255;
+                goto hell;
             }
 
-            if (y <= 128f) {
+            if (y <= 128) {
                 z = 6969;
             }
         """.trimIndent()
