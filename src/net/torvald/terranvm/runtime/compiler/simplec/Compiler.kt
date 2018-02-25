@@ -246,6 +246,8 @@ object SimpleC {
 
     private val exprToIR = hashMapOf(
             "#_declarevar" to "DECLARE",
+            "return" to "RETURN",
+
             "+" to "ADD",
             "-" to "SUB",
             "*" to "MUL",
@@ -271,7 +273,10 @@ object SimpleC {
             "goto" to "GOTOLABEL",
             "comefrom" to "DEFLABEL",
 
-            "asm" to "INLINEASM"
+            "asm" to "INLINEASM",
+
+            "funcdef" to "FUNCDEF",
+            "endfuncdef" to "ENDFUNCDEF"
     )
 
     private val irCmpInst = hashSetOf(
@@ -756,6 +761,14 @@ object SimpleC {
                 programOut.add("${node.lineNumber}\t$string")
                 string.delete(0, string.length)
             }
+            else if (node.expressionType == ExpressionType.FUNCTION_DEF) {
+                while (commands.isNotEmpty()) {
+                    string.append("${commands.pop().getReadableNodeName()}\t")
+                }
+
+                programOut.add("${node.lineNumber}\tfuncdef\t$string")
+                string.delete(0, string.length)
+            }
         }
 
 
@@ -810,12 +823,20 @@ object SimpleC {
         val nestedStatementsCommonLabelName = Stack<String>()
 
         notatedProgram.forEachIndexed { index, it ->
-            val words = it. split('\t')
+            val words = it.split('\t')
 
             val lineNumber = words[0].toInt()
 
             val newcmds = ArrayList<IntermediateRepresentation>()
-            newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]] ?: throw NullPointerException("Unknown expression: '${words[1]}'")))
+
+            if (exprToIR.containsKey(words[1])) {
+                newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]]!!))
+            }
+            else {
+                // assuming function call
+                newcmds.add(IntermediateRepresentation(lineNumber, "FUNCCALL", words[1]!!))
+            }
+
             val newcmd = newcmds[0]
 
             fun addNextNewCmd() {
@@ -966,8 +987,28 @@ object SimpleC {
                 "INLINEASM" -> {
                     newcmd.arg1 = words[2].trimIndent().dropLast(1) // drop null terminator
                 }
+                "FUNCCALL" -> {
+                    try { // !! STARTS FROM ONE !! //
+                        newcmd.arg1 = if (words[1].isBlank()) null else words[1]
+                        newcmd.arg2 = if (words[2].isBlank()) null else words[2]
+                        newcmd.arg3 = if (words[3].isBlank()) null else words[3]
+                        newcmd.arg4 = if (words[4].isBlank()) null else words[4]
+                        newcmd.arg5 = if (words[5].isBlank()) null else words[5]
+                    }
+                    catch (e: IndexOutOfBoundsException) {}
+                }
+                "FUNCDEF", "RETURN", "ENDFUNCDEF" -> {
+                    try { // !! STARTS FROM 2 !! //
+                        newcmd.arg1 = if (words[2].isBlank()) null else words[2]
+                        newcmd.arg2 = if (words[3].isBlank()) null else words[3]
+                        newcmd.arg3 = if (words[4].isBlank()) null else words[4]
+                        newcmd.arg4 = if (words[5].isBlank()) null else words[5]
+                        newcmd.arg5 = if (words[6].isBlank()) null else words[6]
+                    }
+                    catch (e: IndexOutOfBoundsException) {}
+                }
                 else -> {
-                    throw InternalError("Unknown instruction: ${newcmd.instruction}")
+                    throw InternalError("Unknown IR instruction: ${newcmd.instruction}")
                 }
             }
 
@@ -1183,6 +1224,21 @@ object SimpleC {
                 "INLINEASM" -> {
                     ASMs.add(it.arg1!!)
                 }
+                "FUNCDEF" -> {
+                    ASMs.add("JMP @\$ENDFUNCDEF_${it.arg1!!};")
+                    ASMs.add(":${it.arg1!!};")
+                }
+                "RETURN" -> {
+                    ASMs.add("RETURN;")
+                }
+                "FUNCCALL" -> {
+                    ASMs.add("LOADWORDI r1, @${it.arg1!!};")
+                    ASMs.add("GOSUB r1;")
+                }
+                "ENDFUNCDEF" -> {
+                    ASMs.add("RETURN;") // RETURN guard
+                    ASMs.add(":\$ENDFUNCDEF_${it.arg1!!};")
+                }
                 else -> throw InternalError("Unknown IR: ${it.instruction}")
             }
         }
@@ -1222,7 +1278,9 @@ object SimpleC {
         }*/
         return when (type) {
             "void" -> ReturnType.NOTHING
-            else -> ReturnType.SOMETHING
+            "int" -> ReturnType.INT
+            "float" -> ReturnType.FLOAT
+            else -> throw SyntaxError("Unknown type: $type")
         }
     }
 
@@ -1236,7 +1294,7 @@ object SimpleC {
             }
             return ret
         }
-        fun debug1(any: Any?) { if (false) println(any) }
+        fun debug1(any: Any?) { if (true ) println(any) }
 
 
 
@@ -1288,7 +1346,7 @@ object SimpleC {
             // chew it down to more understandable format
             var typeHolder: ReturnType? = null
             var nameHolder: String? = null
-            argumentsDef.forEach { token ->
+            argumentsDef.forEachIndexed { index, token ->
                 if (argumentDefBadTokens.contains(token)) {
                     throw IllegalTokenException("at line $lineNumber -- illegal token '$token' used on function argument definition")
                 }
@@ -1296,7 +1354,7 @@ object SimpleC {
 
                 if (token == ",") {
                     if (typeHolder == null) throw SyntaxError("at line $lineNumber -- type not specified")
-                    argTypeNamePair.add(Pair(typeHolder!!, nameHolder))
+                    argTypeNamePair.add(typeHolder!! to nameHolder)
                     typeHolder = null
                     nameHolder = null
                 }
@@ -1309,6 +1367,11 @@ object SimpleC {
                 }
                 else if (typeHolder != null) {
                     nameHolder = token
+
+
+                    if (index == argumentsDef.lastIndex) {
+                        argTypeNamePair.add(typeHolder!! to nameHolder)
+                    }
                 }
                 else {
                     throw InternalError("uncaught shit right there")
@@ -1428,7 +1491,7 @@ object SimpleC {
                 }
                 // bool literals
                 else if (word.matches(regexBooleanWhole)) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.SOMETHING, null, lineNumber)
+                    val leafNode = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.INT, null, lineNumber)
                     leafNode.literalValue = word == "true"
                     return leafNode
                 }
@@ -1437,7 +1500,7 @@ object SimpleC {
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            ReturnType.SOMETHING,
+                            ReturnType.INT,
                             null, lineNumber
                     )
                     try {
@@ -1457,7 +1520,7 @@ object SimpleC {
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            ReturnType.SOMETHING,
+                            ReturnType.INT,
                             null, lineNumber
                     )
                     try {
@@ -1477,7 +1540,7 @@ object SimpleC {
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            ReturnType.SOMETHING,
+                            ReturnType.INT,
                             null, lineNumber
                     )
                     try {
@@ -1497,7 +1560,7 @@ object SimpleC {
                     val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            ReturnType.SOMETHING,
+                            ReturnType.INT,
                             null, lineNumber
                     )
                     try {
@@ -1516,7 +1579,7 @@ object SimpleC {
                 else if (word.matches(regexFPWhole)) {
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
-                            ReturnType.SOMETHING,
+                            ReturnType.FLOAT,
                             null, lineNumber
                     )
                     try {
@@ -1798,7 +1861,9 @@ object SimpleC {
         fun expandImplicitEnds() {
             if (!isRoot) throw Error("Expanding implicit 'end's only make sense when used as root")
 
-            statements.forEach { it._expandImplicitEnds() }
+            // fixme no nested ifs
+            statements.forEach { it.statements.forEach { it._expandImplicitEnds() } } // root level if OF FUNCDEF
+            statements.forEach { it._expandImplicitEnds() } // root level if
         }
 
         private fun _expandImplicitEnds() {
@@ -1806,6 +1871,13 @@ object SimpleC {
                 this.statements.add(SyntaxTreeNode(
                         ExpressionType.FUNCTION_CALL, null, "end${this.name}", this.lineNumber, this.isRoot
                 ))
+            }
+            else if (this.expressionType == ExpressionType.FUNCTION_DEF) {
+                val endfuncdef = SyntaxTreeNode(
+                        ExpressionType.FUNCTION_CALL, null, "endfuncdef", this.lineNumber, this.isRoot
+                )
+                endfuncdef.addArgument(SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, null, this.name!!, this.lineNumber))
+                this.statements.add(endfuncdef)
             }
         }
 
@@ -1863,8 +1935,8 @@ object SimpleC {
         VARIABLE_LEAF // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
     }
     enum class ReturnType {
+        INT, FLOAT,
         NOTHING, // null
-        SOMETHING, // any var/val
         DATABASE // array of bytes, also could be String
     }
 
@@ -1887,7 +1959,7 @@ object SimpleC {
 
     /**
      * Notation rules:
-     * - Variable: prepend with '$' (e.g. $duplicantsCount)
+     * - Variable: prepend with '$' (e.g. $duplicantsCount) // totally not a Oxygen Not Included reference
      * - Register: prepend with 'r' (e.g. r3)
      */
     data class IntermediateRepresentation(
@@ -1907,7 +1979,7 @@ object SimpleC {
             arg3?.let { sb.append(", $it") }
             arg4?.let { sb.append(", $it") }
             arg5?.let { sb.append(", $it") }
-            sb.append(" (at line $lineNum);")
+            sb.append("; (at line $lineNum)")
             return sb.toString()
         }
     }
@@ -1917,5 +1989,5 @@ open class SyntaxError(msg: String? = null) : Exception(msg)
 class IllegalTokenException(msg: String? = null) : SyntaxError(msg)
 class UnresolvedReference(msg: String? = null) : SyntaxError(msg)
 class UndefinedStatement(msg: String? = null) : SyntaxError(msg)
-class DuplicatedDefinition(msg: String? = null) : SyntaxError(msg)
+class DuplicateDefinition(msg: String? = null) : SyntaxError(msg)
 class PreprocessorErrorMessage(msg: String) : SyntaxError(msg)

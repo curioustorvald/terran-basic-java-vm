@@ -51,6 +51,9 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
 
 
+        sb.append("ADRESS :  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n")
+
+
         // coremem
         for (i in 0..vm.memory.lastIndex) {
             if (i % columns == 0) {

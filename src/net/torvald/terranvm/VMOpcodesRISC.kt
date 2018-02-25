@@ -167,11 +167,12 @@ object VMOpcodesRISC {
     fun MALLOC(dest: Register, size: Register) { vm.writeregInt(dest, vm.malloc(vm.readregInt(size)).memAddr) }
     fun RETURN() { POPWORDI(); vm.pc = vm.lr }
     /**
-     * @param addr Address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C)
+     * Register must contain address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C) but not pre-divided
      */
-    fun GOSUB(addr: Int) {
-        PUSHWORDI(addr ushr 2)
-        JMP(addr ushr 2)
+    fun GOSUB(register: Register) {
+        val addr = vm.readregInt(register)
+        PUSHWORDI(vm.pc ushr 2) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
+        JMP(addr)
     }
 
     fun HALT() { vm.terminate = true }

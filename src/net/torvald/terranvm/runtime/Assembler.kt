@@ -231,6 +231,9 @@ object Assembler {
                 if (mathOp == 0) {
                     ""
                 }
+                else if (mathOp == 0b111110) { // GOSUB
+                    "r"
+                }
                 else if (mathOp == 0b011000 || mathOp == 0b011001) { // random number
                     "r"
                 }

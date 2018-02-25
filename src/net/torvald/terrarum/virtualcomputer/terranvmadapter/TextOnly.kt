@@ -35,7 +35,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 20
+        val vmDelay = 200
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -53,21 +53,27 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            asm("
-                loadbytei r1, 0;
-                loadbytei r2, 3;
+            int some_subroutine() {
+                if (1 == 42) {
+                    return 44444;
+                }
 
-                :loope;
+                return 4245;
+            }
 
-                inc r1;
-                storebyte r1, r1, r2;
+            void other_subroutine() {
+                if (443 < 498) {
+                }
 
-                jmp @loope;
-            ");
+                // return null; // implied
+            }
+
+            some_subroutine();
+            other_subroutine();
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
-        val mdaFiller = Assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
+        //val mdaFiller = Assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
 
         println(program)
 
