@@ -60,6 +60,7 @@ object SimpleC {
             Regex("""for\([\s]*;[\s]*;[\s]*\)""")
     ) // more types of infinite loops are must be dealt with (e.g. while (0xFFFFFFFF < 0x7FFFFFFF))
 
+    private val regexRegisterLiteral = Regex("""^r[0-9]+$""")
     private val regexBooleanWhole = Regex("""^(true|false)$""")
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""")
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
@@ -1073,6 +1074,12 @@ object SimpleC {
                     newIR.add(newIR2)
                     i++ // skip next instruction
                 }
+                else if ((it.instruction in VMOpcodesRISC.threeArgsCmd || it.instruction in VMOpcodesRISC.twoArgsCmd) &&
+                        it.arg1!!.startsWith("$$")) {
+                    val newCmd = IntermediateRepresentation(it)
+                    newCmd.arg1 = "r1"
+                    newIR.add(newCmd)
+                }
                 else {
                     newIR.add(it)
                 }
@@ -1103,6 +1110,7 @@ object SimpleC {
 
         fun String.isVar() = this.startsWith('$')
         fun String.asProperAsmData() = if (this.isVar()) "@${this.drop(1)}" else this
+        fun String.isRegister() = this.matches(regexRegisterLiteral)
 
 
         val ASMs = ArrayList<String>()
@@ -1134,6 +1142,9 @@ object SimpleC {
         ASMs.add(".code;")
 
         ir.forEachIndexed { index, it ->
+            val prev = if (index == 0) null else ir[index - 1]
+            val next = if (index == ir.lastIndex) null else ir[index + 1]
+
             when (it.instruction) {
                 "NOP" -> ASMs.add("NOP;")
                 "MOV" -> {
@@ -1163,8 +1174,19 @@ object SimpleC {
                     }
 
 
-                    ASMs.add("${it.instruction} r3, r1, r2;")
-                    ASMs.add("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
+
+                    if (it.arg1!!.isRegister()) {
+                        if (next?.instruction == "RETURN") {
+                            ASMs.add("${it.instruction} r8, r1, r2;")
+                        }
+                        else {
+                            ASMs.add("${it.instruction} ${it.arg1}, r1, r2;")
+                        }
+                    }
+                    else {
+                        ASMs.add("${it.instruction} r3, r1, r2;")
+                        ASMs.add("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
+                    }
                 }
                 in jmpCommands -> {
                     ASMs.add("${it.instruction} @${it.arg1!!.drop(1)};")
@@ -1229,14 +1251,26 @@ object SimpleC {
                     ASMs.add(":${it.arg1!!};")
                 }
                 "RETURN" -> {
-                    ASMs.add("RETURN;")
+                    if (it.arg1 != null) {
+                        if (it.arg2 != null) {
+                            throw InternalError("RETURN with 2 or more args -- '$it'")
+                        }
+
+                        ASMs.add("LOADWORDI r8, ${it.arg1};")
+                        ASMs.add("RETURN;")
+                    }
+                    else {
+                        ASMs.add("RETURN;")
+                    }
                 }
                 "FUNCCALL" -> {
                     ASMs.add("LOADWORDI r1, @${it.arg1!!};")
                     ASMs.add("JSR r1;")
                 }
                 "ENDFUNCDEF" -> {
-                    ASMs.add("RETURN;") // RETURN guard
+                    if (prev?.instruction != "RETURN") {
+                        ASMs.add("RETURN;") // RETURN guard
+                    }
                     ASMs.add(":\$ENDFUNCDEF_${it.arg1!!};")
                 }
                 else -> throw InternalError("Unknown IR: ${it.instruction}")
@@ -1971,6 +2005,16 @@ object SimpleC {
             var arg4: String? = null,
             var arg5: String? = null
     ) {
+        constructor(other: IntermediateRepresentation) : this(
+                other.lineNum,
+                other.instruction,
+                other.arg1,
+                other.arg2,
+                other.arg3,
+                other.arg4,
+                other.arg5
+        )
+
         override fun toString(): String {
             val sb = StringBuilder()
             sb.append(instruction)

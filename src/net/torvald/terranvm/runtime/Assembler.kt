@@ -82,7 +82,7 @@ object Assembler {
 
     private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
 
-    private val registerLiteral = Regex("""r[1-8]""")
+    private val registerLiteral = Regex("""^r[0-9]+$""")
     private val hexLiteral = Regex("""[0-9A-Fa-f]+h""")
 
     private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case

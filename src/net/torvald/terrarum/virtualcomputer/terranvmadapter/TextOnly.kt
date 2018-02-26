@@ -53,15 +53,12 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            asm("loadwordi r7, 13;");
-            asm("loadwordi r8, 6974;");
-
-            void recursif() {
-                asm("xchg r7, r8;");
-                recursif();
+            int fonctionne() {
+                return i + 42;
             }
 
-            recursif();
+            int y;
+            y = fonctionne();
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
