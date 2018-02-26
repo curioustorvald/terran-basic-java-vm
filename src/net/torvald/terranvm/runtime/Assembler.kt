@@ -110,14 +110,14 @@ object Assembler {
     private val primitiveOpcodes: HashMap<String, Int> = hashMapOf(
             // Mathematical and Register data transfer //
 
-            "MOV" to 0b100000,
-            "XCHG" to 0b100001,
-            "INC"  to 0b100010,
-            "DEC"  to 0b100011,
-            "MALLOC" to 0b100100,
-            "FTOI" to 0b100101,
-            "ITOF" to 0b100110,
-            "JSR" to 0b111110,
+            "MOV"    to 0b110000,
+            "XCHG"   to 0b110001,
+            "INC"    to 0b110010,
+            "DEC"    to 0b110011,
+            "MALLOC" to 0b110100,
+            "FTOI"   to 0b110110,
+            "ITOF"   to 0b110111,
+            "JSR"    to 0b111110,
             "RETURN" to 0b111111,
 
             "ADD"  to 0b000001,
@@ -126,6 +126,14 @@ object Assembler {
             "DIV"  to 0b000100,
             "POW"  to 0b000101,
             "MOD"  to 0b000110,
+
+            "ADDINT"  to 0b100001,
+            "SUBINT"  to 0b100010,
+            "MULINT"  to 0b100011,
+            "DIVINT"  to 0b100100,
+            "POWINT"  to 0b100101,
+            "MODINT"  to 0b100110,
+
             "SHL"  to 0b000111,
             "SHR"  to 0b001000,
             "USHR" to 0b001001,
@@ -237,16 +245,16 @@ object Assembler {
                 else if (mathOp == 0b011000 || mathOp == 0b011001) { // random number
                     "r"
                 }
-                else if (mathOp in 0b000001..0b001111) {
+                else if (mathOp in 0b000001..0b001111 || mathOp in 0b100001..0b100110) {
                     "rrr"
                 }
                 else if (mathOp in 0b010000..0b011111) {
                     "rr"
                 }
-                else if (mathOp == 0b100000 || mathOp == 0b100001 || mathOp == 0b100100) { // MOV and XCHG; MALLOC
+                else if (mathOp == 0b110000 || mathOp == 0b110001 || mathOp == 0b110100) { // MOV and XCHG; MALLOC
                     "rr"
                 }
-                else if (mathOp == 0b100010 || mathOp == 0b100011 || mathOp == 0b100101 || mathOp == 0b100110) {
+                else if (mathOp == 0b110010 || mathOp == 0b110011 || mathOp == 0b110110 || mathOp == 0b110110) { // INC, DEC, FTOI, ITOF
                     "r"
                 }
                 else if (mathOp in 0b1000000..0b1000111) { // load/store

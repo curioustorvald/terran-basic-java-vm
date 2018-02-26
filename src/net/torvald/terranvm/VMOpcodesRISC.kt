@@ -187,6 +187,13 @@ object VMOpcodesRISC {
     @Strictfp fun POW(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) pow vm.readregFloat(m)) }
     @Strictfp fun MOD(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) fmod vm.readregFloat(m)) }
 
+    fun ADDINT(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) + vm.readregInt(m)) }
+    fun SUBINT(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) - vm.readregInt(m)) }
+    fun MULINT(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) * vm.readregInt(m)) }
+    fun DIVINT(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) / vm.readregInt(m)) }
+    fun POWINT(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) pow vm.readregInt(m)) }
+    fun MODINT(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) fmod vm.readregInt(m)) }
+
     fun SHL (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) shl  vm.readregInt(m)) }
     fun SHR (dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) shr  vm.readregInt(m)) }
     fun USHR(dest: Register, src: Register, m: Register) { vm.writeregInt(dest, vm.readregInt(src) ushr vm.readregInt(m)) }
@@ -404,12 +411,21 @@ object VMOpcodesRISC {
                 if (opcode.and(0b1111111111000000) == 0) {
                     when (opcode.and(0b111111)) {
                         0 -> HALT()
+
                         1 -> ADD(Rd, Rs, Rm)
                         2 -> SUB(Rd, Rs, Rm)
                         3 -> MUL(Rd, Rs, Rm)
                         4 -> DIV(Rd, Rs, Rm)
                         5 -> POW(Rd, Rs, Rm)
                         6 -> MOD(Rd, Rs, Rm)
+
+                        33 -> ADDINT(Rd, Rs, Rm)
+                        34 -> SUBINT(Rd, Rs, Rm)
+                        35 -> MULINT(Rd, Rs, Rm)
+                        36 -> DIVINT(Rd, Rs, Rm)
+                        37 -> POWINT(Rd, Rs, Rm)
+                        38 -> MODINT(Rd, Rs, Rm)
+
                         7 -> SHL(Rd, Rs, Rm)
                         8 -> SHR(Rd, Rs, Rm)
                         9 -> USHR(Rd, Rs, Rm)
@@ -434,13 +450,13 @@ object VMOpcodesRISC {
                         30 -> RAD(Rd, Rs)
                         31 -> NOT(Rd, Rs)
 
-                        32 -> MOV(Rd, Rs)
-                        33 -> XCHG(Rd, Rs)
-                        34 -> INC(Rd)
-                        35 -> DEC(Rd)
-                        36 -> MALLOC(Rd, Rs)
-                        37 -> FTOI(Rd, Rs)
-                        38 -> ITOF(Rd, Rs)
+                        48 -> MOV(Rd, Rs)
+                        49 -> XCHG(Rd, Rs)
+                        50 -> INC(Rd)
+                        51 -> DEC(Rd)
+                        52 -> MALLOC(Rd, Rs)
+                        54 -> FTOI(Rd, Rs)
+                        55 -> ITOF(Rd, Rs)
 
                         62 -> JSR(Rd)
                         63 -> RETURN()
@@ -577,6 +593,12 @@ object VMOpcodesRISC {
             "DIV" to 3,
             "POW" to 3,
             "MOD" to 3,
+            "ADDINT" to 3,
+            "SUBINT" to 3,
+            "MULINT" to 3,
+            "DIVINT" to 3,
+            "POWINT" to 3,
+            "MODINT" to 3,
             "SHL" to 3,
             "SHR" to 3,
             "USHR" to 3,
@@ -659,6 +681,8 @@ object VMOpcodesRISC {
 
     private infix fun Float.pow(other: Float) = Math.pow(this.toDouble(), other.toDouble()).toFloat()
     private infix fun Float.fmod(other: Float) = Math.floorMod(this.toInt(), other.toInt()).toFloat()
+    private infix fun Int.pow(other: Int) = Math.pow(this.toDouble(), other.toDouble()).toInt()
+    private infix fun Int.fmod(other: Int) = Math.floorMod(this.toInt(), other.toInt()).toInt()
 
     /**
      * Will seed itself using RTC or uptime

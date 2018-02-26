@@ -53,12 +53,7 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            int fonctionne() {
-                return i + 42;
-            }
-
-            int y;
-            y = fonctionne();
+            asm("loadwordi r1, 42; loadwordi r2, 42f;");
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
