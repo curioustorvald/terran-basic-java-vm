@@ -46,30 +46,22 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(512, stdout = peripheral.printStream, tbasic_remove_string_dupes = true)
+        vm = TerranVM(512, stdout = peripheral.printStream)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction()
         vm.peripherals[3] = peripheral
 
 
         val testProgram = """
-            int some_subroutine() {
-                if (1 == 42) {
-                    return 44444;
-                }
+            asm("loadwordi r7, 13;");
+            asm("loadwordi r8, 6974;");
 
-                return 4245;
+            void recursif() {
+                asm("xchg r7, r8;");
+                recursif();
             }
 
-            void other_subroutine() {
-                if (443 < 498) {
-                }
-
-                // return null; // implied
-            }
-
-            some_subroutine();
-            other_subroutine();
+            recursif();
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 

@@ -169,7 +169,7 @@ object VMOpcodesRISC {
     /**
      * Register must contain address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C) but not pre-divided
      */
-    fun GOSUB(register: Register) {
+    fun JSR(register: Register) {
         val addr = vm.readregInt(register)
         PUSHWORDI(vm.pc ushr 2) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
         JMP(addr)
@@ -442,7 +442,7 @@ object VMOpcodesRISC {
                         37 -> FTOI(Rd, Rs)
                         38 -> ITOF(Rd, Rs)
 
-                        62 -> GOSUB(Rd)
+                        62 -> JSR(Rd)
                         63 -> RETURN()
 
                         else -> throw NullPointerException()

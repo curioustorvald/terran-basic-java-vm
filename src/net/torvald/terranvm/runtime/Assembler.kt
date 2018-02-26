@@ -117,7 +117,7 @@ object Assembler {
             "MALLOC" to 0b100100,
             "FTOI" to 0b100101,
             "ITOF" to 0b100110,
-            "GOSUB" to 0b111110,
+            "JSR" to 0b111110,
             "RETURN" to 0b111111,
 
             "ADD"  to 0b000001,
@@ -231,7 +231,7 @@ object Assembler {
                 if (mathOp == 0) {
                     ""
                 }
-                else if (mathOp == 0b111110) { // GOSUB
+                else if (mathOp == 0b111110) { // JSR
                     "r"
                 }
                 else if (mathOp == 0b011000 || mathOp == 0b011001) { // random number

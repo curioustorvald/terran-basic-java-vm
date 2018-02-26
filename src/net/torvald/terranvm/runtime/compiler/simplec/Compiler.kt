@@ -1233,7 +1233,7 @@ object SimpleC {
                 }
                 "FUNCCALL" -> {
                     ASMs.add("LOADWORDI r1, @${it.arg1!!};")
-                    ASMs.add("GOSUB r1;")
+                    ASMs.add("JSR r1;")
                 }
                 "ENDFUNCDEF" -> {
                     ASMs.add("RETURN;") // RETURN guard

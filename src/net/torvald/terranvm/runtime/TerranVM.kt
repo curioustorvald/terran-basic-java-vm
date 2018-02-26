@@ -701,7 +701,7 @@ MTHFU
     companion object {
         val charset = Charsets.UTF_8
 
-        val interruptCount = 16
+        val interruptCount = 24
         
         val INT_DIV_BY_ZERO = 0
         val INT_ILLEGAL_OP = 1
@@ -713,6 +713,11 @@ MTHFU
         val INT_PERI_INPUT = 7
         val INT_PERI_OUTPUT = 8
         val INT_INTERRUPT = 9
+        val INT_SERIAL0 = 10
+        val INT_SERIAL1 = 11
+
+        val INT_RASTER_FBUFFER = 16 // required to fire interrupt following every screen refresh
+
 
 
         val IRQ_SYSTEM_TIMER = 0
@@ -736,16 +741,16 @@ MTHFU
     private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
 
     // Interrupt handlers (its just JMPs) //
-    fun interruptDivByZero() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt()) }
-    fun interruptIllegalOp() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt()) }
-    fun interruptOutOfMem()  { VMOpcodesRISC.GOSUB(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt()) }
-    fun interruptStackOverflow() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt()) }
-    fun interruptMathError() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt()) }
-    fun interruptSegmentationFault() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt()) }
-    fun interruptKeyPress() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt()) }
-    fun interruptPeripheralInput() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt()) }
-    fun interruptPeripheralOutput() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt()) }
-    fun interruptStopExecution() { VMOpcodesRISC.GOSUB(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt()) }
+    fun interruptDivByZero() { VMOpcodesRISC.JMP(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptIllegalOp() { VMOpcodesRISC.JMP(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptOutOfMem()  { VMOpcodesRISC.JMP(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptStackOverflow() { VMOpcodesRISC.JMP(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptMathError() { VMOpcodesRISC.JMP(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptSegmentationFault() { VMOpcodesRISC.JMP(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptKeyPress() { VMOpcodesRISC.JMP(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptPeripheralInput() { VMOpcodesRISC.JMP(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptPeripheralOutput() { VMOpcodesRISC.JMP(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptStopExecution() { VMOpcodesRISC.JMP(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt().ushr(2)) }
 
 
     class BIOS(val vm: TerranVM) : VMPeripheralHardware {
