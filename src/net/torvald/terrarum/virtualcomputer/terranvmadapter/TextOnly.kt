@@ -52,23 +52,33 @@ class TextOnly : Game() {
         vm.peripherals[3] = peripheral
 
 
-        val testProgram = """
-            asm("loadwordi r1, 42; loadwordi r2, 42f;");
+        /*val testProgram = """
+
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
-
-        //val mdaFiller = Assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
 
         println(program)
 
         val notatedProgram = SimpleC.treeToProperNotation(program)
+
         val programInIR = SimpleC.notationToIR(notatedProgram)
         val programInNewIR = SimpleC.preprocessIR(programInIR)
         val programASM = SimpleC.IRtoASM(programInNewIR)
-        val code = Assembler(programASM.joinToString("\n"))
+        val code = Assembler(programASM.joinToString("\n"))*/
 
 
-        vm.loadProgram(code)
+        //val mdaFiller = Assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
+
+
+        val intFloatTest = Assembler("""
+            #loadbytei r1, 42;
+            #loadbytei r2, 42f;
+            loadwordi r1, 42;
+            loadwordi r2, 42f;
+        """.trimIndent())
+
+
+        vm.loadProgram(intFloatTest)
         vm.delayInMills = vmDelay
 
 

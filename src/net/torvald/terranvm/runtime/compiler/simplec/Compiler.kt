@@ -60,13 +60,13 @@ object SimpleC {
             Regex("""for\([\s]*;[\s]*;[\s]*\)""")
     ) // more types of infinite loops are must be dealt with (e.g. while (0xFFFFFFFF < 0x7FFFFFFF))
 
-    private val regexRegisterLiteral = Regex("""^r[0-9]+$""")
+    private val regexRegisterLiteral = Regex("""^r[0-9]+$""") // same as the assembler
     private val regexBooleanWhole = Regex("""^(true|false)$""")
-    private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""")
+    private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""") // DIFFERENT FROM the assembler
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
-    private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""")
-    private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""")
-    private val regexIntWhole = Regex("""^([0-9_]+[Ll]?)$""")
+    private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""") // DIFFERENT FROM the assembler
+    private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the assembler
+    private val regexIntWhole = Regex("""^([0-9_]+[Ll]?)$""") // DIFFERENT FROM the assembler
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
     private fun String.matchesFloatLiteral() = this.matches(regexFPWhole)

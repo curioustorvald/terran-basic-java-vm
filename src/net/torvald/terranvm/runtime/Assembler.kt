@@ -82,8 +82,11 @@ object Assembler {
 
     private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
 
-    private val registerLiteral = Regex("""^r[0-9]+$""")
-    private val hexLiteral = Regex("""[0-9A-Fa-f]+h""")
+    val regexRegisterLiteral = Regex("""^r[0-9]+$""") // same as the compiler
+    val regexHexWhole = Regex("""^([0-9A-Fa-f_]+h)$""") // DIFFERENT FROM the compiler
+    val regexBinWhole = Regex("""^([01_]+b)$""") // DIFFERENT FROM the compiler
+    val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the compiler
+    val regexIntWhole = Regex("""^([0-9_]+)$""") // DIFFERENT FROM the compiler
 
     private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
 
@@ -410,6 +413,19 @@ object Assembler {
     }
 
     fun assemblyToOpcode(line: String): IntArray {
+        fun String.toFloatOrInt(): Int =
+                if (this.startsWith(labelMarker)) // label?
+                    getLabel(this).ushr(2)
+                else if (this.matches(regexHexWhole))
+                    this.dropLast(1).replace("_", "").toInt(16)
+                else if (this.matches(regexBinWhole))
+                    this.dropLast(1).replace("_", "").toInt(2)
+                else if (this.matches(regexIntWhole))
+                    this.replace("_", "").toInt()
+                else
+                    this.replace("_", "").toFloat().toRawBits()
+
+
         val words = line.split(delimiters)
         val cmd = words[0].toUpperCase()
 
@@ -427,6 +443,7 @@ object Assembler {
         else {
 
             val arguments = getOpArgs(resultingOpcode)
+            debug("arguments: $arguments")
 
             // check if user had provided right number of arguments
             if (words.size != arguments.length + 1) {
@@ -438,7 +455,7 @@ object Assembler {
                 val word = words[index + 1]
 
                 if (c == 'f') { // 'f' is only used for LOADWORDI (arg: rf), which outputs TWO opcodes
-                    val fullword = word.toFloatOrNull()?.toRawBits() ?: word.resolveInt()
+                    val fullword = word.toFloatOrInt()
                     val lowhalf = fullword.and(0xFFFF)
                     val highhalf = fullword.ushr(16)
 
@@ -774,7 +791,7 @@ object Assembler {
     }
 
     private fun String.toRegInt() =
-            if (this.matches(registerLiteral))
+            if (this.matches(regexRegisterLiteral))
                 this[1].toInt() - 49 // "r1" -> 0
             else
                 throw IllegalArgumentException("Illegal register literal: '$this'")
@@ -782,7 +799,7 @@ object Assembler {
     private fun String.resolveInt() =
         if (this.startsWith(labelMarker)) // label?
             getLabel(this).ushr(2)
-        else if (this.matches(hexLiteral)) // hex?
+        else if (this.matches(regexHexWhole)) // hex?
             this.dropLast(1).toLong(16).toInt() // because what the fuck Kotlin?
         else if (this.matches(matchInteger)) // number?
             this.toLong().toInt() // because what the fuck Kotlin?
