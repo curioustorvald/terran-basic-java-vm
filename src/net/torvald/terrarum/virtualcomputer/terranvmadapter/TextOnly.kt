@@ -52,8 +52,32 @@ class TextOnly : Game() {
         vm.peripherals[3] = peripheral
 
 
-        /*val testProgram = """
+        val assembler = Assembler(vm)
 
+
+        val testProgram = """
+            void fo1() <%
+                fo2();
+
+                asm("loadwordi r6, 42195;");
+            %>
+
+            void fo2() <%
+
+                asm("loadwordi r7, 421f;");
+            %>
+
+            int i;
+            int j;
+            int k;
+
+            i = 42f;
+            j = 59f;
+            k = 0xBEBAFECA;
+
+            fo1();
+
+            asm("loadwordi r2, 69696969;");
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
@@ -64,21 +88,21 @@ class TextOnly : Game() {
         val programInIR = SimpleC.notationToIR(notatedProgram)
         val programInNewIR = SimpleC.preprocessIR(programInIR)
         val programASM = SimpleC.IRtoASM(programInNewIR)
-        val code = Assembler(programASM.joinToString("\n"))*/
+        val code = assembler(programASM.joinToString("\n"))
 
 
-        //val mdaFiller = Assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
+        //val mdaFiller = assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
 
 
-        val intFloatTest = Assembler("""
+        /*val intFloatTest = assembler("""
             #loadbytei r1, 42;
             #loadbytei r2, 42f;
             loadwordi r1, 42;
             loadwordi r2, 42f;
-        """.trimIndent())
+        """.trimIndent())*/
 
 
-        vm.loadProgram(intFloatTest)
+        vm.loadProgram(code)
         vm.delayInMills = vmDelay
 
 

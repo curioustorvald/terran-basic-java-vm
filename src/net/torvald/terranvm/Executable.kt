@@ -20,16 +20,18 @@ object Executable {
 
 
     fun main() {
+        val vm = TerranVM(1024)
+        val assembler = Assembler(vm)
+
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
         val notatedProgram = SimpleC.treeToProperNotation(program)
         val programInIR = SimpleC.notationToIR(notatedProgram)
         val programInNewIR = SimpleC.preprocessIR(programInIR)
         val programASM = SimpleC.IRtoASM(programInNewIR)
-        val code = Assembler(programASM.joinToString("\n"))
+        val code = assembler(programASM.joinToString("\n"))
 
-
-        val vm = TerranVM(1024)
         vm.loadProgram(code)
+
 
 
         // test print mem

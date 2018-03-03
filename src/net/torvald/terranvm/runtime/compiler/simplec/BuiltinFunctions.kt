@@ -6,7 +6,7 @@ import net.torvald.terranvm.runtime.Assembler
  * Created by minjaesong on 2017-06-14.
  */
 
-internal fun asm(assembly: String) = Assembler(assembly)
+//internal fun asm(assembly: String) = Assembler(assembly)
 
 /*class Assignvar : CBuiltinFunction("#_assignvar", 3) {
     override fun toASM(args: Array<SimpleC.SyntaxTreeNode>): ByteArray {

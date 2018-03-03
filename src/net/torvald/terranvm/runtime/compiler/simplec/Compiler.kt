@@ -60,19 +60,19 @@ object SimpleC {
             Regex("""for\([\s]*;[\s]*;[\s]*\)""")
     ) // more types of infinite loops are must be dealt with (e.g. while (0xFFFFFFFF < 0x7FFFFFFF))
 
-    private val regexRegisterLiteral = Regex("""^r[0-9]+$""") // same as the assembler
+    private val regexRegisterLiteral = Regex("""^[Rr][0-9]+$""") // same as the assembler
     private val regexBooleanWhole = Regex("""^(true|false)$""")
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""") // DIFFERENT FROM the assembler
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""") // DIFFERENT FROM the assembler
-    private val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the assembler
-    private val regexIntWhole = Regex("""^([0-9_]+[Ll]?)$""") // DIFFERENT FROM the assembler
+    private val regexFPWhole =  Regex("""^([-+]?[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the assembler
+    private val regexIntWhole = Regex("""^([-+]?[0-9_]+[Ll]?)$""") // DIFFERENT FROM the assembler
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
     private fun String.matchesFloatLiteral() = this.matches(regexFPWhole)
     private fun String.matchesIntLiteral() = this.matchesNumberLiteral()
-    private fun makeTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
-    private fun makeSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_${arg2}_\$l$lineNum"
+    private fun generateTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
+    private fun generateSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_${arg2}_\$l$lineNum"
 
 
     private val regexVarNameWhole = Regex("""^([A-Za-z_][A-Za-z0-9_]*)$""")
@@ -253,9 +253,16 @@ object SimpleC {
             "-" to "SUB",
             "*" to "MUL",
             "/" to "DIV",
+            "^" to "POW",
+            "%" to "MOD",
+
             "<<" to "SHL",
             ">>" to "SHR",
             ">>>" to "USHR",
+            "and" to "AND",
+            "or" to "OR",
+            "xor" to "XOR",
+            "not" to "NOT",
 
             "=" to "MOV",
 
@@ -294,7 +301,7 @@ object SimpleC {
 
 
     // compiler options
-    var useDigraph = false
+    var useDigraph = true
     var useTrigraph = false
     var errorIncompatibles = true
 
@@ -862,7 +869,7 @@ object SimpleC {
                 in VMOpcodesRISC.threeArgsCmd -> {
                     newcmd.arg2 = words[2].toIRVar()
                     newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
-                    newcmd.arg1 = makeTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
+                    newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
 
                     nestedStatementsCommonLabelName.push(newcmd.arg1)
                 }
@@ -875,7 +882,7 @@ object SimpleC {
                     }
 
                     nestedStatementsCommonLabelName.push(
-                            makeSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", newcmd.arg1!!, newcmd.arg2!!)
+                            generateSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", newcmd.arg1!!, newcmd.arg2!!)
                     )
                 }
                 "IF" -> {
@@ -1310,7 +1317,7 @@ object SimpleC {
             "bool" -> if (isPointer) ReturnType.BOOL_PTR else ReturnType.BOOL
             else -> if (isPointer) ReturnType.STRUCT_PTR else ReturnType.STRUCT
         }*/
-        return when (type) {
+        return when (type.toLowerCase()) {
             "void" -> ReturnType.NOTHING
             "int" -> ReturnType.INT
             "float" -> ReturnType.FLOAT
@@ -1531,17 +1538,14 @@ object SimpleC {
                 }
                 // hexadecimal literals
                 else if (word.matches(regexHexWhole)) {
-                    val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             ReturnType.INT,
                             null, lineNumber
                     )
                     try {
-                        leafNode.literalValue = if (isLong)
-                            word.replace(Regex("""[^0-9A-Fa-f]"""), "").toLong(16)
-                        else
-                            word.replace(Regex("""[^0-9A-Fa-f]"""), "").toInt(16)
+                        leafNode.literalValue =
+                            word.replace(Regex("""[^0-9A-Fa-f]"""), "").toLong(16).and(0xFFFFFFFFL).toInt()
                     }
                     catch (e: NumberFormatException) {
                         throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
@@ -1551,17 +1555,14 @@ object SimpleC {
                 }
                 // octal literals
                 else if (word.matches(regexOctWhole)) {
-                    val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             ReturnType.INT,
                             null, lineNumber
                     )
                     try {
-                        leafNode.literalValue = if (isLong)
-                            word.replace(Regex("""[^0-7]"""), "").toLong(8)
-                        else
-                            word.replace(Regex("""[^0-7]"""), "").toInt(8)
+                        leafNode.literalValue =
+                            word.replace(Regex("""[^0-7]"""), "").toLong(8).and(0xFFFFFFFFL).toInt()
                     }
                     catch (e: NumberFormatException) {
                         throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
@@ -1571,17 +1572,14 @@ object SimpleC {
                 }
                 // binary literals
                 else if (word.matches(regexBinWhole)) {
-                    val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             ReturnType.INT,
                             null, lineNumber
                     )
                     try {
-                        leafNode.literalValue = if (isLong)
-                            word.replace(Regex("""[^01]"""), "").toLong(2)
-                        else
-                            word.replace(Regex("""[^01]"""), "").toInt(2)
+                        leafNode.literalValue =
+                            word.replace(Regex("""[^01]"""), "").toLong(2).and(0xFFFFFFFFL).toInt()
                     }
                     catch (e: NumberFormatException) {
                         throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")
@@ -1591,17 +1589,14 @@ object SimpleC {
                 }
                 // int literals
                 else if (word.matches(regexIntWhole)) {
-                    val isLong = word.endsWith('L', true)
                     val leafNode = SyntaxTreeNode(
                             ExpressionType.LITERAL_LEAF,
                             ReturnType.INT,
                             null, lineNumber
                     )
                     try {
-                        leafNode.literalValue = if (isLong)
-                            word.replace(Regex("""[^0-9]"""), "").toLong()
-                        else
-                            word.replace(Regex("""[^0-9]"""), "").toInt()
+                        leafNode.literalValue =
+                            word.replace(Regex("""[^0-9]"""), "").toLong().and(0xFFFFFFFFL).toInt()
                     }
                     catch (e: NumberFormatException) {
                         throw IllegalTokenException("at line $lineNumber -- $word is too large to be represented as ${leafNode.returnType?.toString()?.toLowerCase()}")

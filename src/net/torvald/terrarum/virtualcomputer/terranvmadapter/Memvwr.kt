@@ -2,6 +2,7 @@ package net.torvald.terrarum.virtualcomputer.terranvmadapter
 
 import net.torvald.terranvm.runtime.TerranVM
 import net.torvald.terranvm.runtime.to8HexString
+import net.torvald.terranvm.runtime.toHexString
 import net.torvald.terranvm.runtime.toUint
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -25,10 +26,14 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         val sb = StringBuilder()
 
         /*
+        stack: 60h..1FFh
         r1: 00000000h; 0; 0.0f
         rCMP: -1
         000000 : 00 00 00 00 00 00 00 48 00 00 00 50 00 00 00 58 | .......H...P...X
          */
+
+        sb.append("stack: ${vm.ivtSize.toHexString()}..${(vm.ivtSize + vm.stackSize - 1).toHexString()}\n")
+
 
         // registers
         for (r in 1..8) {
@@ -51,7 +56,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
 
 
-        sb.append("ADRESS :  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n")
+        sb.append("ADRESS :  0  1  2  3| 4  5  6  7| 8  9  A  B| C  D  E  F\n")
 
 
         // coremem
@@ -63,8 +68,12 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
 
             sb.append(vm.memory[i].toUint().toString(16).toUpperCase().padStart(2, '0'))
-            sb.append(' ') // mem value
-
+            if (i % 16 in intArrayOf(3, 7, 11)) {
+                sb.append('|') // mem value
+            }
+            else {
+                sb.append(' ') // mem value
+            }
 
             // ASCII viewer
             if (i % columns == 15) {
@@ -79,17 +88,13 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
                     else {
                         sb.append(mem.toChar())
                     }
+
+                    if (x in intArrayOf(-12, -8, -4))
+                        sb.append('|')
                 }
 
                 sb.append('\n')
             }
-        }
-
-
-        // stack
-        sb.append("stack size: ${vm.sp}/${vm.callStack.size}\n")
-        for (i in 0 until vm.sp) {
-            sb.append("s${i.toString().padStart(4, '0')} : ${vm.callStack[i].to8HexString()}\n")
         }
 
 

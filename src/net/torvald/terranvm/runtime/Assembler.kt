@@ -1,7 +1,5 @@
 package net.torvald.terranvm.runtime
 
-import net.torvald.terranvm.runtime.Assembler.resolveInt
-import net.torvald.terranvm.runtime.Assembler.toRegInt
 import net.torvald.terranvm.toReadableBin
 
 
@@ -64,151 +62,152 @@ import net.torvald.terranvm.toReadableBin
  *
  * Created by minjaesong on 2017-05-28.
  */
-object Assembler {
-
-    private val delimiters = Regex("""[ \t,]+""")
-    private val blankLines = Regex("""(?<=;)[\n ]+""")
-    private val stringMarker = Regex("""\"[^\n]*\"""")
-    private val labelMarker = '@'
-    private val labelDefinitionMarker = ':'
-    private val lineEndMarker = ';'
-    private val commentMarker = '#'
-    private val literalMarker = '"'
-    private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
-    private val matchInteger = Regex("""[0-9]+""")
-    private val regexWhitespaceNoSP = Regex("""[\t\r\n\v\f]""")
-    private val prependedSpaces = Regex("""^[\s]+""")
+class Assembler(val vm: TerranVM) {
 
 
-    private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
+    companion object {
 
-    val regexRegisterLiteral = Regex("""^r[0-9]+$""") // same as the compiler
-    val regexHexWhole = Regex("""^([0-9A-Fa-f_]+h)$""") // DIFFERENT FROM the compiler
-    val regexBinWhole = Regex("""^([01_]+b)$""") // DIFFERENT FROM the compiler
-    val regexFPWhole =  Regex("""^([0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the compiler
-    val regexIntWhole = Regex("""^([0-9_]+)$""") // DIFFERENT FROM the compiler
+        private val delimiters = Regex("""[ \t,]+""")
+        private val blankLines = Regex("""(?<=;)[\n ]+""")
+        private val stringMarker = Regex("""\"[^\n]*\"""")
+        private val labelMarker = '@'
+        private val labelDefinitionMarker = ':'
+        private val lineEndMarker = ';'
+        private val commentMarker = '#'
+        private val literalMarker = '"'
+        private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
+        private val matchInteger = Regex("""[0-9]+""")
+        private val regexWhitespaceNoSP = Regex("""[\t\r\n\v\f]""")
+        private val prependedSpaces = Regex("""^[\s]+""")
 
-    private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
 
-    private var currentSection = ".CODE"
+        private val dataSectActualData = Regex("""^[A-Za-z]+[m \t]+[A-Za-z0-9_]+[m \t]+""")
 
-    val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
+        val regexRegisterLiteral = Regex("""^[Rr][0-9]+$""") // same as the compiler
+        val regexHexWhole = Regex("""^([0-9A-Fa-f_]+h)$""") // DIFFERENT FROM the compiler
+        val regexBinWhole = Regex("""^([01_]+b)$""") // DIFFERENT FROM the compiler
+        val regexFPWhole = Regex("""^([-+]?[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the compiler
+        val regexIntWhole = Regex("""^([-+]?[0-9_]+)$""") // DIFFERENT FROM the compiler
+
+        private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
+
+        private var currentSection = ".CODE"
+
+        val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
 
 
+        val bitmaskRd = 0b00000001110000000000000000000000
+        val bitmaskRs = 0b00000000001110000000000000000000
+        val bitmaskRm = 0b00000000000001110000000000000000
+        val bitmaskR4 = 0b00000000000000001110000000000000
+        val bitmaskR5 = 0b00000000000000000001110000000000
+        val bitmaskCond = 0b11100000000000000000000000000000
+        val conditions: HashMap<String, Int> = hashMapOf(
+                "" to 0,
+                "Z" to 0x20000000,
+                "NZ" to 0x40000000,
+                "GT" to 0x60000000,
+                "LS" to 0x80000000L.toInt()
+        )
+        private val primitiveOpcodes: HashMap<String, Int> = hashMapOf(
+                // Mathematical and Register data transfer //
 
+                "MOV" to 0b110000,
+                "XCHG" to 0b110001,
+                "INC" to 0b110010,
+                "DEC" to 0b110011,
+                "MALLOC" to 0b110100,
+                "FTOI" to 0b110110,
+                "ITOF" to 0b110111,
+                "JSR" to 0b111110,
+                "RETURN" to 0b111111,
 
-    val bitmaskRd = 0b00000001110000000000000000000000
-    val bitmaskRs = 0b00000000001110000000000000000000
-    val bitmaskRm = 0b00000000000001110000000000000000
-    val bitmaskR4 = 0b00000000000000001110000000000000
-    val bitmaskR5 = 0b00000000000000000001110000000000
-    val bitmaskCond = 0b11100000000000000000000000000000
-    val conditions: HashMap<String, Int> = hashMapOf(
-            "" to 0,
-            "Z"  to 0x20000000,
-            "NZ" to 0x40000000,
-            "GT" to 0x60000000,
-            "LS" to 0x80000000L.toInt()
-    )
-    private val primitiveOpcodes: HashMap<String, Int> = hashMapOf(
-            // Mathematical and Register data transfer //
+                "ADD" to 0b000001,
+                "SUB" to 0b000010,
+                "MUL" to 0b000011,
+                "DIV" to 0b000100,
+                "POW" to 0b000101,
+                "MOD" to 0b000110,
 
-            "MOV"    to 0b110000,
-            "XCHG"   to 0b110001,
-            "INC"    to 0b110010,
-            "DEC"    to 0b110011,
-            "MALLOC" to 0b110100,
-            "FTOI"   to 0b110110,
-            "ITOF"   to 0b110111,
-            "JSR"    to 0b111110,
-            "RETURN" to 0b111111,
+                "ADDINT" to 0b100001,
+                "SUBINT" to 0b100010,
+                "MULINT" to 0b100011,
+                "DIVINT" to 0b100100,
+                "POWINT" to 0b100101,
+                "MODINT" to 0b100110,
 
-            "ADD"  to 0b000001,
-            "SUB"  to 0b000010,
-            "MUL"  to 0b000011,
-            "DIV"  to 0b000100,
-            "POW"  to 0b000101,
-            "MOD"  to 0b000110,
+                "SHL" to 0b000111,
+                "SHR" to 0b001000,
+                "USHR" to 0b001001,
+                "AND" to 0b001010,
+                "OR" to 0b001011,
+                "XOR" to 0b001100,
+                "ABS" to 0b010000,
+                "SIN" to 0b010001,
+                "COS" to 0b010010,
+                "TAN" to 0b010011,
+                "FLOOR" to 0b010100,
+                "CEIL" to 0b010101,
+                "ROUND" to 0b010110,
+                "LOG" to 0b010111,
+                "RNDI" to 0b011000,
+                "RND" to 0b011001,
+                "SGN" to 0b011010,
+                "SQRT" to 0b011011,
+                "CBRT" to 0b011100,
+                "INV" to 0b011101,
+                "RAD" to 0b011110,
+                "NOT" to 0b011111,
 
-            "ADDINT"  to 0b100001,
-            "SUBINT"  to 0b100010,
-            "MULINT"  to 0b100011,
-            "DIVINT"  to 0b100100,
-            "POWINT"  to 0b100101,
-            "MODINT"  to 0b100110,
+                "HALT" to 0,
 
-            "SHL"  to 0b000111,
-            "SHR"  to 0b001000,
-            "USHR" to 0b001001,
-            "AND"  to 0b001010,
-            "OR"   to 0b001011,
-            "XOR"  to 0b001100,
-            "ABS"  to 0b010000,
-            "SIN"  to 0b010001,
-            "COS"  to 0b010010,
-            "TAN"  to 0b010011,
-            "FLOOR" to 0b010100,
-            "CEIL" to 0b010101,
-            "ROUND" to 0b010110,
-            "LOG"  to 0b010111,
-            "RNDI" to 0b011000,
-            "RND"  to 0b011001,
-            "SGN"  to 0b011010,
-            "SQRT" to 0b011011,
-            "CBRT" to 0b011100,
-            "INV"  to 0b011101,
-            "RAD"  to 0b011110,
-            "NOT"  to 0b011111,
+                // Load and Store to memory //
 
-            "HALT" to 0,
+                "LOADBYTE" to 0b0000_000000000_0000000001000_00_0,
+                "LOADHWORD" to 0b0000_000000000_0000000001000_01_0,
+                "LOADWORD" to 0b0000_000000000_0000000001000_10_0,
+                "STOREBYTE" to 0b0000_000000000_0000000001000_00_1,
+                "STOREHWORD" to 0b0000_000000000_0000000001000_01_1,
+                "STOREWORD" to 0b0000_000000000_0000000001000_10_1,
 
-            // Load and Store to memory //
+                // Memory copy //
 
-            "LOADBYTE"  to 0b0000_000000000_0000000001000_00_0,
-            "LOADHWORD" to 0b0000_000000000_0000000001000_01_0,
-            "LOADWORD"  to 0b0000_000000000_0000000001000_10_0,
-            "STOREBYTE"  to 0b0000_000000000_0000000001000_00_1,
-            "STOREHWORD" to 0b0000_000000000_0000000001000_01_1,
-            "STOREWORD"  to 0b0000_000000000_0000000001000_10_1,
+                "MEMCPY" to 0b0000_000000000000000_0001001000,
 
-            // Memory copy //
+                // Compare //
 
-            "MEMCPY" to 0b0000_000000000000000_0001001000,
+                "CMP" to 0b0001_000000_0000000000000000000,
+                "CMPII" to 0b0001_000000_0000000000000000000,
+                "CMPIF" to 0b0001_000000_0000000000000000001,
+                "CMPFI" to 0b0001_000000_0000000000000000010,
+                "CMPFF" to 0b0001_000000_0000000000000000011,
 
-            // Compare //
+                // Load and Store byte/halfword/word immediate //
 
-            "CMP" to 0b0001_000000_0000000000000000000,
-            "CMPII" to 0b0001_000000_0000000000000000000,
-            "CMPIF" to 0b0001_000000_0000000000000000001,
-            "CMPFI" to 0b0001_000000_0000000000000000010,
-            "CMPFF" to 0b0001_000000_0000000000000000011,
+                "LOADBYTEI" to 0b0001_000_000010_00000000_00000000,
+                "LOADHWORDI" to 0b0001_000_000100_0000000000000000,
+                "STOREBYTEI" to 0b0001_000_000011_00000000_00000000,
+                "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
 
-            // Load and Store byte/halfword/word immediate //
+                "LOADWORDI" to 0b0001_000_000110_0000000000000000,
+                "LOADWORDILO" to 0b0001_000_000110_0000000000000000, // used in Int.toReadableOpcode()
+                "LOADWORDIHI" to 0b0001_000_000111_0000000000000000, // used in Int.toReadableOpcode()
 
-            "LOADBYTEI"   to 0b0001_000_000010_00000000_00000000,
-            "LOADHWORDI"  to 0b0001_000_000100_0000000000000000,
-            "STOREBYTEI"  to 0b0001_000_000011_00000000_00000000,
-            "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
+                // Load and Store a word from register to memory //
 
-            "LOADWORDI"  to 0b0001_000_000110_0000000000000000,
-            "LOADWORDILO"  to 0b0001_000_000110_0000000000000000, // used in Int.toReadableOpcode()
-            "LOADWORDIHI"  to 0b0001_000_000111_0000000000000000, // used in Int.toReadableOpcode()
+                "LOADWORDIMEM" to 0b0010.shl(25),
+                "STOREWORDIMEM" to 0b0011.shl(25),
 
-            // Load and Store a word from register to memory //
+                // Push and Pop //
 
-            "LOADWORDIMEM" to 0b0010.shl(25),
-            "STOREWORDIMEM" to 0b0011.shl(25),
+                "PUSH" to 0b0100.shl(25),
+                "POP" to 0b0101.shl(25),
+                "PUSHWORDI" to 0b0110.shl(25),
+                "POPWORDI" to 0b0111.shl(25),
 
-            // Push and Pop //
+                // Conditional jump (WARNING: USES CUSTOM CONDITION HANDLER!) //
 
-            "PUSH" to 0b0100.shl(25),
-            "POP"  to 0b0101.shl(25),
-            "PUSHWORDI" to 0b0110.shl(25),
-            "POPWORDI"  to 0b0111.shl(25),
-
-            // Conditional jump (WARNING: USES CUSTOM CONDITION HANDLER!) //
-
-            /*"JMP" to 0b000_1000.shl(25),
+                /*"JMP" to 0b000_1000.shl(25),
             "JZ"  to 0b001_1000.shl(25),
             "JNZ" to 0b010_1000.shl(25),
             "JGT" to 0b011_1000.shl(25),
@@ -216,107 +215,108 @@ object Assembler {
             "JFW" to 0b101_1000.shl(25),
             "JBW" to 0b110_1000.shl(25),*/
 
-            // Call peripheral //
+                // Call peripheral //
 
-            "CALL" to 0b1111_000_00000000000000_00000000,
-            "MEMSIZE" to 0b1111_000_00000000000001_00000000,
-            "UPTIME"  to 0b1111_000_00000000000001_11111111,
-            "INT" to 0b111111111111111111111_00000000,
+                "CALL" to 0b1111_000_00000000000000_00000000,
+                "MEMSIZE" to 0b1111_000_00000000000001_00000000,
+                "UPTIME" to 0b1111_000_00000000000001_11111111,
+                "INT" to 0b111111111111111111111_00000000,
 
-            // Assembler-specific commands //
+                // Assembler-specific commands //
 
-            "NOP" to 0b000_0000_000_000_000_0000000000_100000 // MOV r1, r1
-    )
-    val opcodes = HashMap<String, Int>()
+                "NOP" to 0b000_0000_000_000_000_0000000000_100000 // MOV r1, r1
+        )
+        val opcodes = HashMap<String, Int>()
 
-    val twoLiners = hashSetOf("LOADWORDI")
+        val twoLiners = hashSetOf("LOADWORDI")
 
-    /**
-     * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
-     */
-    fun getOpArgs(opcode: Int): String {
-        val opcode = opcode.and(0x1FFFFFFF) // drop conditions
-        return when (opcode.ushr(25).and(0xF)) {
-            0 -> {
-                val mathOp = opcode.and(127)
-                if (mathOp == 0) {
-                    ""
+        /**
+         * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
+         */
+        fun getOpArgs(opcode: Int): String {
+            val opcode = opcode.and(0x1FFFFFFF) // drop conditions
+            return when (opcode.ushr(25).and(0xF)) {
+                0 -> {
+                    val mathOp = opcode.and(127)
+                    if (mathOp == 0) {
+                        ""
+                    }
+                    else if (mathOp == 0b111110) { // JSR
+                        "r"
+                    }
+                    else if (mathOp == 0b011000 || mathOp == 0b011001) { // random number
+                        "r"
+                    }
+                    else if (mathOp in 0b000001..0b001111 || mathOp in 0b100001..0b100110) {
+                        "rrr"
+                    }
+                    else if (mathOp in 0b010000..0b011111) {
+                        "rr"
+                    }
+                    else if (mathOp == 0b110000 || mathOp == 0b110001 || mathOp == 0b110100) { // MOV and XCHG; MALLOC
+                        "rr"
+                    }
+                    else if (mathOp == 0b110010 || mathOp == 0b110011 || mathOp == 0b110110 || mathOp == 0b110110) { // INC, DEC, FTOI, ITOF
+                        "r"
+                    }
+                    else if (mathOp in 0b1000000..0b1000111) { // load/store
+                        "rrr"
+                    }
+                    else if (mathOp == 0b1001000) { // memcpy
+                        "rrrrr"
+                    }
+                    else {
+                        ""
+                    }
                 }
-                else if (mathOp == 0b111110) { // JSR
-                    "r"
+                1 -> {
+                    val mode = opcode.ushr(17).and(0b11111)
+                    return when (mode) {
+                        0, 0b00100, 0b01000, 0b01100, 0b10000, 0b10100, 0b11000, 0b11100 -> "rr"
+                        1 -> "rb"
+                        2 -> "rw"
+                        3 -> "rf"
+                        else -> throw IllegalArgumentException()
+                    }
                 }
-                else if (mathOp == 0b011000 || mathOp == 0b011001) { // random number
-                    "r"
-                }
-                else if (mathOp in 0b000001..0b001111 || mathOp in 0b100001..0b100110) {
-                    "rrr"
-                }
-                else if (mathOp in 0b010000..0b011111) {
-                    "rr"
-                }
-                else if (mathOp == 0b110000 || mathOp == 0b110001 || mathOp == 0b110100) { // MOV and XCHG; MALLOC
-                    "rr"
-                }
-                else if (mathOp == 0b110010 || mathOp == 0b110011 || mathOp == 0b110110 || mathOp == 0b110110) { // INC, DEC, FTOI, ITOF
-                    "r"
-                }
-                else if (mathOp in 0b1000000..0b1000111) { // load/store
-                    "rrr"
-                }
-                else if (mathOp == 0b1001000) { // memcpy
-                    "rrrrr"
-                }
-                else {
-                    ""
-                }
-            }
-            1 -> {
-                val mode = opcode.ushr(17).and(0b11111)
-                return when (mode) {
-                    0, 0b00100, 0b01000, 0b01100, 0b10000, 0b10100, 0b11000, 0b11100 -> "rr"
-                    1 -> "rb"
-                    2 -> "rw"
-                    3 -> "rf"
-                    else -> throw IllegalArgumentException()
-                }
-            }
-            2, 3 -> "ra" // loadi/storei
-            4, 5 -> "r"  // push/pop
-            6 -> "a" // pushwordi
-            7 -> ""  // popwordi
-            8 -> "a" // conditional jump
-            15 -> {
-                val cond = opcode.ushr(8).and(0x3FFF)
+                2, 3 -> "ra" // loadi/storei
+                4, 5 -> "r"  // push/pop
+                6 -> "a" // pushwordi
+                7 -> ""  // popwordi
+                8 -> "a" // conditional jump
+                15 -> {
+                    val cond = opcode.ushr(8).and(0x3FFF)
 
-                if (cond <= 1) {
-                    "rb"
+                    if (cond <= 1) {
+                        "rb"
+                    }
+                    else if (cond == 0x3FFF) {
+                        "b"
+                    }
+                    else throw IllegalArgumentException()
                 }
-                else if (cond == 0x3FFF) {
-                    "b"
-                }
-                else throw IllegalArgumentException()
-            }
-            else -> throw IllegalArgumentException()
-        }
-    }
-
-    init {
-        // fill up opcodes with conditions
-        conditions.forEach { suffix, bits ->
-            primitiveOpcodes.forEach { mnemo, opcode ->
-                opcodes[mnemo + suffix] = bits or opcode
+                else -> throw IllegalArgumentException()
             }
         }
 
-        opcodes.putAll(mapOf(
-                "JMP" to 0b000_1000.shl(25),
-                "JZ"  to 0b001_1000.shl(25),
-                "JNZ" to 0b010_1000.shl(25),
-                "JGT" to 0b011_1000.shl(25),
-                "JLS" to 0b100_1000.shl(25),
-                "JFW" to 0b101_1000.shl(25),
-                "JBW" to 0b110_1000.shl(25)
-        ))
+        init {
+            // fill up opcodes with conditions
+            conditions.forEach { suffix, bits ->
+                primitiveOpcodes.forEach { mnemo, opcode ->
+                    opcodes[mnemo + suffix] = bits or opcode
+                }
+            }
+
+            opcodes.putAll(mapOf(
+                    "JMP" to 0b000_1000.shl(25),
+                    "JZ" to 0b001_1000.shl(25),
+                    "JNZ" to 0b010_1000.shl(25),
+                    "JGT" to 0b011_1000.shl(25),
+                    "JLS" to 0b100_1000.shl(25),
+                    "JFW" to 0b101_1000.shl(25),
+                    "JBW" to 0b110_1000.shl(25)
+            ))
+        }
     }
 
 
@@ -495,7 +495,7 @@ object Assembler {
 
         val ret = ArrayList<Byte>()
 
-        val programSpaceStart = TerranVM.interruptCount * 4
+        val programSpaceStart = vm.programSpaceStart
         fun getPC() = programSpaceStart + ret.size
         fun addBytes(i: Int) {
             i.toLittle().forEach { ret.add(it) }
@@ -508,7 +508,7 @@ object Assembler {
 
         // pass 1: pre-scan for labels
         debug("\n\n== Pass 1 ==\n\n")
-        var virtualPC = TerranVM.interruptCount * 4
+        var virtualPC = vm.programSpaceStart
 
         debug("*** Start PC: $virtualPC ***")
 

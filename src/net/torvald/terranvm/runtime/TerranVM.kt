@@ -20,7 +20,7 @@ typealias Number = Double
  * Created by minjaesong on 2017-05-09.
  */
 class TerranVM(memSize: Int,
-               private val stackSize: Int = 2500,
+               var stackSize: Int = memSize / 4,
                var stdout: OutputStream = System.out,
                var stdin: InputStream = System.`in`,
                var suppressWarnings: Boolean = false,
@@ -159,43 +159,11 @@ class TerranVM(memSize: Int,
         fun toLittle() = memAddr.toLittle()
     }
 
-    class IntStack(vm: TerranVM, val startPointer: Int, val stackSize: Int) {
-        private val ptr = Pointer(vm, startPointer, Pointer.PointerType.INT32)
-
-        fun push(value: Int) {
-            if (ptr.memAddr - startPointer >= stackSize) throw StackOverflowError()
-            ptr.write(value); ptr.inc()
-        }
-        fun pop(): Int {
-            if (ptr.memAddr <= startPointer) throw EmptyStackException()
-            val ret = ptr.readData() as Int; ptr.dec(); return ret
-        }
-        fun peek(): Int = ptr.readData() as Int
-    }
-
-    class Stack(vm: TerranVM, val stackSize: Int, type: Pointer.PointerType) {
-        init {
-            if (type == Pointer.PointerType.VOID) {
-                throw Error("Unsupported pointer type: VOID")
-            }
-        }
-
-        private val ptr = vm.malloc(stackSize)
-        private val startPointer = ptr.memAddr
-
-        fun push(value: Any) {
-            if (ptr.memAddr - startPointer >= stackSize) throw StackOverflowError()
-            ptr.write(value); ptr.inc()
-        }
-        fun pop(): Any {
-            if (ptr.memAddr <= startPointer) throw EmptyStackException()
-            val ret = ptr.readData() as Int; ptr.dec(); return ret
-        }
-        fun peek(): Any = ptr.readData()
-    }
-
-
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////
+    // Memory Management Unit //
+    ////////////////////////////
 
     fun memSliceBySize(from: Int, size: Int): ByteArray = memory.sliceArray(from until from + size)
     fun memSlice(from: Int, to: Int): ByteArray = memory.sliceArray(from..to)
@@ -265,39 +233,6 @@ class TerranVM(memSize: Int,
         removeFromMallocList(residual)
     }
 
-    fun makeStringDB(string: ByteArray): Pointer {
-        val string = if (string.last() == 0.toByte()) string else string + 0 // safeguard null terminator
-
-        // look for dupes
-        if (tbasic_remove_string_dupes) {
-            val existingPtnStart = memory.search(string)
-
-            if (existingPtnStart == null) {
-                return makeBytesDB(string)
-            }
-            else {
-                return Pointer(this, existingPtnStart)
-            }
-        }
-        else {
-            return makeBytesDB(string)
-        }
-    }
-    fun makeStringDB(string: String): Pointer {
-        return makeStringDB(string.toCString())
-    }
-    fun makeNumberDB(number: Number): TBASNumber {
-        val ptr = malloc(8)
-        ptr.type = Pointer.PointerType.INT64
-        ptr.write(number)
-        return TBASNumber(ptr)
-    }
-    fun makeBytesDB(bytes: ByteArray): Pointer {
-        val ptr = malloc(bytes.size)
-        ptr.write(bytes)
-        return ptr
-    }
-
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -328,26 +263,21 @@ class TerranVM(memSize: Int,
     /**
      * Memory Map
      *
-     * 0     32        userSpaceStart  memSize
-     * | IVT | program space | User space |
+     * 0     96   96+stkSize   userSpaceStart  memSize
+     * | IVT | Stack | Program Space | User Space | (more program-user space pair, managed by MMU) |
      *
      * Reg: Register
      *  - Function arguments
      *  - etc.
-     * CStck: Call stack
-     *  - Stack pointer end: use val stackEnd (256 + (4 * stackSize))
+     *
+     *
+     *  Memory-mapped peripherals must be mapped to their own memory hardware. In other words,
+     *      they don't share your computer's main memory.
      */
     internal val memory = ByteArray(memSize)
 
-    private val varTable = HashMap<String, TBASValue>() // UPPERCASE ONLY!
-
-    fun setvar(name: String, value: TBASValue) { varTable[name] = value }
-    fun getvar(name: String) = varTable[name]
-    fun hasvar(name: String) = varTable.containsKey(name)
-
-    val callStack = IntArray(stackSize, { 0 })
-
     val ivtSize = 4 * TerranVM.interruptCount
+    val programSpaceStart: Int; get() = ivtSize + stackSize
     var userSpaceStart: Int? = null // lateinit
         private set
 
@@ -355,7 +285,7 @@ class TerranVM(memSize: Int,
     var isRunning = false
         private set
 
-    // number registers (32 bit)
+    // general-purpose registers (32 bit)
     var r1: Int = 0
     var r2: Int = 0
     var r3: Int = 0
@@ -364,6 +294,16 @@ class TerranVM(memSize: Int,
     var r6: Int = 0
     var r7: Int = 0
     var r8: Int = 0
+
+    // internal registers (for context switching?)
+    var r11: Int = 0
+    var r12: Int = 0
+    var r13: Int = 0
+    var r14: Int = 0
+    var r15: Int = 0
+    var r16: Int = 0
+    var r17: Int = 0
+    var r18: Int = 0
 
     fun writeregFloat(register: Int, data: Float) {
         when (register) {
@@ -416,12 +356,16 @@ class TerranVM(memSize: Int,
 
     // memory registers (32-bit)
     var rCMP = 0 // compare register
+    var rCMP2 = 0
     //var m2 = 0 // string counter?
     //var m3 = 0 // general-use flags or variable
     //var m4 = 0 // general-use flags or variable
     var pc = 0 // program counter
+    var pc2 = 0
     var sp = 0 // stack pointer
+    var sp2 = 0
     var lr = 0 // link register
+    var lr2 = 0
 
     private var uptimeHolder = 0L
     val uptime: Int // uptime register
@@ -446,8 +390,8 @@ class TerranVM(memSize: Int,
     }
 
     fun loadProgram(opcodes: ByteArray) {
-        if (opcodes.size + ivtSize >= memory.size) {
-            throw Error("Out of memory -- required: ${opcodes.size + ivtSize} (${opcodes.size} for program), installed: ${memory.size}")
+        if (opcodes.size + programSpaceStart >= memory.size) {
+            throw Error("Out of memory -- required: ${opcodes.size + programSpaceStart} (${opcodes.size} for program), installed: ${memory.size}")
         }
 
         softReset()
@@ -455,16 +399,18 @@ class TerranVM(memSize: Int,
         VMOpcodesRISC.invoke(this)
 
 
-        System.arraycopy(opcodes, 0, memory, ivtSize, opcodes.size)
-        memory[opcodes.size + ivtSize] = 0
-        memory[opcodes.size + ivtSize + 1] = 0
-        memory[opcodes.size + ivtSize + 2] = 0
-        memory[opcodes.size + ivtSize + 3] = 0
+        System.arraycopy(opcodes, 0, memory, programSpaceStart, opcodes.size)
+        // HALT guard
+        memory[opcodes.size + programSpaceStart] = 0
+        memory[opcodes.size + programSpaceStart + 1] = 0
+        memory[opcodes.size + programSpaceStart + 2] = 0
+        memory[opcodes.size + programSpaceStart + 3] = 0
 
-        pc = ivtSize
-        userSpaceStart = opcodes.size + 1 + ivtSize
 
-        userSpaceStart = userSpaceStart!! + setDefaultInterrepts() // renew userSpaceStart after interrupts
+        pc = programSpaceStart
+        userSpaceStart = programSpaceStart + opcodes.size + 1
+
+        userSpaceStart = userSpaceStart!! + setDefaultInterrupts() // renew userSpaceStart after interrupts
         userSpaceStart = userSpaceStart!!.ushr(2).shl(2) + 4 // manually align
         mallocList.clear()
 
@@ -472,7 +418,7 @@ class TerranVM(memSize: Int,
         warn("Program loaded; pc: $pcHex, userSpaceStart: $userSpaceStart")
     }
 
-    private fun setDefaultInterrepts(): Int {
+    private fun setDefaultInterrupts(): Int {
         /*val intOOM = Assembler("""
 loadstrinline r1,
 NOMEM
@@ -546,8 +492,6 @@ MTHFU
     }
 
     fun softReset() {
-        varTable.clear()
-        Arrays.fill(callStack, 0)
         userSpaceStart = null
         terminate = false
 
@@ -563,15 +507,70 @@ MTHFU
         r6 = 0
         r7 = 0
         r8 = 0
+
+        r11 = 0
+        r12 = 0
+        r13 = 0
+        r14 = 0
+        r15 = 0
+        r16 = 0
+        r17 = 0
+        r18 = 0
+
         rCMP = 0
+        rCMP2 = 0
         //m2 = 0
         //m3 = 0
         //m4 = 0
         //strCntr = 0
         pc = 0
+        pc2 = 0
         sp = 0
+        sp2 = 0
         lr = 0
+        lr2 = 0
         //... but don't reset the uptime
+    }
+
+    fun swapRegisterSet() {
+        val t1 = r1
+        val t2 = r2
+        val t3 = r3
+        val t4 = r4
+        val t5 = r5
+        val t6 = r6
+        val t7 = r7
+        val t8 = r8
+        val tCMP = rCMP
+        val tpc = pc
+        val tsp = sp
+        val tlr = lr
+
+        r1 = r11
+        r2 = r12
+        r3 = r13
+        r4 = r14
+        r5 = r15
+        r6 = r16
+        r7 = r17
+        r8 = r18
+        rCMP = rCMP2
+        pc = pc2
+        sp = sp2
+        lr = lr2
+
+        r11 = t1
+        r12 = t2
+        r13 = t3
+        r14 = t4
+        r15 = t5
+        r16 = t6
+        r17 = t7
+        r18 = t8
+        rCMP2 = tCMP
+        pc2 = tpc
+        sp2 = tsp
+        lr = tlr
     }
 
     fun hardReset() {
@@ -765,6 +764,7 @@ fun Int.KB() = this shl 10
 fun Int.MB() = this shl 20
 
 fun Int.to8HexString() = this.toLong().and(0xffffffff).toString(16).padStart(8, '0').toUpperCase() + "h"
+fun Int.toHexString() = this.toLong().and(0xffffffff).toString(16).toUpperCase() + "h"
 
 /** Turn string into byte array with null terminator */
 fun String.toCString() = this.toByteArray(TerranVM.charset) + 0

@@ -129,7 +129,19 @@ fun Int.toReadableOpcode(): String {
 }
 
 
-                /**
+fun Int.byte1() = this.and(0xff).toByte()
+fun Int.byte2() = this.ushr(8).and(0xff).toByte()
+fun Int.byte3() = this.ushr(16).and(0xff).toByte()
+fun Int.byte4() = this.ushr(24).and(0xff).toByte()
+
+fun Float.byte1() = this.toRawBits().byte1()
+fun Float.byte2() = this.toRawBits().byte2()
+fun Float.byte3() = this.toRawBits().byte3()
+fun Float.byte4() = this.toRawBits().byte4()
+
+
+
+/**
  * Created by minjaesong on 2017-12-27.
  */
 object VMOpcodesRISC {
@@ -139,7 +151,6 @@ object VMOpcodesRISC {
     fun invoke(vm: TerranVM) {
         this.vm = vm
     }
-
 
 
     fun MOV(dest: Register, src: Register) {
@@ -259,10 +270,11 @@ object VMOpcodesRISC {
     fun STOREWORD(dest: Register, src: Register, peri: Register) {
         val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
         val index = vm.readregInt(src)
-        memspace[index] = vm.readregInt(dest).and(0xFF).toByte()
-        memspace[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF).toByte()
-        memspace[index + 2] = vm.readregInt(dest).ushr(16).and(0xFF).toByte()
-        memspace[index + 3] = vm.readregInt(dest).ushr(24).and(0xFF).toByte()
+        val destValue = vm.readregInt(dest)
+        memspace[index]     = destValue.byte1()
+        memspace[index + 1] = destValue.byte2()
+        memspace[index + 2] = destValue.byte3()
+        memspace[index + 3] = destValue.byte4()
     }
     /**
      * @param dest device ID (0 for main memory)
@@ -319,28 +331,85 @@ object VMOpcodesRISC {
     }
     fun STOREWORDIMEM(dest: Register, offset: Int) {
         val index = offset shl 2
-        vm.memory[index] = vm.readregInt(dest).and(0xFF).toByte()
-        vm.memory[index + 1] = vm.readregInt(dest).ushr(8).and(0xFF).toByte()
-        vm.memory[index + 2] = vm.readregInt(dest).ushr(16).and(0xFF).toByte()
-        vm.memory[index + 3] = vm.readregInt(dest).ushr(24).and(0xFF).toByte()
+        val destValue = vm.readregInt(dest)
+        vm.memory[index]     = destValue.byte1()
+        vm.memory[index + 1] = destValue.byte2()
+        vm.memory[index + 2] = destValue.byte3()
+        vm.memory[index + 3] = destValue.byte4()
     }
+
+    /**
+     * Push whatever value in the dest register into the stack
+     */
     fun PUSH(dest: Register) {
-        if (vm.sp < vm.callStack.size)
-            vm.callStack[vm.sp++] = vm.readregInt(dest)
+        if (vm.sp < vm.stackSize) {
+            val value = vm.readregInt(dest)
+            vm.memory[vm.ivtSize + 4 * vm.sp    ] = value.byte1()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 1] = value.byte2()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 2] = value.byte3()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 3] = value.byte4()
+            vm.sp++
+
+            // old code
+            //vm.callStack[vm.sp++] = vm.readregInt(dest)
+        }
         else
             vm.interruptStackOverflow()
     }
+
+    /**
+     * Push memory address immediate into the stack
+     */
     fun PUSHWORDI(offset: Int) {
-        if (vm.sp < vm.callStack.size)
-            vm.callStack[vm.sp++] = offset shl 2
+        if (vm.sp < vm.stackSize) {
+            val value = offset shl 2
+            vm.memory[vm.ivtSize + 4 * vm.sp    ] = value.byte1()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 1] = value.byte2()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 2] = value.byte3()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 3] = value.byte4()
+            vm.sp++
+
+            // old code
+            //vm.callStack[vm.sp++] = offset shl 2
+        }
         else
             vm.interruptStackOverflow()
     }
+
+    /**
+     * Pop whatever value in the stack and write the value to the register
+     */
     fun POP(dest: Register) {
-        vm.writeregInt(dest, vm.callStack[--vm.sp])
+        vm.sp--
+
+        val value = ByteArray(4)
+        value[0] = vm.memory[vm.ivtSize + 4 * vm.sp]
+        value[1] = vm.memory[vm.ivtSize + 4 * vm.sp + 1]
+        value[2] = vm.memory[vm.ivtSize + 4 * vm.sp + 2]
+        value[3] = vm.memory[vm.ivtSize + 4 * vm.sp + 3]
+
+        vm.writeregInt(dest, value.toLittleInt())
+
+        // old code
+        //vm.writeregInt(dest, vm.callStack[--vm.sp])
     }
+
+    /**
+     * Pop whatever value in the stack and write the value to the Link Register
+     */
     fun POPWORDI() {
-        vm.lr = vm.callStack[--vm.sp]
+        vm.sp--
+
+        val value = ByteArray(4)
+        value[0] = vm.memory[vm.ivtSize + 4 * vm.sp]
+        value[1] = vm.memory[vm.ivtSize + 4 * vm.sp + 1]
+        value[2] = vm.memory[vm.ivtSize + 4 * vm.sp + 2]
+        value[3] = vm.memory[vm.ivtSize + 4 * vm.sp + 3]
+
+        vm.lr = value.toLittleInt()
+
+        // old code
+        // vm.lr = vm.callStack[--vm.sp]
     }
 
 
