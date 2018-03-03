@@ -161,6 +161,9 @@ class Assembler(val vm: TerranVM) {
 
                 "HALT" to 0,
 
+                "SMOV"  to 0b10110000,
+                "SXCHG" to 0b10110001,
+
                 // Load and Store to memory //
 
                 "LOADBYTE" to 0b0000_000000000_0000000001000_00_0,
@@ -237,7 +240,7 @@ class Assembler(val vm: TerranVM) {
             val opcode = opcode.and(0x1FFFFFFF) // drop conditions
             return when (opcode.ushr(25).and(0xF)) {
                 0 -> {
-                    val mathOp = opcode.and(127)
+                    val mathOp = opcode.and(0xFF)
                     if (mathOp == 0) {
                         ""
                     }
@@ -264,6 +267,9 @@ class Assembler(val vm: TerranVM) {
                     }
                     else if (mathOp == 0b1001000) { // memcpy
                         "rrrrr"
+                    }
+                    else if (mathOp in 0b10110000..0b10110001) { // SMOV and SXCHG
+                        "rr"
                     }
                     else {
                         ""

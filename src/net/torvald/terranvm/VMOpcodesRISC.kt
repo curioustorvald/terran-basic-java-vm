@@ -57,7 +57,7 @@ fun Int.toReadableOpcode(): String {
 
     var opString = when (mode) {
         0 -> {
-            Assembler.opcodes.searchFor(this.and(0b1111111)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+            Assembler.opcodes.searchFor(this.and(0b11111111)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
         }
         1 -> {
             Assembler.opcodes.searchFor(1.shl(25) or this.ushr(16).and(0b111).shl(16)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
@@ -157,16 +157,37 @@ object VMOpcodesRISC {
         vm.writeregInt(dest, vm.readregInt(src))
     }
     fun XCHG(dest: Register, src: Register) {
-        /*val t = vm.readregInt(src)
+        val t = vm.readregInt(src)
         vm.writeregInt(src, vm.readregInt(dest))
-        vm.writeregInt(dest, t)*/
+        vm.writeregInt(dest, t)
+    }
+    fun SMOV(dest: Register, src: Register) {
+        vm.writeregInt(dest, when (src) {
+            1 -> vm.pc
+            2 -> vm.sp
+            3 -> vm.lr
+            else -> throw IllegalArgumentException("Unknown special register index: $src")
+        })
+    }
+    fun SXCHG(dest: Register, src: Register) {
+        throw Exception("Security violation")
 
-        // xorswap: to slow down the execution
-        if (vm.readregInt(dest) != vm.readregInt(src)) {
-            XOR(dest, dest, src)
-            XOR(src, src, dest)
-            XOR(dest, dest, src)
+        /*val destVal = vm.readregInt(dest)
+        val srcVal = when (src) {
+            1 -> vm.pc
+            2 -> vm.sp
+            3 -> vm.lr
+            else -> throw IllegalArgumentException("Unknown special register index: $src")
         }
+        if (destVal != srcVal) {
+            when (src) {
+                1 -> vm.pc = destVal
+                2 -> vm.sp = destVal
+                3 -> vm.lr = destVal
+                else -> throw IllegalArgumentException("Unknown special register index: $src")
+            }
+            vm.writeregInt(dest, srcVal) // srcVal is a copy; no tempvar needed
+        }*/
     }
     fun INC(dest: Register) {
         vm.writeregInt(dest, vm.readregInt(dest) + 1)
@@ -477,8 +498,8 @@ object VMOpcodesRISC {
         execInCond { when (opcode.ushr(25).and(0b1111)) {
             0b0000 -> {
                 // Mathematical and Register data transfer
-                if (opcode.and(0b1111111111000000) == 0) {
-                    when (opcode.and(0b111111)) {
+                if (opcode.and(0xFF00) == 0) {
+                    when (opcode.and(0xFF)) {
                         0 -> HALT()
 
                         1 -> ADD(Rd, Rs, Rm)
@@ -530,19 +551,27 @@ object VMOpcodesRISC {
                         62 -> JSR(Rd)
                         63 -> RETURN()
 
-                        else -> throw NullPointerException()
-                    }
-                }
-                // Load and Store to memory
-                else if (opcode.and(0xFFFF).ushr(3) == 0b1000) {
-                    val loadStoreOpcode = opcode.and(0b111)
-                    when (loadStoreOpcode) {
-                        0 -> LOADBYTE(Rd, Rs, Rm)
-                        1 -> STOREBYTE(Rd, Rs, Rm)
-                        2 -> LOADHWORD(Rd, Rs, Rm)
-                        3 -> STOREHWORD(Rd, Rs, Rm)
-                        4 -> LOADWORD(Rd, Rs, Rm)
-                        5 -> STOREWORD(Rd, Rs, Rm)
+                        // Load and Store to memory
+                        in 0b1_000_000..0b1_000_111 -> {
+                            val loadStoreOpcode = opcode.and(0b111)
+                            when (loadStoreOpcode) {
+                                0 -> LOADBYTE(Rd, Rs, Rm)
+                                1 -> STOREBYTE(Rd, Rs, Rm)
+                                2 -> LOADHWORD(Rd, Rs, Rm)
+                                3 -> STOREHWORD(Rd, Rs, Rm)
+                                4 -> LOADWORD(Rd, Rs, Rm)
+                                5 -> STOREWORD(Rd, Rs, Rm)
+                                else -> throw NullPointerException()
+                            }
+                        }
+
+                        // SMOV/SXCHG
+                        0b10_110000 -> SMOV(Rd, Rs)
+                        0b10_110001 -> SXCHG(Rd, Rs)
+
+
+                        // not a scope
+                        // will also be reached if MEMCPY fromAddr == toAddr == 0
                         else -> throw NullPointerException()
                     }
                 }

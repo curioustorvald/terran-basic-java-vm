@@ -73,11 +73,12 @@ class TextOnly : Game() {
 
             i = 42f;
             j = 59f;
-            k = 0xBEBAFECA;
+            k = 0xbebafeca;
 
             fo1();
 
             asm("loadwordi r2, 69696969;");
+            asm("smov r3, r1;");
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
