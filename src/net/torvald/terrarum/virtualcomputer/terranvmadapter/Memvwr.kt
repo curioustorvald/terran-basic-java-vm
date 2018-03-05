@@ -32,7 +32,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         000000 : 00 00 00 00 00 00 00 48 00 00 00 50 00 00 00 58 | .......H...P...X
          */
 
-        sb.append("stack: ${vm.ivtSize.toHexString()}..${(vm.ivtSize + vm.stackSize - 1).toHexString()}\n")
+        sb.append("stack: ${vm.ivtSize.toHexString()}..${(vm.ivtSize + vm.stackSize - 1).toHexString()} (size: ${vm.stackSize} bytes)\n")
 
 
         // registers
@@ -89,7 +89,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
                         sb.append(mem.toChar())
                     }
 
-                    if (x in intArrayOf(-12, -8, -4))
+                    if (x + 15 in intArrayOf(3, 7, 11))
                         sb.append('|')
                 }
 

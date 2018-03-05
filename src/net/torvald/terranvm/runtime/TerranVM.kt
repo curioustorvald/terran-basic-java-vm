@@ -19,14 +19,16 @@ typealias Number = Double
  *
  * Created by minjaesong on 2017-05-09.
  */
-class TerranVM(memSize: Int,
-               var stackSize: Int = memSize / 4,
+class TerranVM(inMemSize: Int,
+               var stackSize: Int = inMemSize.ushr(4).shl(2),
                var stdout: OutputStream = System.out,
                var stdin: InputStream = System.`in`,
                var suppressWarnings: Boolean = false,
          // following is an options for TerranVM's micro operation system
                val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC TODO: turning this on makes it run faster?!
 ) : Runnable {
+    private val memSize = inMemSize.ushr(2).shl(2)
+
     private val DEBUG = true
     private val ERROR = true
 
@@ -380,8 +382,8 @@ class TerranVM(memSize: Int,
         if (memSize > 4.MB()) {
             warn("VM memory size might be too large — recommended max is 4 MBytes")
         }
-        else if (memSize < 256) { // arbitrary amount (note - ATtiny has at least 2K Flash + 128 EEPROM + 128 SRAM. Atari 2600 had 128)
-            throw Error("VM memory size too small — minimum allowed is 256 bytes")
+        else if (memSize < 512) { // arbitrary amount (note - ATtiny has at least 2K Flash + 128 EEPROM + 128 SRAM. Atari 2600 had 128)
+            throw Error("VM memory size too small — minimum allowed is 512 bytes")
         }
         else if (memSize > 16.MB()) {
             throw Error("Memory size too large -- maximum allowed is 16 MBytes")

@@ -748,12 +748,16 @@ object SimpleC {
 
 
         // process using pre-traversed list
+        println("== Traversed nodes ==")
 
         traversedNodes.forEach { node ->
 
             // test print
             print("${node.getReadableNodeName()}")
             print("; ${node.expressionType}")
+            if (node.isPartOfArgumentsNode) {
+                print("; PART_OF_ARGS_NODE")
+            }
             println()
 
 
@@ -762,12 +766,65 @@ object SimpleC {
 
             if (node.expressionType == ExpressionType.FUNCTION_CALL) {
 
+                if (commands.isNotEmpty() && commands.peek().isPartOfArgumentsNode) {
+                    println("stack: $commands -- About to pop ${commands.size} elements")
+
+
+                    // removed dupes
+                    // before: arg3, Barg1, Barg2, arg2[Barg1, Barg2],  Aarg1, Aarg2, arg1[Aarg1, Aarg2]
+                    // saved in here: 'before' reversed
+                    // expected result: commands[arg1[any], arg2[any], arg3]
+                    val temporaryStackRev = Vector(commands).asReversed() // 'asReversed' does not make a copy
+                    commands.clear()
+                    var i = 0; while (i < temporaryStackRev.size) {
+                        println("pushing ${temporaryStackRev[i]}")
+                        commands.push(temporaryStackRev[i])
+                        val shallowSubArgCounts = temporaryStackRev[i].arguments.size
+                        i += 1 + shallowSubArgCounts
+                    }
+
+                    println("NEWstack: $commands -- About to pop ${commands.size} elements")
+
+
+
+                    var reactedCommands = 0
+                    commands.forEach {
+                        string.append("${it.getReadableNodeName()}\t")
+                        it.arguments.forEach {  // what happens to recursive shits?
+                            string.append("${it.getReadableNodeName()}\t")
+                        }
+
+
+                        programOut.add("${node.lineNumber}\t$string")
+                        string.delete(0, string.length)
+                        programOut.add("${node.lineNumber}\tstackpush")
+
+
+                        reactedCommands++
+                    }
+
+
+                    if (commands.size != reactedCommands) {
+                        throw InternalError("$reactedCommands elements from stack processed, but stack actually has ${commands.size}")
+                    }
+                    else {
+                        commands.clear() // just in case...?
+                    }
+
+                }
+
+
+
                 while (commands.isNotEmpty()) {
                     string.append("${commands.pop().getReadableNodeName()}\t")
                 }
 
-                programOut.add("${node.lineNumber}\t$string")
+                if (string.isNotEmpty()) {
+                    programOut.add("${node.lineNumber}\t$string")
+                }
                 string.delete(0, string.length)
+
+
             }
             else if (node.expressionType == ExpressionType.FUNCTION_DEF) {
                 while (commands.isNotEmpty()) {
@@ -845,11 +902,14 @@ object SimpleC {
                 newcmds.add(IntermediateRepresentation(lineNumber, "FUNCCALL", words[1]!!))
             }
 
-            val newcmd = newcmds[0]
+            var newcmd = newcmds[0]
 
             fun addNextNewCmd() {
                 newcmds.add(IntermediateRepresentation(lineNumber))
             }
+
+
+            println("L$lineNumber: inst: ${newcmd.instruction}")
 
 
             // convert internal notation into IR command
@@ -867,9 +927,30 @@ object SimpleC {
                     newcmd.arg2 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
-                    newcmd.arg2 = words[2].toIRVar()
-                    newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
-                    newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
+                    // dump extra args (usually consts?) into list
+                    val oldNewCmd = newcmds[0].copy()
+
+                    if (words.lastIndex - 1 >= 4) { // last item is guaranteed to be '\t'
+                        for (i in 4..words.lastIndex - 1) { // last item is guaranteed to be '\t'
+                            if (i > 4) {
+                                addNextNewCmd()
+                            }
+                            newcmd = newcmds[i - 4]
+                            newcmd.lineNum = oldNewCmd.lineNum
+                            newcmd.instruction = "CONST"
+                            newcmd.arg1 = words[i].toIRVar()
+                        }
+                    }
+
+
+                    // make sure 'newcmd' sit right after the CONSTs
+                    addNextNewCmd()
+                    newcmds[newcmds.lastIndex] = oldNewCmd
+                    oldNewCmd.instruction = oldNewCmd.instruction
+                    oldNewCmd.lineNum = oldNewCmd.lineNum
+                    oldNewCmd.arg2 = words[2].toIRVar()
+                    oldNewCmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
+                    oldNewCmd.arg1 = generateTemporaryVarName(oldNewCmd.instruction, oldNewCmd.arg2!!, oldNewCmd.arg3!!)
 
                     nestedStatementsCommonLabelName.push(newcmd.arg1)
                 }
@@ -1431,7 +1512,7 @@ object SimpleC {
 
             argTypeNamePair.forEach { val (type, name) = it
                 // TODO struct and structName
-                val funcDefArgNode = SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, type, name, lineNumber)
+                val funcDefArgNode = SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, type, name, lineNumber, isPartOfArgumentsNode = true)
                 funcDefNode.addArgument(funcDefArgNode)
             }
 
@@ -1485,7 +1566,7 @@ object SimpleC {
             functionCallArguments.forEach {
                 debug1("!! forEach $it")
 
-                val argNodeLeaf = asTreeNode(lineNumber, it)
+                val argNodeLeaf = asTreeNode(lineNumber, it); argNodeLeaf.isPartOfArgumentsNode = true
                 funcCallNode.addArgument(argNodeLeaf)
             }
 
@@ -1643,7 +1724,9 @@ object SimpleC {
                             tokens[0],
                             lineNumber
                     )
-                    nnode.addArgument(tokens[1].toRawTreeNode(lineNumber))
+
+                    val rawTreeNode = tokens[1].toRawTreeNode(lineNumber); rawTreeNode.isPartOfArgumentsNode = true
+                    nnode.addArgument(rawTreeNode)
                     return nnode
                 }
                 else if (tokens[0] == "return") {
@@ -1653,7 +1736,8 @@ object SimpleC {
                             "return",
                             lineNumber
                     )
-                    returnNode.addArgument(turnInfixTokensIntoTree(lineNumber, tokens.subList(1, tokens.lastIndex + 1)))
+                    val node = turnInfixTokensIntoTree(lineNumber, tokens.subList(1, tokens.lastIndex + 1)); node.isPartOfArgumentsNode = true
+                    returnNode.addArgument(node)
                     return returnNode
                 }
 
@@ -1694,8 +1778,14 @@ object SimpleC {
                             //#_assignvar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype, SyntaxTreeNode value)
 
                             val returnNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.NOTHING, "#_assignvar", lineNumber)
-                            returnNode.addArgument(tokensWithoutType.first().toRawTreeNode(lineNumber))
-                            returnNode.addArgument(typeStr.toRawTreeNode(lineNumber))
+
+                            val nameNode = tokensWithoutType.first().toRawTreeNode(lineNumber); nameNode.isPartOfArgumentsNode = true
+                            returnNode.addArgument(nameNode)
+
+                            val typeNode = typeStr.toRawTreeNode(lineNumber); typeNode.isPartOfArgumentsNode = true
+                            returnNode.addArgument(typeNode)
+
+                            infixNode.isPartOfArgumentsNode = true
                             returnNode.addArgument(infixNode)
 
                             return returnNode
@@ -1704,8 +1794,12 @@ object SimpleC {
                             // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
 
                             val leafNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.NOTHING, "#_declarevar", lineNumber)
-                            leafNode.addArgument(tokens[1].toRawTreeNode(lineNumber))
-                            leafNode.addArgument(tokens[0].toRawTreeNode(lineNumber))
+
+                            val valueNode = tokens[1].toRawTreeNode(lineNumber); valueNode.isPartOfArgumentsNode = true
+                            leafNode.addArgument(valueNode)
+
+                            val typeNode = tokens[0].toRawTreeNode(lineNumber); typeNode.isPartOfArgumentsNode = true
+                            leafNode.addArgument(typeNode)
 
                             return leafNode
                         }
@@ -1775,7 +1869,8 @@ object SimpleC {
 
                 val treeNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, token, lineNumber)
                 repeat(argsCountOf(token)) {
-                    treeNode.addArgument(popAsTree())
+                    val poppedTree = popAsTree(); poppedTree.isPartOfArgumentsNode = true
+                    treeNode.addArgument(poppedTree)
                 }
                 treeArgsStack.push(treeNode)
             }
@@ -1851,8 +1946,9 @@ object SimpleC {
             val returnType: ReturnType?, // STATEMENT, LITERAL_LEAF: valid ReturnType; VAREABLE_LEAF: always null
             var name: String?,
             val lineNumber: Int, // used to generate error message
-            val isRoot: Boolean = false
+            val isRoot: Boolean = false,
             //val derefDepth: Int = 0 // how many ***s are there for pointer
+            var isPartOfArgumentsNode: Boolean = false
     ) {
 
         var literalValue: Any? = null // for LITERALs only
@@ -1905,7 +2001,7 @@ object SimpleC {
                 val endfuncdef = SyntaxTreeNode(
                         ExpressionType.FUNCTION_CALL, null, "endfuncdef", this.lineNumber, this.isRoot
                 )
-                endfuncdef.addArgument(SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, null, this.name!!, this.lineNumber))
+                endfuncdef.addArgument(SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, null, this.name!!, this.lineNumber, isPartOfArgumentsNode = true))
                 this.statements.add(endfuncdef)
             }
         }
@@ -1922,7 +2018,8 @@ object SimpleC {
                     header,
                     "│ ".repeat(depth+1) + "ExprType : $expressionType",
                     "│ ".repeat(depth+1) + "RetnType : $returnType",
-                    "│ ".repeat(depth+1) + "LiteralV : '$literalValue'"
+                    "│ ".repeat(depth+1) + "LiteralV : '$literalValue'",
+                    "│ ".repeat(depth+1) + "isArgNod : $isPartOfArgumentsNode"
             )
 
             if (!isLeaf) {

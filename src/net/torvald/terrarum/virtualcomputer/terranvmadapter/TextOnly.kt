@@ -56,7 +56,7 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            void fo1() <%
+            void fo1(int x, int y) <%
                 fo2();
 
                 asm("loadwordi r6, 42195;");
@@ -73,9 +73,9 @@ class TextOnly : Game() {
 
             i = 42f;
             j = 59f;
-            k = 0xbebafeca;
+            k = 0x6b637366;
 
-            fo1();
+            fo1(1122 + 33, 222);
 
             asm("loadwordi r2, 69696969;");
             asm("smov r3, r1;");
