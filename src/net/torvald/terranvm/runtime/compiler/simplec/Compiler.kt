@@ -1141,31 +1141,39 @@ object SimpleC {
 
 
             if (next != null) {
-                if (next.instruction == "MOV" && it.arg1 == next.arg2) {
-                    val newIRline = IntermediateRepresentation(next.lineNum, it.instruction, next.arg1, it.arg2, it.arg3)
-                    newIR.add(newIRline)
-                    i++ // skip next instruction
-                }
-                else if (next.instruction in irCmpInst && it.arg1 == next.arg2) {
+                // check for compare instructions
+                if (next.instruction in irCmpInst && it.arg1 == next.arg2) {
                     val newIR1 = IntermediateRepresentation(it.lineNum, it.instruction, "r4", it.arg2, it.arg3)
                     val newIR2 = IntermediateRepresentation(next.lineNum, next.instruction, next.arg1, "r4")
                     newIR.add(newIR1)
                     newIR.add(newIR2)
                     i++ // skip next instruction
                 }
-                else if ((it.instruction in VMOpcodesRISC.threeArgsCmd || it.instruction in VMOpcodesRISC.twoArgsCmd) &&
-                        it.arg1?.startsWith("$$") ?: throw InternalError("arg1 is null; inst: ${it.instruction}")) {
-                    val newCmd = IntermediateRepresentation(it)
-                    newCmd.arg1 = "r1"
-                    newIR.add(newCmd)
-                }
-                else {
-                    newIR.add(it)
-                }
+            }
+
+
+            // regardless of next being null
+
+            // e.g. (instructions that do something and pushes their final result)
+            //      MOV $z;
+            if (it.instruction in VMOpcodesRISC.twoArgsCmd && it.arg2 == null) {
+                newIR.add(IntermediateRepresentation(it.lineNum, "STACKPOP", "r1"))
+                newIR.add(IntermediateRepresentation(it.lineNum, "MOV", it.arg1, "r1"))
+            }
+            // insts that stores its "final result" onto the temporary vars
+            else if ((it.instruction in VMOpcodesRISC.threeArgsCmd || it.instruction in VMOpcodesRISC.twoArgsCmd) &&
+                    it.arg1?.startsWith("$$") ?: throw InternalError("arg1 is null; inst: ${it.instruction}")) {
+
+                println("!!! ${it.instruction}")
+
+                val newCmd = IntermediateRepresentation(it)
+                newCmd.arg1 = "r1"
+                newIR.add(newCmd)
             }
             else {
                 newIR.add(it)
             }
+
 
 
             i++
@@ -1227,7 +1235,10 @@ object SimpleC {
             when (it.instruction) {
                 "NOP" -> ASMs.add("NOP;")
                 "MOV" -> {
-                    if (it.arg2!!.isVar()) {
+                    if (it.arg2!!.isRegister()) {
+                        // do nothing
+                    }
+                    else if (it.arg2!!.isVar()) {
                         ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
                     }
                     else {
@@ -1256,7 +1267,7 @@ object SimpleC {
 
                     if (it.arg1!!.isRegister()) {
                         if (next?.instruction == "RETURN") {
-                            ASMs.add("${it.instruction} r8, r1, r2;")
+                            ASMs.add("${it.instruction} r1, r1, r2;")
                         }
                         else {
                             ASMs.add("${it.instruction} ${it.arg1}, r1, r2;")
@@ -1354,6 +1365,9 @@ object SimpleC {
                 }
                 "STACKPUSH" -> {
                     ASMs.add("PUSH r1;")
+                }
+                "STACKPOP" -> {
+                    ASMs.add("POP ${it.arg1!!};")
                 }
                 "CONST" -> {
                     ASMs.add("LOADWORDI r1, ${it.arg1!!};")

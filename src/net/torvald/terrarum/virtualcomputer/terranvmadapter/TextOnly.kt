@@ -46,7 +46,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(512, stdout = peripheral.printStream)
+        vm = TerranVM(1024, stdout = peripheral.printStream)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction()
         vm.peripherals[3] = peripheral
@@ -56,29 +56,13 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            void fo1(int x, int y) <%
-                fo2();
+            int x;
+            int y;
+            int z;
 
-                asm("loadwordi r6, 42195;");
-            %>
-
-            void fo2() <%
-
-                asm("loadwordi r7, 421f;");
-            %>
-
-            int i;
-            int j;
-            int k;
-
-            i = 42f;
-            j = 59f;
-            k = 0x6b637366;
-
-            fo1(1122 + 33, 222);
-
-            asm("loadwordi r2, 69696969;");
-            asm("smov r3, r1;");
+            x = 6;
+            y = 7;
+            z = (x + y);
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 
