@@ -409,6 +409,9 @@ object VMOpcodesRISC {
         value[2] = vm.memory[vm.ivtSize + 4 * vm.sp + 2]
         value[3] = vm.memory[vm.ivtSize + 4 * vm.sp + 3]
 
+        // fill with FF for security
+        System.arraycopy(vm.bytes_ffffffff, 0, vm.memory, vm.ivtSize + 4 * vm.sp, 4)
+
         vm.writeregInt(dest, value.toLittleInt())
 
         // old code
@@ -426,6 +429,9 @@ object VMOpcodesRISC {
         value[1] = vm.memory[vm.ivtSize + 4 * vm.sp + 1]
         value[2] = vm.memory[vm.ivtSize + 4 * vm.sp + 2]
         value[3] = vm.memory[vm.ivtSize + 4 * vm.sp + 3]
+
+        // fill with FF for security
+        System.arraycopy(vm.bytes_ffffffff, 0, vm.memory, vm.ivtSize + 4 * vm.sp, 4)
 
         vm.lr = value.toLittleInt()
 

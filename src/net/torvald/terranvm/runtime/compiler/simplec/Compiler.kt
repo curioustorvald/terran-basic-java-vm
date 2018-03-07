@@ -70,7 +70,7 @@ object SimpleC {
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
     private fun String.matchesFloatLiteral() = this.matches(regexFPWhole)
-    private fun String.matchesIntLiteral() = this.matchesNumberLiteral()
+    private fun String.matchesStringLiteral() = this.endsWith(0.toChar())
     private fun generateTemporaryVarName(inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_$arg2"
     private fun generateSuperTemporaryVarName(lineNum: Int, inst: String, arg1: String, arg2: String) = "$$${inst}_${arg1}_${arg2}_\$l$lineNum"
 
@@ -284,7 +284,9 @@ object SimpleC {
             "asm" to "INLINEASM",
 
             "funcdef" to "FUNCDEF",
-            "endfuncdef" to "ENDFUNCDEF"
+            "endfuncdef" to "ENDFUNCDEF",
+
+            "stackpush" to "STACKPUSH"
     )
 
     private val irCmpInst = hashSetOf(
@@ -882,6 +884,7 @@ object SimpleC {
      */
     fun notationToIR(notatedProgram: MutableList<String>): MutableList<IntermediateRepresentation> {
         fun String.toIRVar() = if (this.matchesNumberLiteral()) this else "$" + this
+        fun String.isLiteral() = this.matchesNumberLiteral()
 
 
         val IRs = ArrayList<IntermediateRepresentation>()
@@ -894,11 +897,16 @@ object SimpleC {
 
             val newcmds = ArrayList<IntermediateRepresentation>()
 
+            // turn expression to IR
             if (exprToIR.containsKey(words[1])) {
                 newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]]!!))
             }
+            // or is it literal?
+            else if (words[1].isLiteral() && words[2].isBlank()) {
+                newcmds.add(IntermediateRepresentation(lineNumber, "CONST", words[1]!!))
+            }
             else {
-                // assuming function call
+                // or assume as function call
                 newcmds.add(IntermediateRepresentation(lineNumber, "FUNCCALL", words[1]!!))
             }
 
@@ -909,7 +917,7 @@ object SimpleC {
             }
 
 
-            println("L$lineNumber: inst: ${newcmd.instruction}")
+            println("L$lineNumber: inst: ${newcmd.instruction}, wordCount: ${words.size}")
 
 
             // convert internal notation into IR command
@@ -927,30 +935,10 @@ object SimpleC {
                     newcmd.arg2 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
-                    // dump extra args (usually consts?) into list
-                    val oldNewCmd = newcmds[0].copy()
-
-                    if (words.lastIndex - 1 >= 4) { // last item is guaranteed to be '\t'
-                        for (i in 4..words.lastIndex - 1) { // last item is guaranteed to be '\t'
-                            if (i > 4) {
-                                addNextNewCmd()
-                            }
-                            newcmd = newcmds[i - 4]
-                            newcmd.lineNum = oldNewCmd.lineNum
-                            newcmd.instruction = "CONST"
-                            newcmd.arg1 = words[i].toIRVar()
-                        }
-                    }
-
-
-                    // make sure 'newcmd' sit right after the CONSTs
-                    addNextNewCmd()
-                    newcmds[newcmds.lastIndex] = oldNewCmd
-                    oldNewCmd.instruction = oldNewCmd.instruction
-                    oldNewCmd.lineNum = oldNewCmd.lineNum
-                    oldNewCmd.arg2 = words[2].toIRVar()
-                    oldNewCmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
-                    oldNewCmd.arg1 = generateTemporaryVarName(oldNewCmd.instruction, oldNewCmd.arg2!!, oldNewCmd.arg3!!)
+                    // if there's extra unused args, you are doing it wrong!  @see treeToProperNotation()
+                    newcmd.arg2 = words[2].toIRVar()
+                    newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
+                    newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
 
                     nestedStatementsCommonLabelName.push(newcmd.arg1)
                 }
@@ -1096,6 +1084,9 @@ object SimpleC {
                     }
                     catch (e: IndexOutOfBoundsException) {}
                 }
+                "STACKPUSH", "CONST" -> {
+                    // no further jobs required
+                }
                 else -> {
                     throw InternalError("Unknown IR instruction: ${newcmd.instruction}")
                 }
@@ -1163,7 +1154,7 @@ object SimpleC {
                     i++ // skip next instruction
                 }
                 else if ((it.instruction in VMOpcodesRISC.threeArgsCmd || it.instruction in VMOpcodesRISC.twoArgsCmd) &&
-                        it.arg1!!.startsWith("$$")) {
+                        it.arg1?.startsWith("$$") ?: throw InternalError("arg1 is null; inst: ${it.instruction}")) {
                     val newCmd = IntermediateRepresentation(it)
                     newCmd.arg1 = "r1"
                     newIR.add(newCmd)
@@ -1288,7 +1279,7 @@ object SimpleC {
 
                     val lhandType = if (lhand.isVar())
                         varTable[lhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
-                    else if (lhand.matchesIntLiteral())
+                    else if (lhand.matchesNumberLiteral())
                         "INTLITERAL"
                     else if (lhand.matchesFloatLiteral())
                         "FLOATLITERAL"
@@ -1297,7 +1288,7 @@ object SimpleC {
 
                     val rhandType = if (rhand.isVar())
                         varTable[rhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
-                    else if (rhand.matchesIntLiteral())
+                    else if (rhand.matchesNumberLiteral())
                         "INTLITERAL"
                     else if (rhand.matchesFloatLiteral())
                         "FLOATLITERAL"
@@ -1360,6 +1351,12 @@ object SimpleC {
                         ASMs.add("RETURN;") // RETURN guard
                     }
                     ASMs.add(":\$ENDFUNCDEF_${it.arg1!!};")
+                }
+                "STACKPUSH" -> {
+                    ASMs.add("PUSH r1;")
+                }
+                "CONST" -> {
+                    ASMs.add("LOADWORDI r1, ${it.arg1!!};")
                 }
                 else -> throw InternalError("Unknown IR: ${it.instruction}")
             }

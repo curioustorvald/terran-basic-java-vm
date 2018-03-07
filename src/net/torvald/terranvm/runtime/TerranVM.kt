@@ -28,6 +28,8 @@ class TerranVM(inMemSize: Int,
                val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC TODO: turning this on makes it run faster?!
 ) : Runnable {
     private val memSize = inMemSize.ushr(2).shl(2)
+    val bytes_ffffffff = (-1).toLittle()
+    val bytes_00000000 = byteArrayOf(0, 0, 0, 0)
 
     private val DEBUG = true
     private val ERROR = true
@@ -389,6 +391,7 @@ class TerranVM(inMemSize: Int,
             throw Error("Memory size too large -- maximum allowed is 16 MBytes")
         }
 
+        hardReset()
     }
 
     fun loadProgram(opcodes: ByteArray) {
@@ -582,7 +585,14 @@ MTHFU
         uptimeHolder = 0L
 
         // erase memory
-        Arrays.fill(memory, 0)
+        for (i in 0 until memSize step 4) {
+            System.arraycopy(bytes_00000000, 0, memory, i, 4)
+        }
+
+        // erase-mark stack area with FF for easier debugging with memvwr
+        for (i in 0 until stackSize step 4) {
+            System.arraycopy(bytes_ffffffff, 0, memory, ivtSize + i, 4)
+        }
     }
 
 
