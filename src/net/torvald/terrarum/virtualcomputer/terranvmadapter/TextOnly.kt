@@ -56,13 +56,13 @@ class TextOnly : Game() {
 
 
         val testProgram = """
-            int x;
-            int y;
-            int z;
+            float x;
+            float y;
+            float z;
 
-            x = 6;
-            y = 7;
-            z = (x + y);
+            x = 6f;
+            y = 4f;
+            z = (x + y) / (x - y);
         """.trimIndent()
         val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
 

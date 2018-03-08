@@ -41,6 +41,10 @@ import kotlin.collections.HashMap
  * - Assignment does not return shit.
  *
  *
+ * ## Issues
+ * - FIXME  arithmetic ops will not work with integers, need to autodetect types and slap in ADDINT instead of just ADD
+ *
+ *
  * Created by minjaesong on 2017-06-04.
  */
 object SimpleC {
@@ -234,7 +238,7 @@ object SimpleC {
         "short" -> 2
         "int" -> 4
         "long" -> 8
-        "float" -> 8 // in SimpleC, float is same as double
+        "float" -> 4
         "double" -> 8
         "bool" -> 1
         "void" -> 1 // GCC feature
@@ -793,7 +797,9 @@ object SimpleC {
                     commands.forEach {
                         string.append("${it.getReadableNodeName()}\t")
                         it.arguments.forEach {  // what happens to recursive shits?
-                            string.append("${it.getReadableNodeName()}\t")
+                            if (it.isLeaf && it.expressionType != ExpressionType.FUNCTION_CALL) {
+                                string.append("${it.getReadableNodeName()}\t")
+                            }
                         }
 
 
@@ -936,11 +942,34 @@ object SimpleC {
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
                     // if there's extra unused args, you are doing it wrong!  @see treeToProperNotation()
-                    newcmd.arg2 = words[2].toIRVar()
-                    newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
-                    newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
 
-                    nestedStatementsCommonLabelName.push(newcmd.arg1)
+                    // if the inst has NO args why '3'? [linenum, inst, '\t']
+                    if (words.size == 3) {
+                        val oldInst = newcmd.instruction // MUL, DIV, ADD, SUB, etc
+
+                        newcmd.arg1 = "r2"
+                        newcmd.instruction = "STACKPOP"
+
+                        addNextNewCmd()
+                        newcmds[1].arg1 = "r3"
+                        newcmds[1].instruction = "STACKPOP"
+
+                        addNextNewCmd()
+                        newcmds[2].instruction = oldInst // MUL, DIV, ADD, SUB, etc.
+                        newcmds[2].arg1 = "r1"
+                        newcmds[2].arg2 = "r2"
+                        newcmds[2].arg3 = "r3"
+
+                        nestedStatementsCommonLabelName.push(newcmds[2].arg1)
+                    }
+                    else {
+                        newcmd.arg2 = words[2].toIRVar()
+                        newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
+                        newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
+
+                        nestedStatementsCommonLabelName.push(newcmd.arg1)
+                    }
+
                 }
                 "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
                     newcmd.arg1 = words[2].toIRVar()
@@ -1164,8 +1193,6 @@ object SimpleC {
             else if ((it.instruction in VMOpcodesRISC.threeArgsCmd || it.instruction in VMOpcodesRISC.twoArgsCmd) &&
                     it.arg1?.startsWith("$$") ?: throw InternalError("arg1 is null; inst: ${it.instruction}")) {
 
-                println("!!! ${it.instruction}")
-
                 val newCmd = IntermediateRepresentation(it)
                 newCmd.arg1 = "r1"
                 newIR.add(newCmd)
@@ -1173,7 +1200,6 @@ object SimpleC {
             else {
                 newIR.add(it)
             }
-
 
 
             i++
@@ -1249,28 +1275,43 @@ object SimpleC {
                     ASMs.add("STOREWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
-                    if (it.arg2!!.isVar()) {
-                        ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
+                    if (it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
+                        // uh... do nothing?
                     }
                     else {
-                        ASMs.add("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
-                    }
+                        if (it.arg2!!.isVar()) {
+                            ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
+                        }
+                        else {
+                            ASMs.add("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
+                        }
 
-                    if (it.arg3!!.isVar()) {
-                        ASMs.add("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
-                    }
-                    else {
-                        ASMs.add("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
+                        if (it.arg3!!.isVar()) {
+                            ASMs.add("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
+                        }
+                        else {
+                            ASMs.add("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
+                        }
                     }
 
 
 
                     if (it.arg1!!.isRegister()) {
                         if (next?.instruction == "RETURN") {
-                            ASMs.add("${it.instruction} r1, r1, r2;")
+                            if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
+                                ASMs.add("${it.instruction} r1, ${it.arg2!!}, ${it.arg3!!};")
+                            }
+                            else {
+                                ASMs.add("${it.instruction} r1, r1, r2;")
+                            }
                         }
                         else {
-                            ASMs.add("${it.instruction} ${it.arg1}, r1, r2;")
+                            if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
+                                ASMs.add("${it.instruction} ${it.arg1!!}, ${it.arg2!!}, ${it.arg3!!};")
+                            }
+                            else {
+                                ASMs.add("${it.instruction} ${it.arg1}, r1, r2;")
+                            }
                         }
                     }
                     else {
