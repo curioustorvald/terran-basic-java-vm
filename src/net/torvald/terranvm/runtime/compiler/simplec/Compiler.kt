@@ -711,7 +711,10 @@ object SimpleC {
 
 
         fun SyntaxTreeNode.getReadableNodeName(): String {
-            if (this.name != null && this.literalValue != null) {
+            if (this.expressionType == ExpressionType.VARIABLE_LEAF) {
+                return "$${this.name}"
+            }
+            else if (this.name != null && this.literalValue != null) {
                 return ("${this.name} ${this.literalValue}")
             }
             else if (this.name != null) {
@@ -773,7 +776,7 @@ object SimpleC {
             if (node.expressionType == ExpressionType.FUNCTION_CALL) {
 
                 if (commands.isNotEmpty() && commands.peek().isPartOfArgumentsNode) {
-                    println("stack: $commands -- About to pop ${commands.size} elements")
+                    //println("stack: $commands -- About to pop ${commands.size} elements")
 
 
                     // removed dupes
@@ -783,13 +786,13 @@ object SimpleC {
                     val temporaryStackRev = Vector(commands).asReversed() // 'asReversed' does not make a copy
                     commands.clear()
                     var i = 0; while (i < temporaryStackRev.size) {
-                        println("pushing ${temporaryStackRev[i]}")
+                        //println("pushing ${temporaryStackRev[i]}")
                         commands.push(temporaryStackRev[i])
                         val shallowSubArgCounts = temporaryStackRev[i].arguments.size
                         i += 1 + shallowSubArgCounts
                     }
 
-                    println("NEWstack: $commands -- About to pop ${commands.size} elements")
+                    //println("NEWstack: $commands -- About to pop ${commands.size} elements")
 
 
 
@@ -889,7 +892,7 @@ object SimpleC {
 
      */
     fun notationToIR(notatedProgram: MutableList<String>): MutableList<IntermediateRepresentation> {
-        fun String.toIRVar() = if (this.matchesNumberLiteral()) this else "$" + this
+        //fun String.toIRVar() = if (this.matchesNumberLiteral()) this else "$" + this
         fun String.isLiteral() = this.matchesNumberLiteral()
 
 
@@ -906,6 +909,10 @@ object SimpleC {
             // turn expression to IR
             if (exprToIR.containsKey(words[1])) {
                 newcmds.add(IntermediateRepresentation(lineNumber, exprToIR[words[1]]!!))
+            }
+            // or is it variable?
+            else if (words[1].isVariable()) {
+                newcmds.add(IntermediateRepresentation(lineNumber, "LOADVARASCONST", words[1]!!))
             }
             // or is it literal?
             else if (words[1].isLiteral() && words[2].isBlank()) {
@@ -937,14 +944,16 @@ object SimpleC {
                     newcmd.arg1 = "$" + words[2]
                 }
                 "MOV" -> {
-                    newcmd.arg1 = words[2].toIRVar()
-                    newcmd.arg2 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
+                    newcmd.arg1 = words[2]
+                    newcmd.arg2 = if (words[3].isEmpty()) IRs.last().arg1 else words[3]
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
                     // if there's extra unused args, you are doing it wrong!  @see treeToProperNotation()
 
-                    // if the inst has NO args why '3'? [linenum, inst, '\t']
-                    if (words.size == 3) {
+                    // if the inst has NO or ONLY ONE args
+                    // why '3'? [linenum, inst, '\t']
+                    // why '4'? [linenum, inst, arg1, '\t']; okay to pop as prev cmd are always "CONST 42159", "LOADVAR foo", etc
+                    if (words.size in 3..4) {
                         val oldInst = newcmd.instruction // MUL, DIV, ADD, SUB, etc
 
                         newcmd.arg1 = "r2"
@@ -963,8 +972,8 @@ object SimpleC {
                         nestedStatementsCommonLabelName.push(newcmds[2].arg1)
                     }
                     else {
-                        newcmd.arg2 = words[2].toIRVar()
-                        newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3].toIRVar()
+                        newcmd.arg2 = words[2]
+                        newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3]
                         newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
 
                         nestedStatementsCommonLabelName.push(newcmd.arg1)
@@ -972,8 +981,8 @@ object SimpleC {
 
                 }
                 "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
-                    newcmd.arg1 = words[2].toIRVar()
-                    newcmd.arg2 = words[3].toIRVar()
+                    newcmd.arg1 = words[2]
+                    newcmd.arg2 = words[3]
 
                     if (newcmd.arg2!!.drop(1).isEmpty()) {
                         newcmd.arg2 = nestedStatementsCommonLabelName.pop()
@@ -1113,7 +1122,7 @@ object SimpleC {
                     }
                     catch (e: IndexOutOfBoundsException) {}
                 }
-                "STACKPUSH", "CONST" -> {
+                "STACKPUSH", "CONST", "LOADVARASCONST" -> {
                     // no further jobs required
                 }
                 else -> {
@@ -1214,6 +1223,14 @@ object SimpleC {
         return newIR
     }
 
+    fun String.isVariable() = this.startsWith('$')
+    fun String.isRegister() = this.matches(regexRegisterLiteral)
+
+    fun ArrayList<String>.append(str: String) = if (str.endsWith(';'))
+        this.add(str)
+    else
+        throw IllegalArgumentException("You missed a semicolon for: $str")
+
 
     /**
      * All the DECLAREs are expected to be at the head of the list
@@ -1221,9 +1238,7 @@ object SimpleC {
     fun IRtoASM(ir: MutableList<IntermediateRepresentation>): List<String> {
 
 
-        fun String.isVar() = this.startsWith('$')
-        fun String.asProperAsmData() = if (this.isVar()) "@${this.drop(1)}" else this
-        fun String.isRegister() = this.matches(regexRegisterLiteral)
+        fun String.asProperAsmData() = if (this.isVariable()) "@${this.drop(1)}" else this
 
 
         val ASMs = ArrayList<String>()
@@ -1235,62 +1250,62 @@ object SimpleC {
         ir.removeAll { it.instruction.startsWith("DECLARE") }
 
 
-        ASMs.add(".data;")
+        ASMs.append(".data;")
 
 
         irDeclares.forEach {
             when (it.instruction) {
                 "DECLAREI" -> {
-                    ASMs.add("INT ${it.arg1!!.drop(1)} 0;")
+                    ASMs.append("INT ${it.arg1!!.drop(1)} 0;")
                     varTable.put(it.arg1!!.drop(1), "INT")
                 }
                 "DECLAREF" -> {
-                    ASMs.add("FLOAT ${it.arg1!!.drop(1)} 0.0;")
+                    ASMs.append("FLOAT ${it.arg1!!.drop(1)} 0.0;")
                     varTable.put(it.arg1!!.drop(1), "FLOAT")
                 }
                 else -> TODO("Other declaration types (e.g. STRING, BYTES)")
             }
         }
 
-        ASMs.add(".code;")
+        ASMs.append(".code;")
 
         ir.forEachIndexed { index, it ->
             val prev = if (index == 0) null else ir[index - 1]
             val next = if (index == ir.lastIndex) null else ir[index + 1]
 
             when (it.instruction) {
-                "NOP" -> ASMs.add("NOP;")
+                "NOP" -> ASMs.append("NOP;")
                 "MOV" -> {
                     if (it.arg2!!.isRegister()) {
                         // do nothing
                     }
-                    else if (it.arg2!!.isVar()) {
-                        ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
+                    else if (it.arg2!!.isVariable()) {
+                        ASMs.append("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
                     }
                     else {
-                        ASMs.add("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
+                        ASMs.append("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
                     }
 
 
-                    ASMs.add("STOREWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
+                    ASMs.append("STOREWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
                     if (it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
                         // uh... do nothing?
                     }
                     else {
-                        if (it.arg2!!.isVar()) {
-                            ASMs.add("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
+                        if (it.arg2!!.isVariable()) {
+                            ASMs.append("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
                         }
                         else {
-                            ASMs.add("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
+                            ASMs.append("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
                         }
 
-                        if (it.arg3!!.isVar()) {
-                            ASMs.add("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
+                        if (it.arg3!!.isVariable()) {
+                            ASMs.append("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
                         }
                         else {
-                            ASMs.add("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
+                            ASMs.append("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
                         }
                     }
 
@@ -1299,37 +1314,37 @@ object SimpleC {
                     if (it.arg1!!.isRegister()) {
                         if (next?.instruction == "RETURN") {
                             if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
-                                ASMs.add("${it.instruction} r1, ${it.arg2!!}, ${it.arg3!!};")
+                                ASMs.append("${it.instruction} r1, ${it.arg2!!}, ${it.arg3!!};")
                             }
                             else {
-                                ASMs.add("${it.instruction} r1, r1, r2;")
+                                ASMs.append("${it.instruction} r1, r1, r2;")
                             }
                         }
                         else {
                             if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
-                                ASMs.add("${it.instruction} ${it.arg1!!}, ${it.arg2!!}, ${it.arg3!!};")
+                                ASMs.append("${it.instruction} ${it.arg1!!}, ${it.arg2!!}, ${it.arg3!!};")
                             }
                             else {
-                                ASMs.add("${it.instruction} ${it.arg1}, r1, r2;")
+                                ASMs.append("${it.instruction} ${it.arg1}, r1, r2;")
                             }
                         }
                     }
                     else {
-                        ASMs.add("${it.instruction} r3, r1, r2;")
-                        ASMs.add("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
+                        ASMs.append("${it.instruction} r3, r1, r2;")
+                        ASMs.append("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
                     }
                 }
                 in jmpCommands -> {
-                    ASMs.add("${it.instruction} @${it.arg1!!.drop(1)};")
+                    ASMs.append("${it.instruction} @${it.arg1!!.drop(1)};")
                 }
                 "LABEL" -> {
-                    ASMs.add(":${it.arg1!!.drop(1)};")
+                    ASMs.append(":${it.arg1!!.drop(1)};")
                 }
                 in irCmpInst -> {
                     val lhand = it.arg1!!
                     val rhand = it.arg2!!
 
-                    val lhandType = if (lhand.isVar())
+                    val lhandType = if (lhand.isVariable())
                         varTable[lhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
                     else if (lhand.matchesNumberLiteral())
                         "INTLITERAL"
@@ -1338,7 +1353,7 @@ object SimpleC {
                     else
                         throw IllegalArgumentException("Unknown literal type: $lhand at line ${it.lineNum}")
 
-                    val rhandType = if (rhand.isVar())
+                    val rhandType = if (rhand.isVariable())
                         varTable[rhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
                     else if (rhand.matchesNumberLiteral())
                         "INTLITERAL"
@@ -1359,27 +1374,27 @@ object SimpleC {
 
 
                     if (lIsLiteral) {
-                        ASMs.add("LOADWORDI r1, $lhand;")
+                        ASMs.append("LOADWORDI r1, $lhand;")
                     }
                     else {
-                        ASMs.add("LOADWORDIMEM r1, ${lhand.asProperAsmData()};")
+                        ASMs.append("LOADWORDIMEM r1, ${lhand.asProperAsmData()};")
                     }
 
                     if (rIsLiteral) {
-                        ASMs.add("LOADWORDI r2, $rhand;")
+                        ASMs.append("LOADWORDI r2, $rhand;")
                     }
                     else {
-                        ASMs.add("LOADWORDIMEM r2, ${rhand.asProperAsmData()};")
+                        ASMs.append("LOADWORDIMEM r2, ${rhand.asProperAsmData()};")
                     }
 
-                    ASMs.add("$cmpInst r1, r2;")
+                    ASMs.append("$cmpInst r1, r2;")
                 }
                 "INLINEASM" -> {
-                    ASMs.add(it.arg1!!)
+                    ASMs.append(it.arg1!!)
                 }
                 "FUNCDEF" -> {
-                    ASMs.add("JMP @\$ENDFUNCDEF_${it.arg1!!};")
-                    ASMs.add(":${it.arg1!!};")
+                    ASMs.append("JMP @\$ENDFUNCDEF_${it.arg1!!};")
+                    ASMs.append(":${it.arg1!!};")
                 }
                 "RETURN" -> {
                     if (it.arg1 != null) {
@@ -1387,37 +1402,40 @@ object SimpleC {
                             throw InternalError("RETURN with 2 or more args -- '$it'")
                         }
 
-                        ASMs.add("LOADWORDI r8, ${it.arg1};")
-                        ASMs.add("RETURN;")
+                        ASMs.append("LOADWORDI r8, ${it.arg1};")
+                        ASMs.append("RETURN;")
                     }
                     else {
-                        ASMs.add("RETURN;")
+                        ASMs.append("RETURN;")
                     }
                 }
                 "FUNCCALL" -> {
-                    ASMs.add("LOADWORDI r1, @${it.arg1!!};")
-                    ASMs.add("JSR r1;")
+                    ASMs.append("LOADWORDI r1, @${it.arg1!!};")
+                    ASMs.append("JSR r1;")
                 }
                 "ENDFUNCDEF" -> {
                     if (prev?.instruction != "RETURN") {
-                        ASMs.add("RETURN;") // RETURN guard
+                        ASMs.append("RETURN;") // RETURN guard
                     }
-                    ASMs.add(":\$ENDFUNCDEF_${it.arg1!!};")
+                    ASMs.append(":\$ENDFUNCDEF_${it.arg1!!};")
                 }
                 "STACKPUSH" -> {
-                    ASMs.add("PUSH r1;")
+                    ASMs.append("PUSH r1;")
                 }
                 "STACKPOP" -> {
-                    ASMs.add("POP ${it.arg1!!};")
+                    ASMs.append("POP ${it.arg1!!};")
                 }
                 "CONST" -> {
-                    ASMs.add("LOADWORDI r1, ${it.arg1!!};")
+                    ASMs.append("LOADWORDI r1, ${it.arg1!!};")
+                }
+                "LOADVARASCONST" -> {
+                    ASMs.append("LOADWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
                 }
                 else -> throw InternalError("Unknown IR: ${it.instruction}")
             }
         }
 
-        ASMs.add("HALT;")
+        ASMs.append("HALT;")
 
 
         println("=========\n   ASM   \n=========")
