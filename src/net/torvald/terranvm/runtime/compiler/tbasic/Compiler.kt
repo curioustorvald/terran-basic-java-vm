@@ -1,7 +1,7 @@
 package net.torvald.terranvm.runtime.compiler.tbasic
 
-/*import net.torvald.terranvm.runtime.compiler.simplec.SimpleC.LineStructure
-import net.torvald.terranvm.runtime.compiler.simplec.SyntaxError
+/*import net.torvald.terranvm.runtime.compiler.cflat.SimpleC.LineStructure
+import net.torvald.terranvm.runtime.compiler.cflat.SyntaxError
 
 /**
  * Created by minjaesong on 2017-06-26.

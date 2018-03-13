@@ -12,7 +12,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
-import net.torvald.terranvm.runtime.compiler.simplec.SimpleC
+import net.torvald.terranvm.runtime.compiler.cflat.Cflat
 
 /**
  * Created by minjaesong on 2017-11-17.
@@ -62,17 +62,27 @@ class TextOnly : Game() {
 
             x = 3f;
             y = 2f;
-            z = (x + y) * y;
+            int foo() {
+                yyyy = 42 + 195;
+
+                if (x == 42 - yyyy) {
+                    return 7f / 3f;
+                } else {
+                    return 0;
+                }
+            }
+
+            z = (x + y) * y / x; // should be 3.333.. (55 55 55 40)
         """.trimIndent()
-        val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
+        val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
 
         println(program)
 
-        val notatedProgram = SimpleC.treeToProperNotation(program)
+        val notatedProgram = Cflat.treeToProperNotation(program)
 
-        val programInIR = SimpleC.notationToIR(notatedProgram)
-        val programInNewIR = SimpleC.preprocessIR(programInIR)
-        val programASM = SimpleC.IRtoASM(programInNewIR)
+        val programInIR = Cflat.notationToIR(notatedProgram)
+        val programInNewIR = Cflat.preprocessIR(programInIR)
+        val programASM = Cflat.IRtoASM(programInNewIR)
         val code = assembler(programASM.joinToString("\n"))
 
 

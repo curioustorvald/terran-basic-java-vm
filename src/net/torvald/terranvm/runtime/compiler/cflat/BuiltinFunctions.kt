@@ -1,6 +1,4 @@
-package net.torvald.terranvm.runtime.compiler.simplec
-
-import net.torvald.terranvm.runtime.Assembler
+package net.torvald.terranvm.runtime.compiler.cflat
 
 /**
  * Created by minjaesong on 2017-06-14.

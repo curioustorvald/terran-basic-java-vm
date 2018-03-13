@@ -1,0 +1,29 @@
+/*
+ * Cb (C-Flat) stdio library implementation for TerranVM Terra Instruction Set
+ *
+ *
+ */
+
+#pragma once
+
+
+#define NULL 0
+#define EOF (-1)
+
+
+void call(int opcode) {
+    __asm__("PUSH r1;"); // save register
+    
+    opcode; // load r1 with opcode
+
+    __asm__("CALL r1, 0;"); // call BIOS with r1 as argument
+    __asm__("POP r1"); // restore register
+}
+
+void print(string text) {
+    printptr(malloc(sizeof(text)));
+}
+
+void printptr(int string_pointer) {
+    call(0x01000000 | string_pointer);
+}

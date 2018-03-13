@@ -1,4 +1,4 @@
-package net.torvald.terranvm.runtime.compiler.simplec
+package net.torvald.terranvm.runtime.compiler.cflat
 
 import net.torvald.terranvm.VMOpcodesRISC
 import java.util.*
@@ -6,7 +6,7 @@ import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
 /**
- * A compiler for SimpleC language that compiles into TBASOpcode.
+ * A compiler for C-flat language that compiles into TerranVM Terra Instruction Set.
  *
  * # Disclaimer
  *
@@ -14,13 +14,13 @@ import kotlin.collections.HashMap
  * 1. I suck at code and test. Please report bugs!
  * 2. Please move along with my terrible sense of humour.
  *
- * # About SimpleC
+ * # About C-flat
  *
- * SimpleC is a stupid version of C. It has no type annotation and adapts Java's philosophy that thinks unsigned math is crystal meth.
+ * C-flat is a stupid version of C. Everything is global and a word (or byte if it's array).
  *
  * ## New Features
  *
- * - No data types, non-zero is truthy and zero is falsy
+ * - Typeless (everything is a word), non-zero is truthy and zero is falsy
  * - Infinite loop using ```forever``` block. You can still use ```for (;;)```, ```while (true)```
  * - Counted simple loop (without loop counter ref) using ```repeat``` block
  *
@@ -28,7 +28,10 @@ import kotlin.collections.HashMap
  * ## Important Changes from C
  *
  * - All function definition must specify return type, even if the type is ```void```.
- * - ```float``` is same as ```double```.
+ * - ```float``` is IEEE 754 Binary32.
+ * - Everything is global
+ * - Everything is a word (32-bit)
+ * - Everything is ```int```, ```float``` and ```pointer``` at the same time. You decide.
  * - Unary pre- and post- increments/decrements are considered _evil_ and thus prohibited.
  * - Unsigned types are also considered _evil_ and thus prohibited.
  * - Everything except function's local variable is ```extern```, any usage of the keyword will throw error.
@@ -47,7 +50,7 @@ import kotlin.collections.HashMap
  *
  * Created by minjaesong on 2017-06-04.
  */
-object SimpleC {
+object Cflat {
 
     private val structOpen = '{'
     private val structClose = '}'
@@ -109,15 +112,15 @@ object SimpleC {
             "typedef","union","unsigned","void","volatile","while",
 
 
-            // SimpleC code blocks
+            // C-flat code blocks
             "forever","repeat"
 
-            // SimpleC dropped keywords (keywords that won't do anything/behave differently than C95, etc.):
+            // C-flat dropped keywords (keywords that won't do anything/behave differently than C95, etc.):
             //  - auto, register, signed, unsigned, volatile, static: not implemented; WILL THROW ERROR
             //  - float: will act same as double
             //  - extern: everthing is global, anyway; WILL THROW ERROR
 
-            // SimpleC exclusive keywords:
+            // C-flat exclusive keywords:
             //  - bool, true, false: bool algebra
     )
     private val unsupportedKeywords = hashSetOf(
@@ -175,16 +178,16 @@ object SimpleC {
     )
     private val funcAnnotations = hashSetOf(
             "auto", // does nothing; useless even in C (it's derived from B language, actually)
-            "extern" // not used in SimpleC
+            "extern" // not used in C-flat
     )
     private val funcTypes = hashSetOf(
             "char", "short", "int", "long", "float", "double", "bool", "void"
     )
     private val varAnnotations = hashSetOf(
             "auto", // does nothing; useless even in C (it's derived from B language, actually)
-            "extern", // not used in SimpleC
+            "extern", // not used in C-flat
             "const",
-            "register" // not used in SimpleC
+            "register" // not used in C-flat
     )
     private val varTypes = hashSetOf(
             "struct", "char", "short", "int", "long", "float", "double", "bool", "var", "val"
@@ -218,11 +221,18 @@ object SimpleC {
             """\?""" to 0x3F.toChar()  // uestion mark (used to avoid trigraphs)
     )
     private val builtinFunctions = hashSetOf(
-            "#_assignvar", "#_plusassignvar", "#_minusassignvar", // #_assignvar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype, SyntaxTreeNode value)
             "#_declarevar" // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
     )
     private val functionWithSingleArgNoParen = hashSetOf(
             "return", "goto", "comefrom"
+    )
+    private val compilerInternalFuncArgsCount = hashMapOf(
+            "#_declarevar" to 2,
+            "endfuncdef" to 1,
+            "=" to 2,
+
+            "endif" to 0,
+            "endelse" to 0
     )
 
 
@@ -580,7 +590,7 @@ object SimpleC {
                                 val numberWord = program.substring(charCtr..charCtr + travelForth - 1)
 
 
-                                debug1("[SimpleC.tokenise] decimal number token: $sb$numberWord, on line $currentProgramLineNumber")
+                                debug1("[C-flat.tokenise] decimal number token: $sb$numberWord, on line $currentProgramLineNumber")
                                 sb.append(numberWord)
                                 splitAndMoveAlong()
 
@@ -590,7 +600,7 @@ object SimpleC {
                             else { // reference call
                                 splitAndMoveAlong() // split previously accumulated word
 
-                                debug1("[SimpleC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
+                                debug1("[C-flat.tokenise] splittable token: $char, on line $currentProgramLineNumber")
                                 sb.append(char)
                                 splitAndMoveAlong()
                             }
@@ -598,7 +608,7 @@ object SimpleC {
                         else if (char != ' ') {
                             splitAndMoveAlong() // split previously accumulated word
 
-                            debug1("[SimpleC.tokenise] splittable token: $char, on line $currentProgramLineNumber")
+                            debug1("[C-flat.tokenise] splittable token: $char, on line $currentProgramLineNumber")
                             sb.append(char)
                             splitAndMoveAlong()
                         }
@@ -729,7 +739,7 @@ object SimpleC {
         }
 
 
-        val commands = Stack<SyntaxTreeNode>()
+        //val commands = Stack<SyntaxTreeNode>()
         val string = StringBuilder()
         val programOut = ArrayList<String>()
             // contains all the strings; should be array of strings (with extra info like line number?)
@@ -743,7 +753,7 @@ object SimpleC {
 
         val traversedNodes = ArrayList<SyntaxTreeNode>()
         fun preTraverse(node: SyntaxTreeNode) {
-            node.arguments.reversed().forEach { preTraverse(it) }
+            node.arguments.forEach { preTraverse(it) }
             traversedNodes.add(node)
             node.statements.forEach { preTraverse(it) }
         }
@@ -758,8 +768,8 @@ object SimpleC {
 
         // process using pre-traversed list
         println("== Traversed nodes ==")
-
-        traversedNodes.forEach { node ->
+        // FIXME interpretation of the traversed tree is wrong
+        traversedNodes.forEachIndexed { index, node ->
 
             // test print
             print("${node.getReadableNodeName()}")
@@ -770,10 +780,8 @@ object SimpleC {
             println()
 
 
-            commands.push(node)
 
-
-            if (node.expressionType == ExpressionType.FUNCTION_CALL) {
+            /*if (node.expressionType == ExpressionType.FUNCTION_CALL) {
 
                 if (commands.isNotEmpty() && commands.peek().isPartOfArgumentsNode) {
                     //println("stack: $commands -- About to pop ${commands.size} elements")
@@ -835,15 +843,31 @@ object SimpleC {
                 }
                 string.delete(0, string.length)
 
+            }*/
+            if ((node.expressionType == ExpressionType.INTERNAL_FUNCTION_CALL || node.name == "=") && index > 0) {
+                // prev inst is the arg (e.g. [foo, endfuncdef])
+                // we read from it; after read, we remove it from the output array
+                //
 
+                val argsCount = compilerInternalFuncArgsCount[node.getReadableNodeName()] ?: 0
+
+                for (i in argsCount downTo 1) {
+                    val preNode = traversedNodes[index - i]
+                    string.append("${preNode.getReadableNodeName()}\t")
+                    programOut.removeAt(programOut.lastIndex) // pop out from it
+                }
+
+                programOut.add("${node.lineNumber}\t${node.getReadableNodeName()}\t$string")
+                string.delete(0, string.length)
             }
             else if (node.expressionType == ExpressionType.FUNCTION_DEF) {
-                while (commands.isNotEmpty()) {
-                    string.append("${commands.pop().getReadableNodeName()}\t")
-                }
+                string.append("${node.getReadableNodeName()}\t")
 
                 programOut.add("${node.lineNumber}\tfuncdef\t$string")
                 string.delete(0, string.length)
+            }
+            else {
+                programOut.add("${node.lineNumber}\t${node.getReadableNodeName()}\t")
             }
         }
 
@@ -944,52 +968,29 @@ object SimpleC {
                     newcmd.arg1 = "$" + words[2]
                 }
                 "MOV" -> {
-                    newcmd.arg1 = words[2]
-                    newcmd.arg2 = if (words[3].isEmpty()) IRs.last().arg1 else words[3]
-                }
-                in VMOpcodesRISC.threeArgsCmd -> {
-                    // if there's extra unused args, you are doing it wrong!  @see treeToProperNotation()
-
-                    // if the inst has NO or ONLY ONE args
-                    // why '3'? [linenum, inst, '\t']
-                    // why '4'? [linenum, inst, arg1, '\t']; okay to pop as prev cmd are always "CONST 42159", "LOADVAR foo", etc
-                    if (words.size in 3..4) {
-                        val oldInst = newcmd.instruction // MUL, DIV, ADD, SUB, etc
-
-                        newcmd.arg1 = "r2"
-                        newcmd.instruction = "STACKPOP"
-
-                        addNextNewCmd()
-                        newcmds[1].arg1 = "r3"
-                        newcmds[1].instruction = "STACKPOP"
-
-                        addNextNewCmd()
-                        newcmds[2].instruction = oldInst // MUL, DIV, ADD, SUB, etc.
-                        newcmds[2].arg1 = "r1"
-                        newcmds[2].arg2 = "r2"
-                        newcmds[2].arg3 = "r3"
-
-                        nestedStatementsCommonLabelName.push(newcmds[2].arg1)
-                    }
-                    else {
-                        newcmd.arg2 = words[2]
-                        newcmd.arg3 = if (words[3].isEmpty()) IRs.last().arg1 else words[3]
-                        newcmd.arg1 = generateTemporaryVarName(newcmd.instruction, newcmd.arg2!!, newcmd.arg3!!)
-
-                        nestedStatementsCommonLabelName.push(newcmd.arg1)
-                    }
-
-                }
-                "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
+                    val oldCmd = newcmd.instruction
                     newcmd.arg1 = words[2]
                     newcmd.arg2 = words[3]
+                }
+                in VMOpcodesRISC.threeArgsCmd -> {
+                    val oldCmd = newcmd.instruction
+                    repeat(3) { addNextNewCmd() }
 
-                    if (newcmd.arg2!!.drop(1).isEmpty()) {
-                        newcmd.arg2 = nestedStatementsCommonLabelName.pop()
-                    }
+                    newcmds[0] = IntermediateRepresentation(lineNumber, "STACKPOP", "r3")
+                    newcmds[1] = IntermediateRepresentation(lineNumber, "STACKPOP", "r2")
+                    newcmds[2] = IntermediateRepresentation(lineNumber, oldCmd)
+                    newcmds[3] = IntermediateRepresentation(lineNumber, "STACKPUSH")
+                }
+                "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
+                    //newcmd.arg1 = words[2]
+                    //newcmd.arg2 = words[3]
+
+                    //if (newcmd.arg2!!.drop(1).isEmpty()) {
+                    //    newcmd.arg2 = nestedStatementsCommonLabelName.pop()
+                    //}
 
                     nestedStatementsCommonLabelName.push(
-                            generateSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", newcmd.arg1!!, newcmd.arg2!!)
+                            generateSuperTemporaryVarName(lineNumber, "IF${newcmd.instruction}", "TEMPO", "RARY")
                     )
                 }
                 "IF" -> {
@@ -1180,35 +1181,23 @@ object SimpleC {
 
             if (next != null) {
                 // check for compare instructions
-                if (next.instruction in irCmpInst && it.arg1 == next.arg2) {
+                // FIXME now
+                /*if (next.instruction in irCmpInst && it.arg1 == next.arg2) {
                     val newIR1 = IntermediateRepresentation(it.lineNum, it.instruction, "r4", it.arg2, it.arg3)
                     val newIR2 = IntermediateRepresentation(next.lineNum, next.instruction, next.arg1, "r4")
                     newIR.add(newIR1)
                     newIR.add(newIR2)
                     i++ // skip next instruction
-                }
+                }*/
             }
 
 
-            // regardless of next being null
 
-            // e.g. (instructions that do something and pushes their final result)
-            //      MOV $z;
-            if (it.instruction in VMOpcodesRISC.twoArgsCmd && it.arg2 == null) {
-                newIR.add(IntermediateRepresentation(it.lineNum, "STACKPOP", "r1"))
-                newIR.add(IntermediateRepresentation(it.lineNum, "MOV", it.arg1, "r1"))
-            }
-            // insts that stores its "final result" onto the temporary vars
-            else if ((it.instruction in VMOpcodesRISC.threeArgsCmd || it.instruction in VMOpcodesRISC.twoArgsCmd) &&
-                    it.arg1?.startsWith("$$") ?: throw InternalError("arg1 is null; inst: ${it.instruction}")) {
-
-                val newCmd = IntermediateRepresentation(it)
-                newCmd.arg1 = "r1"
-                newIR.add(newCmd)
-            }
-            else {
+            //if (it.instruction == "LOADVARASCONST") {
+            //}
+            //else {
                 newIR.add(it)
-            }
+            //}
 
 
             i++
@@ -1290,48 +1279,55 @@ object SimpleC {
                     ASMs.append("STOREWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
-                    if (it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
-                        // uh... do nothing?
+                    // using with 2 stackpops
+                    if (it.arg1 == null && it.arg2 == null && it.arg3 == null) {
+                        ASMs.append("${it.instruction} r1, r2, r3;")
                     }
                     else {
-                        if (it.arg2!!.isVariable()) {
-                            ASMs.append("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
+                        // TODO are they even being used?
+                        if (it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
+                            // uh... do nothing?
                         }
                         else {
-                            ASMs.append("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
-                        }
-
-                        if (it.arg3!!.isVariable()) {
-                            ASMs.append("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
-                        }
-                        else {
-                            ASMs.append("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
-                        }
-                    }
-
-
-
-                    if (it.arg1!!.isRegister()) {
-                        if (next?.instruction == "RETURN") {
-                            if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
-                                ASMs.append("${it.instruction} r1, ${it.arg2!!}, ${it.arg3!!};")
+                            if (it.arg2!!.isVariable()) {
+                                ASMs.append("LOADWORDIMEM r1, ${it.arg2!!.asProperAsmData()};")
                             }
                             else {
-                                ASMs.append("${it.instruction} r1, r1, r2;")
+                                ASMs.append("LOADWORDI r1, ${it.arg2!!.asProperAsmData()};")
+                            }
+
+                            if (it.arg3!!.isVariable()) {
+                                ASMs.append("LOADWORDIMEM r2, ${it.arg3!!.asProperAsmData()};")
+                            }
+                            else {
+                                ASMs.append("LOADWORDI r2, ${it.arg3!!.asProperAsmData()};")
+                            }
+                        }
+
+
+
+                        if (it.arg1!!.isRegister()) {
+                            if (next?.instruction == "RETURN") {
+                                if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
+                                    ASMs.append("${it.instruction} r1, ${it.arg2!!}, ${it.arg3!!};")
+                                }
+                                else {
+                                    ASMs.append("${it.instruction} r1, r1, r2;")
+                                }
+                            }
+                            else {
+                                if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
+                                    ASMs.append("${it.instruction} ${it.arg1!!}, ${it.arg2!!}, ${it.arg3!!};")
+                                }
+                                else {
+                                    ASMs.append("${it.instruction} ${it.arg1}, r1, r2;")
+                                }
                             }
                         }
                         else {
-                            if (it.arg1!!.isRegister() && it.arg2!!.isRegister() && it.arg3!!.isRegister()) {
-                                ASMs.append("${it.instruction} ${it.arg1!!}, ${it.arg2!!}, ${it.arg3!!};")
-                            }
-                            else {
-                                ASMs.append("${it.instruction} ${it.arg1}, r1, r2;")
-                            }
+                            ASMs.append("${it.instruction} r3, r1, r2;")
+                            ASMs.append("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
                         }
-                    }
-                    else {
-                        ASMs.append("${it.instruction} r3, r1, r2;")
-                        ASMs.append("STOREWORDIMEM r3, ${it.arg1!!.asProperAsmData()};")
                     }
                 }
                 in jmpCommands -> {
@@ -1430,6 +1426,7 @@ object SimpleC {
                 }
                 "LOADVARASCONST" -> {
                     ASMs.append("LOADWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
+                    ASMs.append("PUSH r1;")
                 }
                 else -> throw InternalError("Unknown IR: ${it.instruction}")
             }
@@ -1764,7 +1761,7 @@ object SimpleC {
                     )
                     try {
                         leafNode.literalValue = if (word.endsWith('F', true))
-                            word.slice(0..word.lastIndex - 1).toDouble() // DOUBLE when SimpleC; replace it with 'toFloat()' if you're standard C
+                            word.slice(0..word.lastIndex - 1).toDouble() // DOUBLE when C-flat; replace it with 'toFloat()' if you're standard C
                         else
                             word.toDouble()
                     }
@@ -1863,7 +1860,7 @@ object SimpleC {
                         else {
                             // #_declarevar(SyntaxTreeNode<RawString> varname, SyntaxTreeNode<RawString> vartype)
 
-                            val leafNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, ReturnType.NOTHING, "#_declarevar", lineNumber)
+                            val leafNode = SyntaxTreeNode(ExpressionType.INTERNAL_FUNCTION_CALL, ReturnType.NOTHING, "#_declarevar", lineNumber)
 
                             val valueNode = tokens[1].toRawTreeNode(lineNumber); valueNode.isPartOfArgumentsNode = true
                             leafNode.addArgument(valueNode)
@@ -2064,12 +2061,12 @@ object SimpleC {
         private fun _expandImplicitEnds() {
             if (this.name in functionsImplicitEnd) {
                 this.statements.add(SyntaxTreeNode(
-                        ExpressionType.FUNCTION_CALL, null, "end${this.name}", this.lineNumber, this.isRoot
+                        ExpressionType.INTERNAL_FUNCTION_CALL, null, "end${this.name}", this.lineNumber, this.isRoot
                 ))
             }
             else if (this.expressionType == ExpressionType.FUNCTION_DEF) {
                 val endfuncdef = SyntaxTreeNode(
-                        ExpressionType.FUNCTION_CALL, null, "endfuncdef", this.lineNumber, this.isRoot
+                        ExpressionType.INTERNAL_FUNCTION_CALL, null, "endfuncdef", this.lineNumber, this.isRoot
                 )
                 endfuncdef.addArgument(SyntaxTreeNode(ExpressionType.FUNC_ARGUMENT_DEF, null, this.name!!, this.lineNumber, isPartOfArgumentsNode = true))
                 this.statements.add(endfuncdef)
@@ -2120,6 +2117,7 @@ object SimpleC {
     enum class ExpressionType {
         FUNCTION_DEF, FUNC_ARGUMENT_DEF, // expect Arguments and Statements
 
+        INTERNAL_FUNCTION_CALL,
         FUNCTION_CALL, // expect Arguments and Statements
         // the case of OPERATOR CALL //
         // returnType: variable type; name: "="; TODO add description for STRUCT

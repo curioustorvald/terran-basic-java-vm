@@ -1,7 +1,7 @@
 package net.torvald.terranvm
 
 import net.torvald.terranvm.runtime.*
-import net.torvald.terranvm.runtime.compiler.simplec.SimpleC
+import net.torvald.terranvm.runtime.compiler.cflat.Cflat
 
 /**
  * Created by minjaesong on 2017-05-25.
@@ -23,11 +23,11 @@ object Executable {
         val vm = TerranVM(1024)
         val assembler = Assembler(vm)
 
-        val program = SimpleC.buildTree(SimpleC.tokenise(SimpleC.preprocess(testProgram)))
-        val notatedProgram = SimpleC.treeToProperNotation(program)
-        val programInIR = SimpleC.notationToIR(notatedProgram)
-        val programInNewIR = SimpleC.preprocessIR(programInIR)
-        val programASM = SimpleC.IRtoASM(programInNewIR)
+        val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
+        val notatedProgram = Cflat.treeToProperNotation(program)
+        val programInIR = Cflat.notationToIR(notatedProgram)
+        val programInNewIR = Cflat.preprocessIR(programInIR)
+        val programASM = Cflat.IRtoASM(programInNewIR)
         val code = assembler(programASM.joinToString("\n"))
 
         vm.loadProgram(code)

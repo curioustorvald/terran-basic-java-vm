@@ -1,4 +1,4 @@
-package net.torvald.terranvm.runtime.compiler.simplec
+package net.torvald.terranvm.runtime.compiler.cflat
 
 /**
  * Created by minjaesong on 2017-06-15.
@@ -38,10 +38,10 @@ class CStruct(name: String, val identifier: String): CData(name) {
     }
 }
 
-class CPrimitive(name: String, val type: SimpleC.ReturnType, val value: Any?, val derefDepth: Int = 0): CData(name) {
+class CPrimitive(name: String, val type: Cflat.ReturnType, val value: Any?, val derefDepth: Int = 0): CData(name) {
     override fun sizeOf(): Int {
         var typestr = type.toString()
         if (typestr.endsWith("_PTR")) typestr = typestr.drop(4)
-        return SimpleC.sizeofPrimitive(typestr)
+        return Cflat.sizeofPrimitive(typestr)
     }
 }

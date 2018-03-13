@@ -1,6 +1,6 @@
 package net.torvald.terranvm
 
-//import net.torvald.terranvm.runtime.compiler.simplec.SimpleC
+//import net.torvald.terranvm.runtime.compiler.cflat.SimpleC
 
 /**
  * Created by minjaesong on 2017-06-04.
