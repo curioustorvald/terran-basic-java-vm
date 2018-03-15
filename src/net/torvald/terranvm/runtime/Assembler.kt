@@ -799,6 +799,8 @@ class Assembler(val vm: TerranVM) {
     private fun String.toRegInt() =
             if (this.matches(regexRegisterLiteral))
                 this[1].toInt() - 49 // "r1" -> 0
+            else if (this == "0")
+                -1
             else
                 throw IllegalArgumentException("Illegal register literal: '$this'")
 

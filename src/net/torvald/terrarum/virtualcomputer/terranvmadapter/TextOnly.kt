@@ -35,7 +35,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 200
+        val vmDelay = 0
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -62,17 +62,33 @@ class TextOnly : Game() {
 
             x = 3f;
             y = 2f;
-            int foo() {
-                yyyy = 42 + 195;
 
-                if (x == 42 - yyyy) {
-                    return 7f / 3f;
-                } else {
-                    return 0;
-                }
-            }
+            //int foo() {
+            //    y = 42 + 195;
+            //
+            //    if (x == 42 - y) {
+            //        return 7f / 3f;
+            //    } else {
+            //        return 0;
+            //    }
+            //}
 
             z = (x + y) * y / x; // should be 3.333.. (55 55 55 40)
+
+
+            float fortyeight;
+            float two;
+            float nine;
+            float three;
+            float res;
+
+            fortyeight = 48f;
+            two = 2f;
+            nine = 9f;
+            three = 3f;
+
+            res = fortyeight / two * (nine + three);
+
         """.trimIndent()
         val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
 

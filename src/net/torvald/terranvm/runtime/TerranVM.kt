@@ -319,6 +319,7 @@ class TerranVM(inMemSize: Int,
             6 -> r6 = data.toRawBits()
             7 -> r7 = data.toRawBits()
             8 -> r8 = data.toRawBits()
+            0 -> throw IllegalArgumentException("Cannot write to '0' register")
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
@@ -332,6 +333,7 @@ class TerranVM(inMemSize: Int,
             6 -> r6 = data
             7 -> r7 = data
             8 -> r8 = data
+            0 -> throw IllegalArgumentException("Cannot write to '0' register")
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
@@ -670,7 +672,7 @@ MTHFU
                     VMOpcodesRISC.decodeAndExecute(opcode)
                 }
                 catch (oom: ArrayIndexOutOfBoundsException) {
-                    execDebugError("[TBASRT] illegal memory address access")
+                    execDebugError("[TBASRT] illegal memory address access: from opcode ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
                     interruptOutOfMem()
                 }
 

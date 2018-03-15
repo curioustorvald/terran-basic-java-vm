@@ -50,7 +50,7 @@ fun Int.toReadableOpcode(): String {
         // JMP only
         5 -> "FW"
         6 -> "BW"
-        else -> throw NullPointerException("Illegal condition: ${this.ushr(29)}")
+        else -> throw NullPointerException("Illegal condition: ${this.ushr(29)} for opcode ${this.toReadableBin()}")
     }
 
     val mode = this.and(0b00011110000000000000000000000000).ushr(25)
@@ -760,8 +760,53 @@ object VMOpcodesRISC {
             "INT" to 1
     )
 
+    private val returnType = hashMapOf(
+            "MOV" to "Int32",
+            "XCHG" to "Int32",
+            "INC" to "Int32",
+            "DEC" to "Int32",
+            "FTOI" to "Float",
+            "ITOF" to "Int32",
+            "ADD" to "Float",
+            "SUB" to "Float",
+            "MUL" to "Float",
+            "DIV" to "Float",
+            "POW" to "Float",
+            "MOD" to "Float",
+            "ADDINT" to "Int32",
+            "SUBINT" to "Int32",
+            "MULINT" to "Int32",
+            "DIVINT" to "Int32",
+            "POWINT" to "Int32",
+            "MODINT" to "Int32",
+            "SHL" to "Int32",
+            "SHR" to "Int32",
+            "USHR" to "Int32",
+            "AND" to "Int32",
+            "OR" to "Int32",
+            "XOR" to "Int32",
+            "ABS" to "Float",
+            "SIN" to "Float",
+            "COS" to "Float",
+            "TAN" to "Float",
+            "FLOOR" to "Float",
+            "CEIL" to "Float",
+            "ROUND" to "Float",
+            "LOG" to "Float",
+            "RNDI" to "Float",
+            "RND" to "Float",
+            "SGN" to "Float",
+            "SQRT" to "Float",
+            "CBRT" to "Float",
+            "INV" to "Float",
+            "RAD" to "Float",
+            "NOT" to "Int32"
+    )
+
     val threeArgsCmd = hashSetOf<String>()
     val twoArgsCmd = hashSetOf<String>()
+    val returnsIntegerCmd = hashSetOf<String>()
+    val returnsFloatCmd = hashSetOf<String>()
 
     init {
         argumentCount.forEach { t, u ->
@@ -780,7 +825,31 @@ object VMOpcodesRISC {
                 twoArgsCmd.add(t + "LS")
             }
         }
+
+        returnType.forEach { t, u ->
+            if ("Float" == u) {
+                returnsFloatCmd.add(t)
+                returnsFloatCmd.add(t + "Z")
+                returnsFloatCmd.add(t + "NZ")
+                returnsFloatCmd.add(t + "GT")
+                returnsFloatCmd.add(t + "LS")
+            }
+            else if ("Int32" == u) {
+                returnsIntegerCmd.add(t)
+                returnsIntegerCmd.add(t + "Z")
+                returnsIntegerCmd.add(t + "NZ")
+                returnsIntegerCmd.add(t + "GT")
+                returnsIntegerCmd.add(t + "LS")
+            }
+        }
     }
+
+    fun getReturnType(cmd: String): String? =
+            when (cmd) {
+                in returnsIntegerCmd -> "int"
+                in returnsFloatCmd -> "float"
+                else -> null
+            }
 
 
     private infix fun Float.pow(other: Float) = Math.pow(this.toDouble(), other.toDouble()).toFloat()

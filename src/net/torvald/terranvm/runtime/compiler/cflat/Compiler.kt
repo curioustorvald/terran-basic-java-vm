@@ -278,7 +278,7 @@ object Cflat {
             "xor" to "XOR",
             "not" to "NOT",
 
-            "=" to "MOV",
+            "=" to "ASSIGN",
 
             "==" to "ISEQ",
             "!=" to "ISNEQ",
@@ -844,7 +844,7 @@ object Cflat {
                 string.delete(0, string.length)
 
             }*/
-            if ((node.expressionType == ExpressionType.INTERNAL_FUNCTION_CALL || node.name == "=") && index > 0) {
+            if ((node.expressionType == ExpressionType.INTERNAL_FUNCTION_CALL) && index > 0) {
                 // prev inst is the arg (e.g. [foo, endfuncdef])
                 // we read from it; after read, we remove it from the output array
                 //
@@ -899,6 +899,7 @@ object Cflat {
         return programOut
     }
 
+
     /**
     Intermediate Representation:
 
@@ -921,6 +922,7 @@ object Cflat {
 
 
         val IRs = ArrayList<IntermediateRepresentation>()
+        val virtualStack = Stack<String>()
         val nestedStatementsCommonLabelName = Stack<String>()
 
         notatedProgram.forEachIndexed { index, it ->
@@ -936,11 +938,17 @@ object Cflat {
             }
             // or is it variable?
             else if (words[1].isVariable()) {
-                newcmds.add(IntermediateRepresentation(lineNumber, "LOADVARASCONST", words[1]!!))
+                newcmds.add(IntermediateRepresentation(lineNumber, "STACKPUSHIPTR", words[1]!!))
+                virtualStack.push("variable")
             }
             // or is it literal?
             else if (words[1].isLiteral() && words[2].isBlank()) {
-                newcmds.add(IntermediateRepresentation(lineNumber, "CONST", words[1]!!))
+                newcmds.add(IntermediateRepresentation(lineNumber, "STACKPUSHICONST", words[1]!!))
+
+                if (words[1].matchesFloatLiteral())
+                    virtualStack.push("literal_float")
+                else
+                    virtualStack.push("literal_int")
             }
             else {
                 // or assume as function call
@@ -954,7 +962,7 @@ object Cflat {
             }
 
 
-            println("L$lineNumber: inst: ${newcmd.instruction}, wordCount: ${words.size}")
+            //println("L$lineNumber: inst: ${newcmd.instruction}, wordCount: ${words.size}")
 
 
             // convert internal notation into IR command
@@ -967,19 +975,63 @@ object Cflat {
                     }
                     newcmd.arg1 = "$" + words[2]
                 }
-                "MOV" -> {
-                    val oldCmd = newcmd.instruction
-                    newcmd.arg1 = words[2]
-                    newcmd.arg2 = words[3]
+                "ASSIGN" -> {
+                    repeat(2) { addNextNewCmd() }
+
+                    newcmds[0] = IntermediateRepresentation(lineNumber, "STACKPOP", "r2")
+                    newcmds[1] = IntermediateRepresentation(lineNumber, "STACKPOP", "r1")
+
+                    val typeRhand = virtualStack.pop()
+                    //val typeLhand = virtualStack.pop()
+
+                    var cmd = if (typeRhand.startsWith("literal"))
+                        "ASSIGNCONST"
+                    else
+                        "ASSIGNVAR"
+
+                    // do not pop othe elem: intended cmd is: pop(), push_what_just_popped()
+
+                    newcmds[2] = IntermediateRepresentation(lineNumber, cmd)
+
                 }
                 in VMOpcodesRISC.threeArgsCmd -> {
                     val oldCmd = newcmd.instruction
-                    repeat(3) { addNextNewCmd() }
+                    val returnType = VMOpcodesRISC.getReturnType(newcmd.instruction)
+                    repeat(5) { addNextNewCmd() }
 
                     newcmds[0] = IntermediateRepresentation(lineNumber, "STACKPOP", "r3")
                     newcmds[1] = IntermediateRepresentation(lineNumber, "STACKPOP", "r2")
-                    newcmds[2] = IntermediateRepresentation(lineNumber, oldCmd)
-                    newcmds[3] = IntermediateRepresentation(lineNumber, "STACKPUSH")
+
+                    val typeRhand = virtualStack.pop()
+                    val typeLhand = virtualStack.pop()
+
+                    // command relative to hand types (literal or pointer)
+
+                    if (!typeRhand.startsWith("literal")) {
+                        // not a literal; dereference pointer
+                        // if it were a literal, the value is already on the register, so no further jobs required
+                        newcmds[2] = IntermediateRepresentation(lineNumber, "DEREFPTR", "r3")
+                    }
+                    else {
+                        newcmds[2] = IntermediateRepresentation(lineNumber, "NOP")
+                    }
+
+                    if (!typeLhand.startsWith("literal")) {
+                        // not a literal; dereference pointer
+                        // if it were a literal, the value is already on the register, so no further jobs required
+                        newcmds[3] = IntermediateRepresentation(lineNumber, "DEREFPTR", "r2")
+                    }
+                    else {
+                        newcmds[3] = IntermediateRepresentation(lineNumber, "NOP")
+                    }
+
+
+                    newcmds[4] = IntermediateRepresentation(lineNumber, oldCmd)
+
+                    if (returnType != null) {
+                        newcmds[5] = IntermediateRepresentation(lineNumber, "STACKPUSH")
+                        virtualStack.push("literal_$returnType")
+                    }
                 }
                 "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
                     //newcmd.arg1 = words[2]
@@ -1123,7 +1175,7 @@ object Cflat {
                     }
                     catch (e: IndexOutOfBoundsException) {}
                 }
-                "STACKPUSH", "CONST", "LOADVARASCONST" -> {
+                "STACKPUSH", "STACKPUSHICONST", "STACKPUSHIPTR" -> {
                     // no further jobs required
                 }
                 else -> {
@@ -1415,14 +1467,32 @@ object Cflat {
                     }
                     ASMs.append(":\$ENDFUNCDEF_${it.arg1!!};")
                 }
+                "DEREFPTR" -> {
+                    if (!it.arg1!!.isRegister()) throw InternalError("arg1 is not a register (${it.arg1})")
+
+                    ASMs.append("LOADBYTEI r5, 0;")
+                    ASMs.append("LOADWORD ${it.arg1!!}, ${it.arg1!!}, r5;")
+                }
                 "STACKPUSH" -> {
                     ASMs.append("PUSH r1;")
                 }
                 "STACKPOP" -> {
                     ASMs.append("POP ${it.arg1!!};")
                 }
-                "CONST" -> {
+                "STACKPUSHIPTR" -> {
+                    ASMs.append("PUSHWORDI ${it.arg1!!.asProperAsmData()};")
+                }
+                "STACKPUSHICONST" -> {
                     ASMs.append("LOADWORDI r1, ${it.arg1!!};")
+                    ASMs.append("PUSH r1;")
+                }
+                "ASSIGNCONST" -> {
+                    ASMs.append("LOADBYTEI r3, 0;")
+                    ASMs.append("STOREWORD r2, r1, r3;")
+                }
+                "CONST" -> {
+                    TODO("Please check! Did you possibly mean ASSIGNCONST?")
+                    //ASMs.append("LOADWORDI r1, ${it.arg1!!};")
                 }
                 "LOADVARASCONST" -> {
                     ASMs.append("LOADWORDIMEM r1, ${it.arg1!!.asProperAsmData()};")
