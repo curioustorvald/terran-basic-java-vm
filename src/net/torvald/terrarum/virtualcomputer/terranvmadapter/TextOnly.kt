@@ -59,6 +59,7 @@ class TextOnly : Game() {
             float x;
             float y;
             float z;
+            float z1;
 
             x = 3f;
             y = 2f;
@@ -73,21 +74,8 @@ class TextOnly : Game() {
             //    }
             //}
 
-            z = (x + y) * y / x; // should be 3.333.. (55 55 55 40)
-
-
-            float fortyeight;
-            float two;
-            float nine;
-            float three;
-            float res;
-
-            fortyeight = 48f;
-            two = 2f;
-            nine = 9f;
-            three = 3f;
-
-            res = fortyeight / two * (nine + three);
+            z = (x + y ) * y / x; // should      be 3.333.. (55 55 55 40)
+            z1= (3f+ 2f) * 2f/ 3f;// should also be 3.333.. (55 55 55 40)
 
         """.trimIndent()
         val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
