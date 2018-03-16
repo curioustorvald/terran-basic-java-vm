@@ -72,7 +72,7 @@ object Cflat {
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""") // DIFFERENT FROM the assembler
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""") // DIFFERENT FROM the assembler
-    private val regexFPWhole =  Regex("""^([-+]?[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[0-9]+\.?([Ee][-+]?[0-9]+)?[Ff]?)$""") // same as the assembler
+    private val regexFPWhole =  Regex("""^([-+]?[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[-+]?[0-9]+\.?([Ee][-+]?[0-9]+)[Ff]?|[-+]?[0-9]+\.[0-9]*[Ff]?|[-+]?[0-9]+[Ff])$""") // same as the assembler
     private val regexIntWhole = Regex("""^([-+]?[0-9_]+[Ll]?)$""") // DIFFERENT FROM the assembler
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
