@@ -64,19 +64,21 @@ class TextOnly : Game() {
             x = 3f;
             y = 2f;
 
-            //int foo() {
-            //    y = 42 + 195;
-            //
-            //    if (x == 42 - y) {
-            //        return 7f / 3f;
-            //    } else {
-            //        return 0;
-            //    }
-            //}
+            int foo() {
+                y = 42 + 195;
+
+                if (x == 42) {
+                    return 7f / 3f;
+                } else {
+                    return 0;
+                }
+            }
 
             z = (x + y ) * y / x; // should      be 3.333.. (55 55 55 40)
-            z1= (3f+ 2f) * 2f/ 3f;// should also be 3.333.. (55 55 55 40)
 
+            if (z > 5f) {
+                z1= (3f+ 2f) * 2f/ 3f;// should also be 3.333.. (55 55 55 40)
+            }
         """.trimIndent()
         val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
 

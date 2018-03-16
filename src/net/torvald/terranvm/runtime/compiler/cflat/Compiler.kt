@@ -72,7 +72,7 @@ object Cflat {
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""") // DIFFERENT FROM the assembler
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""") // DIFFERENT FROM the assembler
-    private val regexFPWhole =  Regex("""^([-+]?[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[-+]?[0-9]+\.?([Ee][-+]?[0-9]+)[Ff]?|[-+]?[0-9]+\.[0-9]*[Ff]?|[-+]?[0-9]+[Ff])$""") // same as the assembler
+    private val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]*.*|[-+]?[0-9]+[eEfF].*)$""") // same as the assembler
     private val regexIntWhole = Regex("""^([-+]?[0-9_]+[Ll]?)$""") // DIFFERENT FROM the assembler
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
@@ -304,7 +304,12 @@ object Cflat {
     )
 
     private val irCmpInst = hashSetOf(
-            "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ"
+            "ISEQ_II", "ISEQ_IF", "ISEQ_FI", "ISEQ_FF",
+            "ISNEQ_II", "ISNEQ_IF", "ISNEQ_FI", "ISNEQ_FF",
+            "ISGT_II", "ISGT_IF", "ISGT_FI", "ISGT_FF",
+            "ISLS_II", "ISLS_IF", "ISLS_FI", "ISLS_FF",
+            "ISGTEQ_II", "ISGTEQ_IF", "ISGTEQ_FI", "ISGTEQ_FF",
+            "ISLSEQ_II", "ISLSEQ_IF", "ISLSEQ_FI", "ISLSEQ_FF"
     )
 
     private val jmpCommands = hashSetOf(
@@ -899,6 +904,11 @@ object Cflat {
         return programOut
     }
 
+    /**
+     * @param type "variable", "literal_i", "literal_f"
+     * @param value string for variable name, int for integer and float literals
+     */
+    private data class VirtualStackItem(val type: String, val value: String)
 
     /**
     Intermediate Representation:
@@ -922,7 +932,8 @@ object Cflat {
 
 
         val IRs = ArrayList<IntermediateRepresentation>()
-        val virtualStack = Stack<String>()
+        val virtualStack = Stack<VirtualStackItem>()
+        val virtualGlobalVars = HashMap<String, String>() // name, type
         val nestedStatementsCommonLabelName = Stack<String>()
 
         notatedProgram.forEachIndexed { index, it ->
@@ -939,16 +950,21 @@ object Cflat {
             // or is it variable?
             else if (words[1].isVariable()) {
                 newcmds.add(IntermediateRepresentation(lineNumber, "STACKPUSHIPTR", words[1]!!))
-                virtualStack.push("variable")
+                virtualStack.push(VirtualStackItem("variable_" +
+                        "${((virtualGlobalVars[words[1]]) ?: throw InternalError("No such variable: ${words[1]}"))[0]}",
+                        words[1]))
             }
             // or is it literal?
             else if (words[1].isLiteral() && words[2].isBlank()) {
                 newcmds.add(IntermediateRepresentation(lineNumber, "STACKPUSHICONST", words[1]!!))
 
                 if (words[1].matchesFloatLiteral())
-                    virtualStack.push("literal_float")
+                    virtualStack.push(VirtualStackItem("literal_f", words[1]))
                 else
-                    virtualStack.push("literal_int")
+                    virtualStack.push(VirtualStackItem("literal_i", words[1]))
+
+
+                println("!! STACKPUSHICONST ${words[1]} with type ${virtualStack.peek().type}")
             }
             else {
                 // or assume as function call
@@ -974,6 +990,8 @@ object Cflat {
                         else -> "DECLARE"
                     }
                     newcmd.arg1 = "$" + words[2]
+
+                    virtualGlobalVars[newcmd.arg1!!] = words[3]
                 }
                 "ASSIGN" -> {
                     repeat(2) { addNextNewCmd() }
@@ -983,13 +1001,12 @@ object Cflat {
 
                     val typeRhand = virtualStack.pop()
                     //val typeLhand = virtualStack.pop()
+                    // do not pop othe elem: intended cmd is: pop(), push_what_just_popped()
 
-                    var cmd = if (typeRhand.startsWith("literal"))
+                    var cmd = if (typeRhand.type.startsWith("literal"))
                         "ASSIGNCONST"
                     else
                         "ASSIGNVAR"
-
-                    // do not pop othe elem: intended cmd is: pop(), push_what_just_popped()
 
                     newcmds[2] = IntermediateRepresentation(lineNumber, cmd)
 
@@ -1007,7 +1024,7 @@ object Cflat {
 
                     // command relative to hand types (literal or pointer)
 
-                    if (!typeRhand.startsWith("literal")) {
+                    if (!typeRhand.type.startsWith("literal")) {
                         // not a literal; dereference pointer
                         // if it were a literal, the value is already on the register, so no further jobs required
                         newcmds[2] = IntermediateRepresentation(lineNumber, "DEREFPTR", "r3")
@@ -1016,7 +1033,7 @@ object Cflat {
                         newcmds[2] = IntermediateRepresentation(lineNumber, "NOP")
                     }
 
-                    if (!typeLhand.startsWith("literal")) {
+                    if (!typeLhand.type.startsWith("literal")) {
                         // not a literal; dereference pointer
                         // if it were a literal, the value is already on the register, so no further jobs required
                         newcmds[3] = IntermediateRepresentation(lineNumber, "DEREFPTR", "r2")
@@ -1026,11 +1043,13 @@ object Cflat {
                     }
 
 
+                    // TODO type-awareness
+
                     newcmds[4] = IntermediateRepresentation(lineNumber, oldCmd)
 
                     if (returnType != null) {
                         newcmds[5] = IntermediateRepresentation(lineNumber, "STACKPUSH")
-                        virtualStack.push("literal_$returnType")
+                        virtualStack.push(VirtualStackItem("literal_${returnType[0]}", "something"))
                     }
                 }
                 "ISEQ", "ISNEQ", "ISGT", "ISLS", "ISGTEQ", "ISLSEQ" -> {
@@ -1049,10 +1068,48 @@ object Cflat {
                     val sourceExpr = nestedStatementsCommonLabelName.peek() // $$IFISEQ_42_$x_$l5
                     val sourceCmpCmd = sourceExpr.split('_')[0].drop(2)
 
-                    repeat(3) { addNextNewCmd() }
-                    val newcmd2 = newcmds[1] // jump
-                    val newcmd3 = newcmds[2] // jump
-                    val newcmd4 = newcmds[3] // label for IF_TRUE
+                    repeat(8) { addNextNewCmd() }
+                    newcmd      = newcmds[5] // jump
+                    val newcmd2 = newcmds[6] // jump
+                    val newcmd3 = newcmds[7] // jump
+                    val newcmd4 = newcmds[8] // label for IF_TRUE
+
+                    newcmds[0] = IntermediateRepresentation(lineNumber, "STACKPOP", "r3")
+                    newcmds[1] = IntermediateRepresentation(lineNumber, "STACKPOP", "r2")
+
+                    val rhand = virtualStack.pop().type // r3 // variable_[if] | literal_[if]
+                    val lhand = virtualStack.pop().type // r2 // variable_[if] | literal_[if]
+
+                    if (rhand.startsWith("variable")) {
+                        // add dereference inst
+                        newcmds[2] = IntermediateRepresentation(lineNumber, "DEREFPTR", "r3")
+                    }
+                    else {
+                        newcmds[2] = IntermediateRepresentation(lineNumber, "NOP")
+                    }
+
+                    if (lhand.startsWith("variable")) {
+                        // add dereference inst
+                        newcmds[3] = IntermediateRepresentation(lineNumber, "DEREFPTR", "r2")
+                    }
+                    else {
+                        newcmds[3] = IntermediateRepresentation(lineNumber, "NOP")
+                    }
+
+                    // add type flags into prev command
+                    val typeAppendix = "_${lhand.last().minus(0x20)}" + // capitalise [if] to [IF]
+                                       "${rhand.last().minus(0x20)}" // capitalise [if] to [IF]
+
+                    println("!! ${IRs.last().instruction} -> ${IRs.last().instruction}$typeAppendix") // expecting ISEQ or others
+
+                    val newCmpInst = IRs.last().instruction + typeAppendix
+                    // NOPify prev cmp commands;
+                    // Expected: STACKPOP r3; STACKPOP r2; (deref if needed); ISEQ_FF
+                    // At this point we get: ISEQ_FF; STACKPOP r3; STACKPOP r2; (deref if needed)
+                    // Expecting result: NOP; STACKPOP r3; STACKPOP r2; (deref if needed); ISEQ_FF
+                    IRs[IRs.lastIndex] = IntermediateRepresentation(lineNumber, "NOP")
+                    newcmds[4] = IntermediateRepresentation(lineNumber, newCmpInst)
+
 
                     when (sourceCmpCmd) {
                         "IFISEQ" -> {
@@ -1389,24 +1446,28 @@ object Cflat {
                     ASMs.append(":${it.arg1!!.drop(1)};")
                 }
                 in irCmpInst -> {
+                    /*if (it.arg1 == null || it.arg2 == null) {
+                        throw IllegalArgumentException("One or two argument is null; ${it.instruction} ${it.arg1} ${it.arg2}")
+                    }
+
                     val lhand = it.arg1!!
                     val rhand = it.arg2!!
 
                     val lhandType = if (lhand.isVariable())
                         varTable[lhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
-                    else if (lhand.matchesNumberLiteral())
-                        "INTLITERAL"
                     else if (lhand.matchesFloatLiteral())
                         "FLOATLITERAL"
+                    else if (lhand.matchesNumberLiteral())
+                        "INTLITERAL"
                     else
                         throw IllegalArgumentException("Unknown literal type: $lhand at line ${it.lineNum}")
 
                     val rhandType = if (rhand.isVariable())
                         varTable[rhand.drop(1)] ?: throw IllegalArgumentException("Undeclared variable: $lhand at line ${it.lineNum}")
-                    else if (rhand.matchesNumberLiteral())
-                        "INTLITERAL"
-                    else if (rhand.matchesFloatLiteral())
+                    else if (lhand.matchesFloatLiteral())
                         "FLOATLITERAL"
+                    else if (lhand.matchesNumberLiteral())
+                        "INTLITERAL"
                     else
                         throw IllegalArgumentException("Unknown literal type: $rhand at line ${it.lineNum}")
 
@@ -1415,27 +1476,12 @@ object Cflat {
 
 
                     val lIsLiteral = lhandType.endsWith("LITERAL")
-                    val rIsLiteral = rhandType.endsWith("LITERAL")
+                    val rIsLiteral = rhandType.endsWith("LITERAL")*/
 
-                    val cmpInst = "CMP${lhandType[0]}${rhandType[0]}"
+                    val cmpInst = "CMP${it.instruction[it.instruction.lastIndex - 1]}${it.instruction[it.instruction.lastIndex]}"
+                    // all the required variables must be popped to r2 and r3 previously
 
-
-
-                    if (lIsLiteral) {
-                        ASMs.append("LOADWORDI r1, $lhand;")
-                    }
-                    else {
-                        ASMs.append("LOADWORDIMEM r1, ${lhand.asProperAsmData()};")
-                    }
-
-                    if (rIsLiteral) {
-                        ASMs.append("LOADWORDI r2, $rhand;")
-                    }
-                    else {
-                        ASMs.append("LOADWORDIMEM r2, ${rhand.asProperAsmData()};")
-                    }
-
-                    ASMs.append("$cmpInst r1, r2;")
+                    ASMs.append("$cmpInst r2, r3;")
                 }
                 "INLINEASM" -> {
                     ASMs.append(it.arg1!!)

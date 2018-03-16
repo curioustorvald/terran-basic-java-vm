@@ -86,7 +86,7 @@ class Assembler(val vm: TerranVM) {
         val regexRegisterLiteral = Regex("""^[Rr][0-9]+$""") // same as the compiler
         val regexHexWhole = Regex("""^([0-9A-Fa-f_]+h)$""") // DIFFERENT FROM the compiler
         val regexBinWhole = Regex("""^([01_]+b)$""") // DIFFERENT FROM the compiler
-        val regexFPWhole =  Regex("""^([-+]?[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?[Ff]?|[-+]?[0-9]+\.?([Ee][-+]?[0-9]+)[Ff]?|[-+]?[0-9]+\.[0-9]*[Ff]?|[-+]?[0-9]+[Ff])$""") // same as the assembler
+        val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]*.*|[-+]?[0-9]+[eEfF].*)$""") // same as the assembler
         val regexIntWhole = Regex("""^([-+]?[0-9_]+)$""") // DIFFERENT FROM the compiler
 
         private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
