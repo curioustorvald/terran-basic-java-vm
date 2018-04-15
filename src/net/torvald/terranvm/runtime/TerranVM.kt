@@ -421,39 +421,58 @@ class TerranVM(inMemSize: Int,
         mallocList.clear()
 
 
-        warn("Program loaded; pc: $pcHex, userSpaceStart: $userSpaceStart")
+        warn("Program loaded; pc: $pcHex, userSpaceStart: $userSpaceStart (${userSpaceStart?.toHexString()})")
     }
 
     private fun setDefaultInterrupts(): Int {
-        /*val intOOM = Assembler("""
-loadstrinline r1,
-NOMEM
-; printstr; halt;
+        val assembler = Assembler(this)
+        val intOOM = assembler("""
+loadhwordi r1, 024Eh; call r1, FFh; # N
+loadhwordi r1, 024Fh; call r1, FFh; # O
+loadhwordi r1, 024Dh; call r1, FFh; # M
+loadhwordi r1, 0245h; call r1, FFh; # E
+loadhwordi r1, 024Dh; call r1, FFh; # M
+halt;
 """)
-        val intSegfault = Assembler("""
-loadstrinline r1,
-SEGFU
-; printstr; halt;
+        val intSegfault = assembler("""
+loadhwordi r1, 0253h; call r1, FFh; # S
+loadhwordi r1, 0245h; call r1, FFh; # E
+loadhwordi r1, 0247h; call r1, FFh; # G
+loadhwordi r1, 0246h; call r1, FFh; # F
+loadhwordi r1, 0255h; call r1, FFh; # U
+halt;
 """)
-        val intDivZero = Assembler("""
-loadstrinline r1,
-DIV/0
-; printstr; halt;
+        val intDivZero = assembler("""
+loadhwordi r1, 0244h; call r1, FFh; # D
+loadhwordi r1, 0249h; call r1, FFh; # I
+loadhwordi r1, 0256h; call r1, FFh; # V
+loadhwordi r1, 022Fh; call r1, FFh; # /
+loadhwordi r1, 0230h; call r1, FFh; # 0
+halt;
 """)
-        val intIllegalOp = Assembler("""
-loadstrinline r1,
-ILLOP
-; printstr; halt;
+        val intIllegalOp = assembler("""
+loadhwordi r1, 0249h; call r1, FFh; # I
+loadhwordi r1, 024Ch; call r1, FFh; # L
+loadhwordi r1, 024Ch; call r1, FFh; # L
+loadhwordi r1, 024Fh; call r1, FFh; # O
+loadhwordi r1, 0250h; call r1, FFh; # P
+halt;
 """)
-        val intStackOverflow = Assembler("""
-loadstrinline r1,
-STKOF
-; printstr; halt;
+        val intStackOverflow = assembler("""
+loadhwordi r1, 0253h; call r1, FFh; # S
+loadhwordi r1, 0254h; call r1, FFh; # T
+loadhwordi r1, 024Fh; call r1, FFh; # O
+loadhwordi r1, 0256h; call r1, FFh; # V
+loadhwordi r1, 0246h; call r1, FFh; # F
+halt;
 """)
-        val intMathFuck = Assembler("""
-loadstrinline r1,
-MTHFU
-; printstr; halt;
+        val intMathFuck = assembler("""
+loadhwordi r1, 024Dh; call r1, FFh; # M
+loadhwordi r1, 0254h; call r1, FFh; # T
+loadhwordi r1, 0246h; call r1, FFh; # F
+loadhwordi r1, 0243h; call r1, FFh; # C
+loadhwordi r1, 024Bh; call r1, FFh; # K
+halt;
 """)
 
         val intOOMPtr = malloc(intOOM.size)
@@ -470,31 +489,29 @@ MTHFU
         intStackOvflPtr.write(intStackOverflow)
         intMathErrPtr.write(intMathFuck)
 
+        r3 = 0
 
         r1 = intOOMPtr.memAddr
         r2 = INT_OUT_OF_MEMORY * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 0)
+        VMOpcodesRISC.STOREWORD(2, 1, 3)
         r1 = intSegfaultPtr.memAddr
         r2 = INT_SEGFAULT * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 0)
+        VMOpcodesRISC.STOREWORD(2, 1, 3)
         r1 = intDivZeroPtr.memAddr
         r2 = INT_DIV_BY_ZERO * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 0)
+        VMOpcodesRISC.STOREWORD(2, 1, 3)
         r1 = intIllegalOpPtr.memAddr
         r2 = INT_ILLEGAL_OP * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 0)
+        VMOpcodesRISC.STOREWORD(2, 1, 3)
         r1 = intStackOvflPtr.memAddr
         r2 = INT_STACK_OVERFLOW * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 0)
+        VMOpcodesRISC.STOREWORD(2, 1, 3)
         r1 = intMathErrPtr.memAddr
         r2 = INT_MATH_ERROR * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 0)
+        VMOpcodesRISC.STOREWORD(2, 1, 3)
 
 
         return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
-        */
-
-        return 0
     }
 
     fun softReset() {
@@ -652,8 +669,8 @@ MTHFU
                 //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
 
                 if (pauseExec) {
-                    println("tsraienrsatneiotarseinoarstineotrsienoatrsineotras")
-                    vmThread!!.suspend() // fuck it
+                    println("[TerranVM] execution paused")
+                    vmThread!!.suspend() // fuck it, i'll use this anyway
                     pauseExec = false
                 }
 
@@ -759,16 +776,16 @@ MTHFU
     private fun warn(any: Any?) { if (!suppressWarnings) println("[TBASRT] WARNING: $any") }
 
     // Interrupt handlers (its just JMPs) //
-    fun interruptDivByZero() { VMOpcodesRISC.JMP(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptIllegalOp() { VMOpcodesRISC.JMP(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptOutOfMem()  { VMOpcodesRISC.JMP(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptStackOverflow() { VMOpcodesRISC.JMP(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptMathError() { VMOpcodesRISC.JMP(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptSegmentationFault() { VMOpcodesRISC.JMP(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptKeyPress() { VMOpcodesRISC.JMP(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptPeripheralInput() { VMOpcodesRISC.JMP(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptPeripheralOutput() { VMOpcodesRISC.JMP(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt().ushr(2)) }
-    fun interruptStopExecution() { VMOpcodesRISC.JMP(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptDivByZero() { VMOpcodesRISC.JSRI(memSliceBySize(INT_DIV_BY_ZERO * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptIllegalOp() { VMOpcodesRISC.JSRI(memSliceBySize(INT_ILLEGAL_OP * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptOutOfMem()  { VMOpcodesRISC.JSRI(memSliceBySize(INT_OUT_OF_MEMORY * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptStackOverflow() { VMOpcodesRISC.JSRI(memSliceBySize(INT_STACK_OVERFLOW * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptMathError() { VMOpcodesRISC.JSRI(memSliceBySize(INT_MATH_ERROR * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptSegmentationFault() { VMOpcodesRISC.JSRI(memSliceBySize(INT_SEGFAULT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptKeyPress() { VMOpcodesRISC.JSRI(memSliceBySize(INT_KEYPRESS * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptPeripheralInput() { VMOpcodesRISC.JSRI(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptPeripheralOutput() { VMOpcodesRISC.JSRI(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt().ushr(2)) }
+    fun interruptStopExecution() { VMOpcodesRISC.JSRI(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt().ushr(2)) }
 
 }
 

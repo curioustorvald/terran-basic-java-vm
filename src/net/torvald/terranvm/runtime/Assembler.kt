@@ -1,6 +1,7 @@
 package net.torvald.terranvm.runtime
 
 import net.torvald.terranvm.toReadableBin
+import net.torvald.terranvm.toReadableOpcode
 
 
 /**
@@ -36,11 +37,11 @@ import net.torvald.terranvm.toReadableBin
  * ### Data
  * Data section has following syntax:
  * ```
- * type label_name (payload)
+ * type label_name (payload) ;
  * ```
  * Label names are case insensitive.
  * Available types:
- * - STRING (BYTES but will use quotes in the ASM line)
+ * - STRING (BYTES but will use "QUOTES" in the ASM line)
  * - FLOAT (WORD; payload is interpreted as float)
  * - INT (WORD; payload is interpreted as int)
  * - BYTES (byte literals, along with pointer label -- pointer label ONLY!)
@@ -240,7 +241,7 @@ class Assembler(val vm: TerranVM) {
         /**
          * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
          */
-        fun getOpArgs(opcode: Int): String {
+        fun getOpArgs(opcode: Int): String? {
             val opcode = opcode.and(0x1FFFFFFF) // drop conditions
             return when (opcode.ushr(25).and(0xF)) {
                 0 -> {
@@ -286,7 +287,7 @@ class Assembler(val vm: TerranVM) {
                         1 -> "rb"
                         2 -> "rw"
                         3 -> "rf"
-                        else -> throw IllegalArgumentException()
+                        else -> return null
                     }
                 }
                 2, 3 -> "ra" // loadi/storei
@@ -304,9 +305,9 @@ class Assembler(val vm: TerranVM) {
                     else if (cond == 0x3FFF) {
                         "b"
                     }
-                    else throw IllegalArgumentException()
+                    else return null
                 }
-                else -> throw IllegalArgumentException()
+                else -> return null
             }
         }
 
@@ -461,8 +462,8 @@ class Assembler(val vm: TerranVM) {
             debug("arguments: $arguments")
 
             // check if user had provided right number of arguments
-            if (words.size != arguments.length + 1) {
-                throw IllegalArgumentException("'$cmd': Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1}")
+            if (words.size != arguments!!.length + 1) {
+                throw IllegalArgumentException("'$cmd': Number of arguments doesn't match -- expected ${arguments.length}, got ${words.size - 1} ($words)")
             }
 
             // for each arguments the operation requires... (e.g. "rrr", "rb")
@@ -512,11 +513,11 @@ class Assembler(val vm: TerranVM) {
 
         val programSpaceStart = vm.programSpaceStart
         fun getPC() = programSpaceStart + ret.size
-        fun addBytes(i: Int) {
+        fun addWord(i: Int) {
             i.toLittle().forEach { ret.add(it) }
         }
-        fun addBytes(ai: IntArray) {
-            ai.forEach { addBytes(it) }
+        fun addWords(ai: IntArray) {
+            ai.forEach { addWord(it) }
         }
         fun Int.toNextWord() = if (this % 4 == 0) this else this.ushr(2).plus(1).shl(2)
 
@@ -686,7 +687,7 @@ class Assembler(val vm: TerranVM) {
                     if (!flagSpecifyJMP) {
                         flagSpecifyJMP = true
                         flagSpecifyJMPLocation = getPC()
-                        addBytes(composeJMP(0x3FFFFF))
+                        addWord(composeJMP(0x3FFFFF))
                     }
 
 
@@ -713,14 +714,15 @@ class Assembler(val vm: TerranVM) {
                             debug("--> strStart: $start")
                             debug("--> String payload: '$data'")
 
-                            data.toCString().forEach { ret.add(it) }
+                            val theRealPayload = data.toCString()
+
+                            theRealPayload.forEach { ret.add(it) }
                             // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
 
+                            debug("--> payload size: ${theRealPayload.size}")
+
                             // zero filler
-                            // 1 -> 3; 3 -> 1; else -> else
-                            if (data.length and 1 == 1) {
-                                repeat(data.length.and(3) xor 2) { ret.add(0.toByte()) }
-                            }
+                            repeat((4 - (theRealPayload.size % 4)) % 4) { ret.add(0.toByte()) }
                         }
                         "FLOAT" -> {
                             val number = words[2].toFloat()
@@ -741,7 +743,7 @@ class Assembler(val vm: TerranVM) {
                             (2..words.lastIndex).forEach {
                                 if (words[it].matches(matchInteger) && words[it].resolveInt() in 0..255) { // byte literal
                                     debug("--> Byte literal payload: ${words[it].resolveInt()}")
-                                    addBytes(words[it].resolveInt())
+                                    addWord(words[it].resolveInt())
                                 }
                                 else if (words[it].startsWith(labelMarker)) {
                                     debug("--> Byte literal payload (label): ${words[it]}")
@@ -778,7 +780,7 @@ class Assembler(val vm: TerranVM) {
                     else if (!flagSpecifyJMP && currentSection == ".FUNC") {
                         // insert JMP instruction that jumps to .code section
                         flagSpecifyJMP = true
-                        addBytes(composeJMP(flagSpecifyJMPLocation.ushr(2)))
+                        addWord(composeJMP(flagSpecifyJMPLocation.ushr(2)))
                         // set new jmp location
                         flagSpecifyJMPLocation = getPC()
                     }
@@ -789,7 +791,7 @@ class Assembler(val vm: TerranVM) {
                         // will continue to next statements
                     }
                     else {
-                        addBytes(assemblyToOpcode(line))
+                        addWords(assemblyToOpcode(line))
                     }
                 }
             }
@@ -798,6 +800,10 @@ class Assembler(val vm: TerranVM) {
             }
 
         }
+
+
+        // append HALT
+        addWord(0)
 
 
         debug("======== Assembler: Done! ========")

@@ -1,5 +1,6 @@
 package net.torvald.terranvm.runtime
 
+import net.torvald.terranvm.toBytesBin
 import net.torvald.terranvm.toReadableBin
 import net.torvald.terrarum.virtualcomputer.terranvmadapter.PeriMDA
 
@@ -13,6 +14,8 @@ class TerranVMReferenceBIOS(val vm: TerranVM) : VMPeripheralHardware {
         val midHigh8Bits = arg.and(0xFF0000).ushr(16)
         val midLow8Bits = arg.and(0xFF00).ushr(8)
         val lower8Bits = arg.and(0xFF)
+
+        println("BIOS called with arg: ${arg.toBytesBin()}")
 
         when (upper8Bits) {
             // various
@@ -40,6 +43,23 @@ class TerranVMReferenceBIOS(val vm: TerranVM) : VMPeripheralHardware {
             // file operations
             1 -> {
 
+            }
+
+            // print string
+            2 -> {
+                val dbAddr = arg.shl(2).and(0xFFFFFF)
+                var strLen = 0 // length INCLUSIVE to the null terminator
+                var _readByte: Byte
+                do {
+                    _readByte = vm.memory[dbAddr + strLen]
+                    strLen++
+                } while (_readByte != 0.toByte())
+
+                val mda = vm.peripherals[3]!! as PeriMDA
+
+                //if (strLen > 1) {
+                    mda.printStream.write(vm.memSliceBySize(dbAddr, strLen - 1))
+                //}
             }
 
             // compatible BIOS private use area -- ReferenceBIOS will ignore it

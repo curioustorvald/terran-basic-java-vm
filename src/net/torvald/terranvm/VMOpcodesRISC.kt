@@ -14,6 +14,17 @@ fun Int.toReadableBin() =
                 this.ushr(16).and(0x3F).toString(2).padStart(6, '0') + "_" +
                 this.and(0xFFFF).toString(2).padStart(16, '0')
 
+fun Int.toBytesBin(): String {
+    val sb = StringBuilder()
+    this.toString(2).padStart(32, '0').forEachIndexed { index, c ->
+        sb.append(c)
+        if (index != 0 && index in intArrayOf(7, 15, 23)) {
+            sb.append('_')
+        }
+    }
+
+    return sb.toString()
+}
 
 /**
  * Conducts linear search for the hashmap for a value, returns matching key if found, null otherwise.
@@ -50,17 +61,17 @@ fun Int.toReadableOpcode(): String {
         // JMP only
         5 -> "FW"
         6 -> "BW"
-        else -> throw NullPointerException("Illegal condition: ${this.ushr(29)} for opcode ${this.toReadableBin()}")
+        else -> return "(data or unknown opcode)"
     }
 
     val mode = this.and(0b00011110000000000000000000000000).ushr(25)
 
     var opString = when (mode) {
         0 -> {
-            Assembler.opcodes.searchFor(this.and(0b11111111)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+            Assembler.opcodes.searchFor(this.and(0b11111111)) ?: return "(data or unknown opcode)"
         }
         1 -> {
-            Assembler.opcodes.searchFor(1.shl(25) or this.ushr(16).and(0b111).shl(16)) ?: throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+            Assembler.opcodes.searchFor(1.shl(25) or this.ushr(16).and(0b111).shl(16)) ?: return "(data or unknown opcode)"
         }
         2 -> "LOADWORDIMEM"
         3 -> "STOREWORDIMEM"
@@ -87,7 +98,7 @@ fun Int.toReadableOpcode(): String {
                 }
             }
         }
-        else -> throw NullPointerException("Unknown opcode: ${this.toReadableBin()}")
+        else -> return "(data or unknown opcode)"
     }
 
     // manual replace
@@ -102,6 +113,11 @@ fun Int.toReadableOpcode(): String {
 
 
     val argInfo = Assembler.getOpArgs(this)
+
+    if (argInfo == null) {
+        return "(data or unknown opcode)"
+    }
+
     val args = Array(5, { "" })
     val argStr = StringBuilder()
 
@@ -502,7 +518,7 @@ object VMOpcodesRISC {
                 2 -> if (vm.rCMP != 0) action()
                 3 -> if (vm.rCMP >  0) action()
                 4 -> if (vm.rCMP <  0) action()
-                else -> throw NullPointerException()
+                else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
             }
         }
 
@@ -592,7 +608,7 @@ object VMOpcodesRISC {
                     MEMCPY(Rd, Rs, Rm, R4, R5)
                 }
                 else {
-                    throw NullPointerException()
+                    throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
                 }
             }
             0b0001 -> {
@@ -609,7 +625,8 @@ object VMOpcodesRISC {
                     2 -> if (M == 0) LOADHWORDI(Rd, halfword) else STOREHWORDI(Rd, Rs, halfword)
                     // Load word immediate
                     3 -> LOADWORDI(Rd, halfword, M == 1)
-                    else -> throw NullPointerException()
+                    else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+
                 }
             }
             // Load and Store a word from register to memory
@@ -642,7 +659,7 @@ object VMOpcodesRISC {
                     4 -> JLS(offset)
                     5 -> JFW(offset)
                     6 -> JBW(offset)
-                    else -> throw NullPointerException()
+                    else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
                 }
             }
             // Jump to Subroutine Immediate
@@ -664,10 +681,10 @@ object VMOpcodesRISC {
                     INT(irq)
                 }
                 else {
-                    throw NullPointerException("opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                    throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
                 }
             }
-            else -> throw NullPointerException()
+            else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
         } }
     }
 

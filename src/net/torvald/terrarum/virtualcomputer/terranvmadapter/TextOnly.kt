@@ -39,7 +39,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 0
+        val vmDelay = 10
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -50,7 +50,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(1024, stdout = peripheral.printStream)
+        vm = TerranVM(4096, stdout = peripheral.printStream)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[3] = peripheral
@@ -94,24 +94,37 @@ class TextOnly : Game() {
         """.trimIndent())*/
 
         val biosEchoTest = assembler("""
-            loadwordi r1, 0000024Ch; call r1, FFh;
-            loadwordi r1, 0000024Fh; call r1, FFh;
-            loadwordi r1, 00000241h; call r1, FFh;
-            loadwordi r1, 00000244h; call r1, FFh;
-            loadwordi r1, 00000245h; call r1, FFh;
-            loadwordi r1, 00000252h; call r1, FFh;
-            loadwordi r1, 0000020Ah; call r1, FFh;
+            .data;
 
-            :loop;
+            string teststr "There are a lot of 8 and 16-bit single-board hobbyist computers available these days.  But every one of them falls short in some way or another from what I dream of.  I'd just design one myself, but I'm not really good enough with electronics to do that.  So, I'm hoping somebody else will make my dream come true.  So I've compiled a list of things I think it should have.
 
-            loadwordi r1, 00000101h; call r1, FFh; # r2 <- getchar
-            loadwordi r1, 00000200h;
-            or r1, r1, r2;                         # r1 := r1 OR r2
-            call r1, FFh;                          # putchar
-            jmp @loop;
+            Off the Shelf Components
+
+            So, basically I would not want the computer to use any old components that cannot be purchased anymore.  That includes custom chips from Atari or Commodore or whatever.  I would hope that the system would eventually get a larger user base and I wouldn't want to see any shortage of parts arise preventing mass production.  However, I prefer to avoid any FPGA or microcontrollers if possible, but that's not a deal-breaker.
+
+            CPU
+
+            I would want the CPU to be 6502 or compatible, such as 65816.  However, I'd be fine with the traditional 6502.  I would prefer a faster clock speed, such as 8 Mhz or better.  That way people could write code in BASIC and it would actually run fast enough to be useful.  As long as we aren't stuck using something like Commodore's VIC or VIC-2 chips, then this shouldn't be a problem.
+
+            Memory
+
+            I would want 128K or 256 of static RAM, with possibly the ability to upgrade it.  If using 6502 then there will need to be some sort of banking, but with 65816 it should be able to access all of it directly.";
+
+            .code;
+
+
+            loadwordi r1, 00000100h;   # wait for a key press
+            call r1, FFh;              #
+
+            loadwordi r1, 02000000h;
+            loadhwordi r2, @teststr;
+            or r1, r1, r2;
+            call r1, FFh;
+
 
         """.trimIndent())
 
+        println("ASM size: ${biosEchoTest.size} (word-aligned: ${if (biosEchoTest.size % 4 == 0) "yes" else "HELL NAW!"})")
         biosEchoTest.printASM()
 
         vm.loadProgram(biosEchoTest)
@@ -229,7 +242,8 @@ fun ByteArray.printASM() {
     for (i in 0 until this.size step 4) {
         val b = this[i].toUint() or this[i + 1].toUint().shl(8)  or this[i + 2].toUint().shl(16)  or this[i + 3].toUint().shl(24)
 
-        println("${b.toReadableBin()}; ${b.toReadableOpcode()}")
+        print("${b.toReadableBin()}; ")
+        print("${b.toReadableOpcode()}\n")
     }
 }
 
