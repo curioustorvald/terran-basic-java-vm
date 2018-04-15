@@ -68,8 +68,9 @@ fun Int.toReadableOpcode(): String {
         5 -> "POP"
         6 -> "PUSHWORDI"
         7 -> "POPWORDI"
-        8 -> if (cond.isEmpty()) "JMP" else "J$cond"
-        9 -> if (Rs == 0) "SETBANK" else "INQFEATURE"
+        8 -> if (cond.isEmpty()) "JMP" else "J"
+        9 -> "JSRI"
+        10 -> if (Rs == 0) "SETBANK" else "INQFEATURE"
         15 -> {
             if (this.and(0x100) == 0) {
                 "CALL"
@@ -125,7 +126,7 @@ fun Int.toReadableOpcode(): String {
     }
 
 
-    return "$opString$argStr"
+    return "$opString$cond$argStr"
 }
 
 
@@ -203,8 +204,12 @@ object VMOpcodesRISC {
      */
     fun JSR(register: Register) {
         val addr = vm.readregInt(register)
+        JSRI(addr)
+    }
+
+    fun JSRI(offset: Int) {
         PUSHWORDI(vm.pc ushr 2) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
-        JMP(addr)
+        JMP(offset)
     }
 
     fun HALT() { vm.terminate = true }
@@ -487,6 +492,7 @@ object VMOpcodesRISC {
         val R4 = opcode.and(0b00000000000000001110000000000000).ushr(13) + 1
         val R5 = opcode.and(0b00000000000000000001110000000000).ushr(10) + 1
         val cond = opcode.ushr(29)
+        val offset = opcode.and(0x3F_FFFF)
 
 
         fun execInCond(action: () -> Unit) {
@@ -608,10 +614,10 @@ object VMOpcodesRISC {
             }
             // Load and Store a word from register to memory
             0b0010 -> {
-                 LOADWORDIMEM(Rd, opcode.and(0x3F_FFFF))
+                 LOADWORDIMEM(Rd, offset)
             }
             0b0011 -> {
-                 STOREWORDIMEM(Rd, opcode.and(0x3F_FFFF))
+                 STOREWORDIMEM(Rd, offset)
             }
             // Push and Pop
             0b0100 -> {
@@ -621,14 +627,13 @@ object VMOpcodesRISC {
                  POP(Rd)
             }
             0b0110 -> {
-                 val offset = opcode.and(0x3F_FFFF); PUSHWORDI(offset)
+                 PUSHWORDI(offset)
             }
             0b0111 -> {
                  POPWORDI()
             }
             // Conditional jump
             0b1000 -> {
-                val offset = opcode.and(0x3F_FFFF)
                 when (cond) {
                     0 -> JMP(offset)
                     1 -> JZ (offset)
@@ -639,6 +644,10 @@ object VMOpcodesRISC {
                     6 -> JBW(offset)
                     else -> throw NullPointerException()
                 }
+            }
+            // Jump to Subroutine Immediate
+            0b1001 -> {
+                JSRI(offset)
             }
             // Call peripheral; Get memory size; Get uptime; Interrupt
             0b1111 -> {
@@ -655,7 +664,7 @@ object VMOpcodesRISC {
                     INT(irq)
                 }
                 else {
-                    throw NullPointerException()
+                    throw NullPointerException("opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
                 }
             }
             else -> throw NullPointerException()
@@ -753,6 +762,8 @@ object VMOpcodesRISC {
             "JLS" to 1,
             "JFW" to 1,
             "JBW" to 1,
+
+            "JSRI" to 1,
 
             "CALL" to 2,
             "MEMSIZE" to 2,

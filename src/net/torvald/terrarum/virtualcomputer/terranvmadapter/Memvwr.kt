@@ -122,7 +122,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         this.layout = BorderLayout()
         this.isVisible = true
         this.add(javax.swing.JScrollPane(memArea), BorderLayout.CENTER)
-        this.defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
+        this.defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
         this.size = Dimension(600, 960)
     }
 

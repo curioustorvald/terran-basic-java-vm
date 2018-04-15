@@ -3,7 +3,6 @@ package net.torvald.terranvm.runtime
 import net.torvald.terranvm.*
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.*
 import kotlin.collections.ArrayList
 
 
@@ -262,7 +261,7 @@ class TerranVM(inMemSize: Int,
      *
      * (see IRQ_ vars in the companion object)
      */
-    val bios = BIOS(this)
+    val bios = TerranVMReferenceBIOS(this)
 
     /**
      * Memory Map
@@ -499,6 +498,9 @@ MTHFU
     }
 
     fun softReset() {
+        println("[TerranVM] SOFT RESET")
+
+
         userSpaceStart = null
         terminate = false
 
@@ -583,6 +585,9 @@ MTHFU
     fun hardReset() {
         softReset()
 
+        println("[TerranVM] IT WAS HARD RESET ACTUALLY")
+
+
         // reset system uptime timer
         uptimeHolder = 0L
 
@@ -611,23 +616,20 @@ MTHFU
     }
 
     fun resumeExec() {
-        pauseExec = false
-        synchronized(lock) {
-            lock.notify()
-        }
+        vmThread!!.resume()
     }
 
-    override fun run() {
-        execute()
-    }
 
-    val lock = java.lang.Object()
+    val lock = this as java.lang.Object
 
     val pcHex: String; get() = pc.toLong().and(0xffffffff).toString(16).toUpperCase() + "h"
 
+    var vmThread: Thread? = null
+        private set
+
     //private var runcnt = 0
 
-    fun execute() {
+    @Synchronized override fun run() {
 
         execDebugMain("Execution stanted; PC: $pcHex")
 
@@ -642,8 +644,19 @@ MTHFU
                 //runcnt++
 
 
+                if (vmThread == null) {
+                    vmThread = Thread.currentThread()
+                }
+
 
                 //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
+
+                if (pauseExec) {
+                    println("tsraienrsatneiotarseinoarstineotrsienoatrsineotras")
+                    vmThread!!.suspend() // fuck it
+                    pauseExec = false
+                }
+
 
 
                 if (pc >= memory.size) {
@@ -681,14 +694,6 @@ MTHFU
                     execDebugMain("HALT at PC $pcHex")
                 }
 
-
-
-
-                synchronized(lock) {
-                    if (pauseExec) {
-                        lock.wait()
-                    }
-                }
 
 
 
@@ -764,13 +769,6 @@ MTHFU
     fun interruptPeripheralInput() { VMOpcodesRISC.JMP(memSliceBySize(INT_PERI_INPUT * 4, 4).toLittleInt().ushr(2)) }
     fun interruptPeripheralOutput() { VMOpcodesRISC.JMP(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt().ushr(2)) }
     fun interruptStopExecution() { VMOpcodesRISC.JMP(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt().ushr(2)) }
-
-
-    class BIOS(val vm: TerranVM) : VMPeripheralHardware {
-        override fun call(arg: Int) {
-
-        }
-    }
 
 }
 

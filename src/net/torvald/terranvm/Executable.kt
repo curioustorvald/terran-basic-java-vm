@@ -46,9 +46,8 @@ object Executable {
 
 
 
-
-
-        vm.execute()
+        val vmThread = Thread(vm)
+        vmThread.start()
     }
 
 

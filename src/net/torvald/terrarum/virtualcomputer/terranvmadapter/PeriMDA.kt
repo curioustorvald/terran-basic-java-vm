@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
+import net.torvald.terranvm.runtime.to8HexString
 import net.torvald.terranvm.runtime.toUint
 import java.io.OutputStream
 import java.io.PrintStream
@@ -36,16 +37,22 @@ class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : 
      * 0x07bb: change background colour (if supported)
      */
     override fun call(arg: Int) {
+        //println("MDAcall ${arg.to8HexString().drop(4)}")
+
+
         when (arg) {
             0x0000 -> { cursorBlink = false }
             0x00ff -> { cursorBlink = true }
         }
 
-        when (arg.shl(8)) {
-            0x01 -> { cursorX = arg.and(0xff) }
-            0x02 -> { cursorY = arg.and(0xff) }
-            0x03 -> { scrollX += arg.and(0xff).toByte().toInt() } // DON'T use toUint()
-            0x04 -> { scrollY += arg.and(0xff).toByte().toInt() } // DON'T use toUint()
+        when (arg.ushr(8)) {
+            0x01 -> { /* do nothing */ }
+            0x02 -> { cursorX = arg.and(0xff) }
+            0x03 -> { cursorY = arg.and(0xff) }
+            0x04 -> { scrollX += arg.and(0xff).toByte().toInt() } // DON'T use toUint()
+            0x05 -> { scrollY += arg.and(0xff).toByte().toInt() } // DON'T use toUint()
+
+            0x08 -> { printStream.write(arg.and(0xff)) }
         }
     }
 

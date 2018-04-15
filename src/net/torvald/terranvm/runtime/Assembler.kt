@@ -57,7 +57,7 @@ import net.torvald.terranvm.toReadableBin
  * :label_name;
  *
  * Referring labels:
- * @label_name
+ * \@label_name
  *
  *
  * Created by minjaesong on 2017-05-28.
@@ -86,7 +86,7 @@ class Assembler(val vm: TerranVM) {
         val regexRegisterLiteral = Regex("""^[Rr][0-9]+$""") // same as the compiler
         val regexHexWhole = Regex("""^([0-9A-Fa-f_]+h)$""") // DIFFERENT FROM the compiler
         val regexBinWhole = Regex("""^([01_]+b)$""") // DIFFERENT FROM the compiler
-        val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]*.*|[-+]?[0-9]+[eEfF].*)$""") // same as the assembler
+        val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]+[eE]*[-+0-9]*[fF]*|[-+]?[0-9]+[.eEfF][0-9+-]*[fF]?)$""") // same as the assembler
         val regexIntWhole = Regex("""^([-+]?[0-9_]+)$""") // DIFFERENT FROM the compiler
 
         private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
@@ -218,6 +218,10 @@ class Assembler(val vm: TerranVM) {
             "JFW" to 0b101_1000.shl(25),
             "JBW" to 0b110_1000.shl(25),*/
 
+                // Jump to Subroutine, Immediate //
+
+                "JSRI" to 0b00010010000000000000000000000000,
+
                 // Call peripheral //
 
                 "CALL" to 0b1111_000_00000000000000_00000000,
@@ -290,6 +294,7 @@ class Assembler(val vm: TerranVM) {
                 6 -> "a" // pushwordi
                 7 -> ""  // popwordi
                 8 -> "a" // conditional jump
+                9 -> "a" // jsri
                 15 -> {
                     val cond = opcode.ushr(8).and(0x3FFF)
 
@@ -420,7 +425,11 @@ class Assembler(val vm: TerranVM) {
 
     fun assemblyToOpcode(line: String): IntArray {
         fun String.toFloatOrInt(): Int =
-                if (this.startsWith(labelMarker)) // label?
+                if (this.startsWith("0x"))
+                    throw IllegalArgumentException("Use h instead of 0x")
+                else if (this.startsWith("0b"))
+                    throw IllegalArgumentException("Use b instead of 0b")
+                else if (this.startsWith(labelMarker)) // label?
                     getLabel(this).ushr(2)
                 else if (this.matches(regexHexWhole))
                     this.dropLast(1).replace("_", "").toInt(16)
@@ -805,13 +814,17 @@ class Assembler(val vm: TerranVM) {
                 throw IllegalArgumentException("Illegal register literal: '$this'")
 
     private fun String.resolveInt() =
-        if (this.startsWith(labelMarker)) // label?
-            getLabel(this).ushr(2)
-        else if (this.matches(regexHexWhole)) // hex?
-            this.dropLast(1).toLong(16).toInt() // because what the fuck Kotlin?
-        else if (this.matches(matchInteger)) // number?
-            this.toLong().toInt() // because what the fuck Kotlin?
-        else
-            throw IllegalArgumentException("Couldn't convert this to integer: '$this'")
+            if (this.startsWith("0x"))
+                throw IllegalArgumentException("Use h instead of 0x")
+            else if (this.startsWith("0b"))
+                throw IllegalArgumentException("Use b instead of 0b")
+            else if (this.startsWith(labelMarker)) // label?
+                getLabel(this).ushr(2)
+            else if (this.matches(regexHexWhole)) // hex?
+                this.dropLast(1).toLong(16).toInt() // because what the fuck Kotlin?
+            else if (this.matches(matchInteger)) // number?
+                this.toLong().toInt() // because what the fuck Kotlin?
+            else
+                throw IllegalArgumentException("Couldn't convert this to integer: '$this'")
 
 }

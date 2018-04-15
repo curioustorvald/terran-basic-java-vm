@@ -72,7 +72,7 @@ object Cflat {
     private val regexHexWhole = Regex("""^(0[Xx][0-9A-Fa-f_]+?)$""") // DIFFERENT FROM the assembler
     private val regexOctWhole = Regex("""^(0[0-7_]+)$""")
     private val regexBinWhole = Regex("""^(0[Bb][01_]+)$""") // DIFFERENT FROM the assembler
-    private val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]*.*|[-+]?[0-9]+[eEfF].*)$""") // same as the assembler
+    private val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]+[eE]*[-+0-9]*[fF]*|[-+]?[0-9]+[.eEfF][0-9+-]*[fF]?)$""") // same as the assembler
     private val regexIntWhole = Regex("""^([-+]?[0-9_]+[Ll]?)$""") // DIFFERENT FROM the assembler
 
     private fun String.matchesNumberLiteral() = this.matches(regexHexWhole) || this.matches(regexOctWhole) || this.matches(regexBinWhole) || this.matches(regexIntWhole) || this.matches(regexFPWhole)
@@ -712,6 +712,9 @@ object Cflat {
     }
 
     fun treeToProperNotation(root: SyntaxTreeNode): MutableList<String> {
+        fun debug1(any: Any) { if (true) print(any) }
+
+
         // turn into ASM-ique notation
         // strat:
         //  visitNode() -- ".func; :funcName;"
@@ -772,83 +775,20 @@ object Cflat {
 
 
         // process using pre-traversed list
-        println("== Traversed nodes ==")
+        debug1("== Traversed nodes ==\n")
         // FIXME interpretation of the traversed tree is wrong
         traversedNodes.forEachIndexed { index, node ->
 
             // test print
-            print("${node.getReadableNodeName()}")
-            print("; ${node.expressionType}")
+            debug1("${node.getReadableNodeName()}")
+            debug1("; ${node.expressionType}")
             if (node.isPartOfArgumentsNode) {
-                print("; PART_OF_ARGS_NODE")
+                debug1("; PART_OF_ARGS_NODE")
             }
-            println()
+            debug1('\n')
 
 
 
-            /*if (node.expressionType == ExpressionType.FUNCTION_CALL) {
-
-                if (commands.isNotEmpty() && commands.peek().isPartOfArgumentsNode) {
-                    //println("stack: $commands -- About to pop ${commands.size} elements")
-
-
-                    // removed dupes
-                    // before: arg3, Barg1, Barg2, arg2[Barg1, Barg2],  Aarg1, Aarg2, arg1[Aarg1, Aarg2]
-                    // saved in here: 'before' reversed
-                    // expected result: commands[arg1[any], arg2[any], arg3]
-                    val temporaryStackRev = Vector(commands).asReversed() // 'asReversed' does not make a copy
-                    commands.clear()
-                    var i = 0; while (i < temporaryStackRev.size) {
-                        //println("pushing ${temporaryStackRev[i]}")
-                        commands.push(temporaryStackRev[i])
-                        val shallowSubArgCounts = temporaryStackRev[i].arguments.size
-                        i += 1 + shallowSubArgCounts
-                    }
-
-                    //println("NEWstack: $commands -- About to pop ${commands.size} elements")
-
-
-
-                    var reactedCommands = 0
-                    commands.forEach {
-                        string.append("${it.getReadableNodeName()}\t")
-                        it.arguments.forEach {  // what happens to recursive shits?
-                            if (it.isLeaf && it.expressionType != ExpressionType.FUNCTION_CALL) {
-                                string.append("${it.getReadableNodeName()}\t")
-                            }
-                        }
-
-
-                        programOut.add("${node.lineNumber}\t$string")
-                        string.delete(0, string.length)
-                        programOut.add("${node.lineNumber}\tstackpush")
-
-
-                        reactedCommands++
-                    }
-
-
-                    if (commands.size != reactedCommands) {
-                        throw InternalError("$reactedCommands elements from stack processed, but stack actually has ${commands.size}")
-                    }
-                    else {
-                        commands.clear() // just in case...?
-                    }
-
-                }
-
-
-
-                while (commands.isNotEmpty()) {
-                    string.append("${commands.pop().getReadableNodeName()}\t")
-                }
-
-                if (string.isNotEmpty()) {
-                    programOut.add("${node.lineNumber}\t$string")
-                }
-                string.delete(0, string.length)
-
-            }*/
             if ((node.expressionType == ExpressionType.INTERNAL_FUNCTION_CALL) && index > 0) {
                 // prev inst is the arg (e.g. [foo, endfuncdef])
                 // we read from it; after read, we remove it from the output array
@@ -895,9 +835,9 @@ object Cflat {
 
 
 
-        println("========\n   OP   \n========")
-        programOut.forEach { println(it) }
-        println("========")
+        debug1("========\n   OP   \n========\n")
+        programOut.forEach { debug1(it + "\n") }
+        debug1("========\n")
 
 
 
@@ -927,6 +867,9 @@ object Cflat {
 
      */
     fun notationToIR(notatedProgram: MutableList<String>): MutableList<IntermediateRepresentation> {
+        fun debug1(any: Any) { if (true) print(any) }
+
+
         //fun String.toIRVar() = if (this.matchesNumberLiteral()) this else "$" + this
         fun String.isLiteral() = this.matchesNumberLiteral()
 
@@ -964,7 +907,7 @@ object Cflat {
                     virtualStack.push(VirtualStackItem("literal_i", words[1]))
 
 
-                println("!! STACKPUSHICONST ${words[1]} with type ${virtualStack.peek().type}")
+                debug1("!! STACKPUSHICONST ${words[1]} with type ${virtualStack.peek().type}\n")
             }
             else {
                 // or assume as function call
@@ -978,7 +921,7 @@ object Cflat {
             }
 
 
-            //println("L$lineNumber: inst: ${newcmd.instruction}, wordCount: ${words.size}")
+            //debug1("L$lineNumber: inst: ${newcmd.instruction}, wordCount: ${words.size}\n")
 
 
             // convert internal notation into IR command
@@ -1100,7 +1043,7 @@ object Cflat {
                     val typeAppendix = "_${lhand.last().minus(0x20)}" + // capitalise [if] to [IF]
                                        "${rhand.last().minus(0x20)}" // capitalise [if] to [IF]
 
-                    println("!! ${IRs.last().instruction} -> ${IRs.last().instruction}$typeAppendix") // expecting ISEQ or others
+                    debug1("!! ${IRs.last().instruction} -> ${IRs.last().instruction}$typeAppendix\n") // expecting ISEQ or others
 
                     val newCmpInst = IRs.last().instruction + typeAppendix
                     // NOPify prev cmp commands;
@@ -1246,9 +1189,9 @@ object Cflat {
 
 
 
-        println("========\n   IR   \n========")
-        IRs.forEach { println(it) }
-        println("========")
+        debug1("========\n   IR   \n========\n")
+        IRs.forEach { debug1(it.toString() + "\n") }
+        debug1("========\n")
 
 
 
@@ -1257,6 +1200,9 @@ object Cflat {
 
 
     fun preprocessIR(initialIR: MutableList<IntermediateRepresentation>): MutableList<IntermediateRepresentation> {
+        fun debug1(any: Any) { if (true) print(any) }
+
+
         val irDeclaresOnly = ArrayList<IntermediateRepresentation>()
         // copy DECLAREs into the new 'ir'
         initialIR.forEach {
@@ -1276,7 +1222,7 @@ object Cflat {
 
 
         // test print
-        println(ir)
+        debug1(ir + "\n")
 
 
         val newIR = ArrayList<IntermediateRepresentation>()
@@ -1313,9 +1259,9 @@ object Cflat {
         }
 
 
-        println("=========\n  NEWIR  \n=========")
-        newIR.forEach { println(it) }
-        println("=========")
+        debug1("=========\n  NEWIR  \n=========\n")
+        newIR.forEach { debug1(it.toString() + "\n") }
+        debug1("=========\n")
 
 
         return newIR
@@ -1334,6 +1280,7 @@ object Cflat {
      * All the DECLAREs are expected to be at the head of the list
      */
     fun IRtoASM(ir: MutableList<IntermediateRepresentation>): List<String> {
+        fun debug1(any: Any) { if (true) print(any) }
 
 
         fun String.asProperAsmData() = if (this.isVariable()) "@${this.drop(1)}" else this
@@ -1472,7 +1419,7 @@ object Cflat {
                         throw IllegalArgumentException("Unknown literal type: $rhand at line ${it.lineNum}")
 
 
-                    //println("LH: $lhand, RH: $rhand, LHT: $lhandType, RHT: $rhandType")
+                    //debug1("LH: $lhand, RH: $rhand, LHT: $lhandType, RHT: $rhandType\n")
 
 
                     val lIsLiteral = lhandType.endsWith("LITERAL")
@@ -1551,9 +1498,9 @@ object Cflat {
         ASMs.append("HALT;")
 
 
-        println("=========\n   ASM   \n=========")
-        ASMs.forEach { println(it) }
-        println("=========")
+        debug1("=========\n   ASM   \n=========\n")
+        ASMs.forEach { debug1(it + "\n") }
+        debug1("=========\n")
 
 
 
@@ -1599,20 +1546,29 @@ object Cflat {
             }
             return ret
         }
-        fun debug1(any: Any?) { if (true ) println(any) }
+        fun debug1(any: Any?) { if (true) println(any) }
 
 
 
 
         // contradiction: auto AND extern
 
+        val firstAssignIndex = tokens.indexOf("=")
         val firstLeftParenIndex = tokens.indexOf("(")
         val lastRightParenIndex = tokens.lastIndexOf(")")
-        val functionCallTokens: List<String>? = if (firstLeftParenIndex == -1) null else tokens.subList(0, firstLeftParenIndex)
+        val functionCallTokens: List<String>? =
+                if (firstLeftParenIndex == -1)
+                    null
+                else if (firstAssignIndex == -1)
+                    tokens.subList(0, firstLeftParenIndex)
+                else
+                    tokens.subList(firstAssignIndex + 1, firstLeftParenIndex)
         val functionCallTokensContainsTokens = if (functionCallTokens == null) false else
             (functionCallTokens.map { if (splittableTokens.contains(it)) 1 else 0 }.sum() > 0)
         // if TRUE, it's not a function call/def (e.g. foobar = funccall ( arg arg arg )
 
+
+        debug1("line $lineNumber; functionCallTokens: $functionCallTokens; contains tokens?: $functionCallTokensContainsTokens")
 
         /////////////////////////////
         // unwrap (((((parens))))) //
@@ -1705,15 +1661,17 @@ object Cflat {
         //////////////////////
         // as Function Call // (also works as keyworded code block (e.g. if, for, while))
         //////////////////////
-        else if (!functionCallTokensContainsTokens && functionCallTokens != null && functionCallTokens.size == 1) { // e.g. main ( , fooo ( , doSomething (
+        else if (!functionCallTokensContainsTokens && functionCallTokens != null && functionCallTokens.size == 1 &&
+                functionCallTokens.last() in codeBlockKeywords) { // e.g. if ( , while ( ,
             val funcName = functionCallTokens.last()
+
 
             // get arguments
             // complex_statements , ( value = funccall ( arg ) ) , "string,arg" , 42f
             val argumentsDef = tokens.subList(firstLeftParenIndex + 1, lastRightParenIndex)
 
 
-            debug1("!! func call args")
+            debug1("!! func call args:")
             debug1("!! <- $argumentsDef")
 
 

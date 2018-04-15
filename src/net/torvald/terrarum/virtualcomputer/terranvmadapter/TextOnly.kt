@@ -13,6 +13,10 @@ import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
 import net.torvald.terranvm.runtime.compiler.cflat.Cflat
+import net.torvald.terranvm.runtime.toUint
+import net.torvald.terranvm.toReadableBin
+import net.torvald.terranvm.toReadableOpcode
+import kotlin.experimental.or
 
 /**
  * Created by minjaesong on 2017-11-17.
@@ -48,37 +52,24 @@ class TextOnly : Game() {
 
         vm = TerranVM(1024, stdout = peripheral.printStream)
 
-        vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction()
+        vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[3] = peripheral
 
 
         val assembler = Assembler(vm)
 
 
-        val testProgram = """
+        /*val testProgram = """
             float x;
             float y;
             float z;
             float z1;
 
-            x = 3f;
-            y = 2f;
-
-            int foo() {
-                y = 42 + 195;
-
-                if (x == 42) {
-                    return 7f / 3f;
-                } else {
-                    return 0;
-                }
+            float returnsomething() {
+                return 3.3333333333333;
             }
 
-            z = (x + y ) * y / x; // should      be 3.333.. (55 55 55 40)
-
-            if (z > 5f) {
-                z1= (3f+ 2f) * 2f/ 3f;// should also be 3.333.. (55 55 55 40)
-            }
+            z = returnsomething();
         """.trimIndent()
         val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
 
@@ -89,7 +80,7 @@ class TextOnly : Game() {
         val programInIR = Cflat.notationToIR(notatedProgram)
         val programInNewIR = Cflat.preprocessIR(programInIR)
         val programASM = Cflat.IRtoASM(programInNewIR)
-        val code = assembler(programASM.joinToString("\n"))
+        val code = assembler(programASM.joinToString("\n"))*/
 
 
         //val mdaFiller = assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
@@ -102,8 +93,28 @@ class TextOnly : Game() {
             loadwordi r2, 42f;
         """.trimIndent())*/
 
+        val biosEchoTest = assembler("""
+            loadwordi r1, 0000024Ch; call r1, FFh;
+            loadwordi r1, 0000024Fh; call r1, FFh;
+            loadwordi r1, 00000241h; call r1, FFh;
+            loadwordi r1, 00000244h; call r1, FFh;
+            loadwordi r1, 00000245h; call r1, FFh;
+            loadwordi r1, 00000252h; call r1, FFh;
+            loadwordi r1, 0000020Ah; call r1, FFh;
 
-        vm.loadProgram(code)
+            :loop;
+
+            loadwordi r1, 00000101h; call r1, FFh; # r2 <- getchar
+            loadwordi r1, 00000200h;
+            or r1, r1, r2;                         # r1 := r1 OR r2
+            call r1, FFh;                          # putchar
+            jmp @loop;
+
+        """.trimIndent())
+
+        biosEchoTest.printASM()
+
+        vm.loadProgram(biosEchoTest)
         vm.delayInMills = vmDelay
 
 
@@ -116,6 +127,7 @@ class TextOnly : Game() {
 
         vmThread = Thread(vm)
         vmThread.start()
+
     }
 
     private val height: Int; get() = Gdx.graphics.height
@@ -127,7 +139,7 @@ class TextOnly : Game() {
         Gdx.graphics.setTitle("TerranVM Debugging Console - Text Only Mode — F: ${Gdx.graphics.framesPerSecond}")
 
 
-        vm.pauseExec()
+        //vm.pauseExec()
 
 
         memvwr.update()
@@ -161,7 +173,7 @@ class TextOnly : Game() {
         }
 
 
-        vm.resumeExec()
+        //vm.resumeExec()
     }
 
     override fun dispose() {
@@ -187,7 +199,6 @@ class TextOnly : Game() {
 
         override fun keyTyped(p0: Char): Boolean {
             (vm.peripherals[TerranVM.IRQ_KEYBOARD] as GdxPeripheralWrapper).keyTyped(p0)
-            vm.interruptKeyPress()
             return true
         }
 
@@ -212,6 +223,14 @@ class TextOnly : Game() {
         }
     }
 
+}
+
+fun ByteArray.printASM() {
+    for (i in 0 until this.size step 4) {
+        val b = this[i].toUint() or this[i + 1].toUint().shl(8)  or this[i + 2].toUint().shl(16)  or this[i + 3].toUint().shl(24)
+
+        println("${b.toReadableBin()}; ${b.toReadableOpcode()}")
+    }
 }
 
 fun main(args: Array<String>) {
