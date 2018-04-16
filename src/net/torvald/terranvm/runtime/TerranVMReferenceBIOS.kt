@@ -62,6 +62,12 @@ class TerranVMReferenceBIOS(val vm: TerranVM) : VMPeripheralHardware {
                 //}
             }
 
+            // get file by name
+            4, 5 -> {
+                val rDest = arg.ushr(22).and(0b111)
+                val dbAddr = arg.shl(2).and(0xFFFFFF)
+            }
+
             // compatible BIOS private use area -- ReferenceBIOS will ignore it
             in 128..255 -> {
 

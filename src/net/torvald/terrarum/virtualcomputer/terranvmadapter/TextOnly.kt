@@ -50,7 +50,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(1024, stdout = peripheral.printStream)
+        vm = TerranVM(4096, stdout = peripheral.printStream)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[3] = peripheral
@@ -145,29 +145,86 @@ class TextOnly : Game() {
             call r1, FFh;
             return;
 
-            :putchar; # push char first before call; garbles r2
-            pop r2; # return addr
-            pop r1; # actual arg
+            :putchar; # push char first before call; garbles r1 and r2
+            pop r2;                         # return addr
+            pop r1;                         # actual arg
             push r2;
             loadwordi r2, 00000200h;
             or r1, r1, r2;
             call r1, FFh;
             return;
 
-            :putstring; # push label first before call; garbles r2
-            pop r2; # return addr
-            pop r1; # actual arg
+            :putstring; # push label first before call; garbles r1 and r2
+            pop r2;                         # return addr
+            pop r1;                         # actual arg
             push r2;
             loadwordi r2, 02000000h;
             or r1, r1, r2;
             call r1, FFh;
             return;
 
+            :to_nibble; # push argument first; '0' to 0h, '1' to 1h, etc.; garbles r7; stack top has return value
+            pop r2;                         # return addr
+            pop r1;                         # actual arg
+            loadwordi r8, 39h;              # '9'
+
+            cmp r1, r8;                     # IF :
+                                            # (r1 < r8) aka r1 in '0'..'9' :
+            loadwordils r7, 48;                 # r1 = r1 - 48
+            subls r1, r1, r7;                   #
+                                            # (r1 > r8) :
+            loadwordigt r7, 55;                 # r1 = r1 - 55
+            subgt r1, r1, r7;                   #
+                                            # ENDIF
+
+            loadbytei r7, 1111b;            # sanitise r1 by
+            and r1, r1, r7;                 # ANDing with 1111b
+
+            push r1;                        # push return value
+            push r2;                        # push returning PC address
+            return;
+
             :code;
 
-            # print out LOADER
-            pushwordi @loadertext;
-            jsri @putstring;
+            loadbytei r5, 0;                # byte accumulator
+            loadbytei r6, 0;                # byte literal read counter (0 or 1)
+            loadbytei r8, 0;                # constant zero
+
+            pushwordi @loadertext;          # print out LOADER
+            jsri @putstring;                #
+
+            loadwordi r2, 2048;             # allocate buffer, r4 contains address (NOT an offset)
+            malloc r4, r2;                  # (2 KBytes)
+
+            :loop;
+
+            jsri @getchar;                  # getchar
+            mov r3, r1;                     # r3 has character just read
+
+            push r1;                        # putchar
+            jsri @putchar;                  #
+
+            ## turn byte literal (r3) into nibble ##
+            push r3;                        # r3 before: char just read
+            jsri @to_nibble;                # r3 after : '0' to 0h, '1' to 1h, etc.
+            pop r3;                         #
+
+
+            loadbytei r8, 0;
+            cmp r6, r8;                     # IF :
+                                            # (r6 == r8) :
+            loadbyteiz r7, 4;                   # r5 = r3 << 4
+            shlz r5, r3, r7;                    #
+            loadbyteiz r6, 1;                   #
+                                            # (r6 != r8) :
+            ornz r5, r5, r3;                    # r5 = r5 or r3
+            storebytenz r5, r4, r8;             # write r5 as byte to mem[r4]
+            incnz r4; loadbyteinz r6, 0;        #
+                                            # ENDIF
+
+
+
+            jmp @loop;
 
 
         """.trimIndent())

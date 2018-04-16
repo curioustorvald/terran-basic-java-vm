@@ -239,7 +239,7 @@ class Assembler(val vm: TerranVM) {
         )
         val opcodes = HashMap<String, Int>()
 
-        val twoLiners = hashSetOf("LOADWORDI")
+        val twoLiners = hashSetOf("LOADWORDI", "LOADWORDIZ", "LOADWORDINZ", "LOADWORDIGT", "LOADWORDILS")
 
         /**
          * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
@@ -831,6 +831,8 @@ class Assembler(val vm: TerranVM) {
                 getLabel(this).ushr(2)
             else if (this.matches(regexHexWhole)) // hex?
                 this.dropLast(1).toLong(16).toInt() // because what the fuck Kotlin?
+            else if (this.matches(regexBinWhole)) // bin?
+                this.dropLast(1).toLong(2).toInt() // because what the fuck Kotlin?
             else if (this.matches(matchInteger)) // number?
                 this.toLong().toInt() // because what the fuck Kotlin?
             else
