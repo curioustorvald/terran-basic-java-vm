@@ -61,6 +61,9 @@ import net.torvald.terranvm.toReadableOpcode
  * \@label_name
  *
  *
+ *
+ * NOTE: what we say OFFSET is a memory address divided by four (and word-aligned)
+ *
  * Created by minjaesong on 2017-05-28.
  */
 class Assembler(val vm: TerranVM) {
@@ -94,7 +97,7 @@ class Assembler(val vm: TerranVM) {
 
         private var currentSection = ".CODE"
 
-        val asmSections = hashSetOf<String>(".CODE", ".DATA", ".FUNC")
+        val asmSections = hashSetOf<String>(".CODE", ".DATA")
 
 
         val bitmaskRd = 0b00000001110000000000000000000000

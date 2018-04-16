@@ -626,14 +626,17 @@ halt;
     fun execDebugMain(any: Any?) { if (DEBUG) println(any) }
     fun execDebugError(any: Any?) { if (ERROR) System.err.println(any) }
 
-    private var pauseExec = false
+    private var pauseRequested = false
+    var isPaused = false // is this actually paused?
+        private set
 
     fun pauseExec() {
-        pauseExec = true
+        pauseRequested = true
     }
 
     fun resumeExec() {
         vmThread!!.resume()
+        isPaused = false
     }
 
 
@@ -668,10 +671,11 @@ halt;
 
                 //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
 
-                if (pauseExec) {
+                if (pauseRequested) {
                     println("[TerranVM] execution paused")
+                    isPaused = true
                     vmThread!!.suspend() // fuck it, i'll use this anyway
-                    pauseExec = false
+                    pauseRequested = false
                 }
 
 
@@ -702,7 +706,15 @@ halt;
                     VMOpcodesRISC.decodeAndExecute(opcode)
                 }
                 catch (oom: ArrayIndexOutOfBoundsException) {
-                    execDebugError("[TBASRT] illegal memory address access: from opcode ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                    execDebugError("[TBASRT] out-of-bound memory address access: from opcode ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                    execDebugError("r1: $r1; ${r1.to8HexString()}; ${readregFloat(1)}f")
+                    execDebugError("r2: $r2; ${r2.to8HexString()}; ${readregFloat(2)}f")
+                    execDebugError("r3: $r3; ${r3.to8HexString()}; ${readregFloat(3)}f")
+                    execDebugError("r4: $r4; ${r4.to8HexString()}; ${readregFloat(4)}f")
+                    execDebugError("r5: $r5; ${r5.to8HexString()}; ${readregFloat(5)}f")
+                    execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
+                    execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
+                    execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
                     interruptOutOfMem()
                 }
 

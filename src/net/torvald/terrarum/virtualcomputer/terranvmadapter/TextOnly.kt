@@ -39,7 +39,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 10
+        val vmDelay = 1
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -50,7 +50,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(4096, stdout = peripheral.printStream)
+        vm = TerranVM(1024, stdout = peripheral.printStream)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[3] = peripheral
@@ -93,41 +93,90 @@ class TextOnly : Game() {
             loadwordi r2, 42f;
         """.trimIndent())*/
 
-        val biosEchoTest = assembler("""
+        /*val biosEchoTest = assembler("""
+            jmp @code;
+
+            :getchar; # r1 <- char
+            loadwordi r1, 00000100h;
+            call r1, FFh;
+            return;
+
+            :putchar; # push char first before call; garbles r2
+            pop r2; # return addr
+            pop r1; # actual arg
+            push r2;
+            loadwordi r2, 00000200h;
+            or r1, r1, r2;
+            call r1, FFh;
+            return;
+
+
+            :code;
+
+            loadhwordi r1, 40h; push r1;
+            loadhwordi r1, 43h; push r1;
+            loadhwordi r1, 42h; push r1;
+            loadhwordi r1, 41h; push r1;
+            jsri @putchar;
+            jsri @putchar;
+            jsri @putchar;
+            jsri @putchar;
+
+            :loop;
+            jsri @getchar;
+            push r1;
+            jsri @putchar;
+            jmp @loop;
+
+        """.trimIndent())*/
+
+
+        val loader = assembler("""
             .data;
-
-            string teststr "There are a lot of 8 and 16-bit single-board hobbyist computers available these days.  But every one of them falls short in some way or another from what I dream of.  I'd just design one myself, but I'm not really good enough with electronics to do that.  So, I'm hoping somebody else will make my dream come true.  So I've compiled a list of things I think it should have.
-
-            Off the Shelf Components
-
-            So, basically I would not want the computer to use any old components that cannot be purchased anymore.  That includes custom chips from Atari or Commodore or whatever.  I would hope that the system would eventually get a larger user base and I wouldn't want to see any shortage of parts arise preventing mass production.  However, I prefer to avoid any FPGA or microcontrollers if possible, but that's not a deal-breaker.
-
-            CPU
-
-            I would want the CPU to be 6502 or compatible, such as 65816.  However, I'd be fine with the traditional 6502.  I would prefer a faster clock speed, such as 8 Mhz or better.  That way people could write code in BASIC and it would actually run fast enough to be useful.  As long as we aren't stuck using something like Commodore's VIC or VIC-2 chips, then this shouldn't be a problem.
-
-            Memory
-
-            I would want 128K or 256 of static RAM, with possibly the ability to upgrade it.  If using 6502 then there will need to be some sort of banking, but with 65816 it should be able to access all of it directly.";
+            string loadertext "LOADER
+            ";
 
             .code;
 
+            jmp @code;
 
-            loadwordi r1, 00000100h;   # wait for a key press
-            call r1, FFh;              #
+            :getchar; # r1 <- char
+            loadwordi r1, 00000100h;
+            call r1, FFh;
+            return;
 
-            loadwordi r1, 02000000h;
-            loadhwordi r2, @teststr;
+            :putchar; # push char first before call; garbles r2
+            pop r2; # return addr
+            pop r1; # actual arg
+            push r2;
+            loadwordi r2, 00000200h;
             or r1, r1, r2;
             call r1, FFh;
+            return;
+
+            :putstring; # push label first before call; garbles r2
+            pop r2; # return addr
+            pop r1; # actual arg
+            push r2;
+            loadwordi r2, 02000000h;
+            or r1, r1, r2;
+            call r1, FFh;
+            return;
+
+            :code;
+
+            # print out LOADER
+            pushwordi @loadertext;
+            jsri @putstring;
 
 
         """.trimIndent())
 
-        println("ASM size: ${biosEchoTest.size} (word-aligned: ${if (biosEchoTest.size % 4 == 0) "yes" else "HELL NAW!"})")
-        biosEchoTest.printASM()
 
-        vm.loadProgram(biosEchoTest)
+        println("ASM size: ${loader.size} (word-aligned: ${if (loader.size % 4 == 0) "yes" else "HELL NAW!"})")
+        loader.printASM()
+
+        vm.loadProgram(loader)
         vm.delayInMills = vmDelay
 
 

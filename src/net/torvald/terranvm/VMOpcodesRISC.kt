@@ -159,6 +159,8 @@ fun Float.byte4() = this.toRawBits().byte4()
 
 
 /**
+ * NOTE: what we say OFFSET is a memory address divided by four (and word-aligned)
+ *
  * Created by minjaesong on 2017-12-27.
  */
 object VMOpcodesRISC {
@@ -214,7 +216,7 @@ object VMOpcodesRISC {
     }
 
     fun MALLOC(dest: Register, size: Register) { vm.writeregInt(dest, vm.malloc(vm.readregInt(size)).memAddr) }
-    fun RETURN() { POPWORDI(); vm.pc = vm.lr }
+    fun RETURN() { POPWORDI(); vm.pc = vm.lr shl 2 /* LR must contain OFFSET, not actual address */ }
     /**
      * Register must contain address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C) but not pre-divided
      */
@@ -400,15 +402,14 @@ object VMOpcodesRISC {
     }
 
     /**
-     * Push memory address immediate into the stack
+     * Push memory address offset immediate into the stack
      */
     fun PUSHWORDI(offset: Int) {
         if (vm.sp < vm.stackSize) {
-            val value = offset shl 2
-            vm.memory[vm.ivtSize + 4 * vm.sp    ] = value.byte1()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 1] = value.byte2()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 2] = value.byte3()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 3] = value.byte4()
+            vm.memory[vm.ivtSize + 4 * vm.sp    ] = offset.byte1()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 1] = offset.byte2()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 2] = offset.byte3()
+            vm.memory[vm.ivtSize + 4 * vm.sp + 3] = offset.byte4()
             vm.sp++
 
             // old code

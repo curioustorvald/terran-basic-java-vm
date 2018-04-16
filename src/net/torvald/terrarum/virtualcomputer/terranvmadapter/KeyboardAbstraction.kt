@@ -24,7 +24,7 @@ class KeyboardAbstraction(val vm: TerranVM) : GdxPeripheralWrapper(16) {
         println("[KeyboardAbstraction] key typed: ${memory[0].toUint().toChar()}")
 
 
-        if (getKeyRequested) {
+        if (getKeyRequested && vm.isPaused) {
             vm.writeregInt(keyRequestDest!!, memory[0].toUint())
 
             getKeyRequested = false
