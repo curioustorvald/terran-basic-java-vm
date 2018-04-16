@@ -39,7 +39,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 1
+        val vmDelay = 7
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -135,10 +135,18 @@ class TextOnly : Game() {
             .data;
             string loadertext "LOADER
             ";
+            int literalbuffer 0;
+            bytes funckeys 6Bh 70h 72h 74h;
 
             .code;
 
+            jsri @reset_buffer;
             jmp @code;
+
+            :reset_buffer; # garbles r1
+            loadbytei r1, 0;
+            storewordimem r1, @literalbuffer;
+            return;
 
             :getchar; # r1 <- char
             loadwordi r1, 00000100h;
@@ -187,7 +195,7 @@ class TextOnly : Game() {
             :code;
 
             loadbytei r5, 0;                # byte accumulator
-            loadbytei r6, 0;                # byte literal read counter (0 or 1)
+            loadbytei r6, 0;                # byte literal read and acc counter (7 downTo 0)
             loadbytei r8, 0;                # constant zero
 
             pushwordi @loadertext;          # print out LOADER
@@ -198,7 +206,7 @@ class TextOnly : Game() {
 
             :loop;
 
-            jsri @getchar;                  # getchar
+            jsri @getchar;                  # r1 = getchar()
             mov r3, r1;                     # r3 has character just read
 
             push r1;                        # putchar
@@ -209,19 +217,26 @@ class TextOnly : Game() {
             jsri @to_nibble;                # r3 after : '0' to 0h, '1' to 1h, etc.
             pop r3;                         #
 
+            loadbytei r2, 1;                # flip about with r6, keep it to r2
+            xor r2, r6, r2;                 # r2 = r6 xor 1 (01234567 -> 10325476)
 
-            loadbytei r8, 0;
-            cmp r6, r8;                     # IF :
-                                            # (r6 == r8) :
-            loadbyteiz r7, 4;                   # r5 = r3 << 4
-            shlz r5, r3, r7;                    #
-            loadbyteiz r6, 1;                   #
-                                            # (r6 != r8) :
-            ornz r5, r5, r3;                    # r5 = r5 or r3
-            storebytenz r5, r4, r8;             # write r5 as byte to mem[r4]
-            incnz r4; loadbyteinz r6, 0;        #
+            ## accumulate to r5 ##
+            loadbytei r7, 4;                #
+            mulint r8, r7, r2;              # r8 = 8, 12, 0, 4 for r6: 2, 3, 0, 1
+            shl r3, r3, r8;                 #
+            or r5, r5, r3;                  # r5 = r5 or (r3 shl r7)
+
+            storewordimem r5, @literalbuffer;# put r5 into literalbuffer
+
+            loadbytei r1, 7;                # a number to compare against
+            cmp r6, r1;                     # IF :
+                                            # (r6 == 7) :
+            loadbyteiz r8, 0;                   #
+            loadbyteiz r6, 0;                   # r6 = 0
+            loadbyteiz r5, 0;                   # r5 = 0
+                                            # (r6 != 7) :
+            incnz r6;                           # r6++
                                             # ENDIF
-
 
 
             jmp @loop;

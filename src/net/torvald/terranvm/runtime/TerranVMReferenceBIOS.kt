@@ -86,10 +86,10 @@ CASE INSENSITIVE
 
 0..9, A..F: hex literal
 
-L: move program counter
 K: peek what byte is in the current address (example output: "0003DC : 3F")
 P: put a byte to memory and increment program counter
 R: run
+T: move program counter
 
 SYNTAX
 

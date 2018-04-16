@@ -59,6 +59,7 @@ import net.torvald.terranvm.toReadableOpcode
  *
  * Referring labels:
  * \@label_name
+ *      label returns memory OFFSET! (not an actual address)
  *
  *
  *
@@ -80,7 +81,6 @@ class Assembler(val vm: TerranVM) {
         private val commentMarker = '#'
         private val literalMarker = '"'
         private val sectionHeading = Regex("""\.[A-Za-z0-9_]+""")
-        private val matchInteger = Regex("""[0-9]+""")
         private val regexWhitespaceNoSP = Regex("""[\t\r\n\v\f]""")
         private val prependedSpaces = Regex("""^[\s]+""")
 
@@ -92,6 +92,8 @@ class Assembler(val vm: TerranVM) {
         val regexBinWhole = Regex("""^([01_]+b)$""") // DIFFERENT FROM the compiler
         val regexFPWhole =  Regex("""^([-+]?[0-9]*[.][0-9]+[eE]*[-+0-9]*[fF]*|[-+]?[0-9]+[.eEfF][0-9+-]*[fF]?)$""") // same as the assembler
         val regexIntWhole = Regex("""^([-+]?[0-9_]+)$""") // DIFFERENT FROM the compiler
+
+        val regexDecBinHexWhole = Regex("""^([0-9A-Fa-f_]+h)|([01_]+b)|([-+]?[0-9_]+)$""")
 
         private val labelTable = HashMap<String, Int>() // valid name: @label_name_in_lower_case
 
@@ -509,15 +511,23 @@ class Assembler(val vm: TerranVM) {
     }
 
     operator fun invoke(userProgram: String): ByteArray {
+
         resetStatus()
-
-
         val ret = ArrayList<Byte>()
+
+
+        fun zeroFillToAlignWord(payloadSize: Int) {
+            repeat((4 - (payloadSize % 4)) % 4) { ret.add(0.toByte()) }
+        }
+
 
         val programSpaceStart = vm.programSpaceStart
         fun getPC() = programSpaceStart + ret.size
         fun addWord(i: Int) {
             i.toLittle().forEach { ret.add(it) }
+        }
+        fun addByte(i: Byte) {
+            ret.add(i)
         }
         fun addWords(ai: IntArray) {
             ai.forEach { addWord(it) }
@@ -591,16 +601,16 @@ class Assembler(val vm: TerranVM) {
                         }
                         "BYTES" -> {
                             (2..words.lastIndex).forEach {
-                                if (words[it].matches(matchInteger) && words[it].resolveInt() in 0..255) { // byte literal
+                                if (words[it].matches(regexDecBinHexWhole) && words[it].resolveInt() in 0..255) { // byte literal
                                     //debug("--> Byte literal payload: ${words[it].toInt()}")
                                     // write bytes
                                     virtualPC += 1
                                 }
-                                else if (words[it].startsWith(labelMarker)) {
+                                /*else if (words[it].startsWith(labelMarker)) {
                                     //debug("--> Byte literal payload (label): ${words[it]}")
                                     // write bytes
                                     virtualPC += 4
-                                }
+                                }*/
                                 else {
                                     throw IllegalArgumentException("Illegal byte literal ${words[it]}")
                                 }
@@ -719,13 +729,12 @@ class Assembler(val vm: TerranVM) {
 
                             val theRealPayload = data.toCString()
 
-                            theRealPayload.forEach { ret.add(it) }
+                            theRealPayload.forEach { addByte(it) }
                             // using toCString(): null terminator is still required as executor requires it (READ_UNTIL_ZERO, literally)
 
                             debug("--> payload size: ${theRealPayload.size}")
 
-                            // zero filler
-                            repeat((4 - (theRealPayload.size % 4)) % 4) { ret.add(0.toByte()) }
+                            zeroFillToAlignWord(theRealPayload.size)
                         }
                         "FLOAT" -> {
                             val number = words[2].toFloat()
@@ -742,29 +751,25 @@ class Assembler(val vm: TerranVM) {
                             int.toLittle().forEach { ret.add(it) }
                         }
                         "BYTES" -> {
-                            val addedBytesSize = words.lastIndex - 2 + 1
+                            val addedBytesSize = words.size - 2
                             (2..words.lastIndex).forEach {
-                                if (words[it].matches(matchInteger) && words[it].resolveInt() in 0..255) { // byte literal
+                                if (words[it].matches(regexDecBinHexWhole) && words[it].resolveInt() in 0..255) { // byte literal
                                     debug("--> Byte literal payload: ${words[it].resolveInt()}")
-                                    addWord(words[it].resolveInt())
+                                    addByte(words[it].resolveInt().toByte())
                                 }
-                                else if (words[it].startsWith(labelMarker)) {
+                                /*else if (words[it].startsWith(labelMarker)) {
                                     debug("--> Byte literal payload (label): ${words[it]}")
                                     getLabel(words[it]).toLittle().forEach {
                                         ret.add(it)
                                     }
-                                }
+                                }*/
                                 else {
                                     throw IllegalArgumentException("Illegal byte literal ${words[it]}")
                                 }
                             }
 
 
-                            // zero filler
-                            // 1 -> 3; 3 -> 1; else -> else
-                            if (addedBytesSize and 1 == 1) {
-                                repeat(addedBytesSize.and(3) xor 2) { ret.add(0.toByte()) }
-                            }
+                            zeroFillToAlignWord(addedBytesSize)
                         }
                         else -> throw IllegalArgumentException("Unsupported data type: '$type' (or you missed a semicolon?)")
                     }
@@ -833,7 +838,7 @@ class Assembler(val vm: TerranVM) {
                 this.dropLast(1).toLong(16).toInt() // because what the fuck Kotlin?
             else if (this.matches(regexBinWhole)) // bin?
                 this.dropLast(1).toLong(2).toInt() // because what the fuck Kotlin?
-            else if (this.matches(matchInteger)) // number?
+            else if (this.matches(regexIntWhole)) // number?
                 this.toLong().toInt() // because what the fuck Kotlin?
             else
                 throw IllegalArgumentException("Couldn't convert this to integer: '$this'")
