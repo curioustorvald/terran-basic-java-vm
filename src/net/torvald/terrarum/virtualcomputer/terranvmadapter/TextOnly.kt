@@ -12,11 +12,9 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
-import net.torvald.terranvm.runtime.compiler.cflat.Cflat
 import net.torvald.terranvm.runtime.toUint
 import net.torvald.terranvm.toReadableBin
 import net.torvald.terranvm.toReadableOpcode
-import kotlin.experimental.or
 
 /**
  * Created by minjaesong on 2017-11-17.
@@ -25,6 +23,7 @@ class TextOnly : Game() {
 
     lateinit var background: Texture
     lateinit var execLed: Texture
+    lateinit var waitLed: Texture
 
     lateinit var batch: SpriteBatch
 
@@ -43,6 +42,7 @@ class TextOnly : Game() {
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
+        waitLed = Texture(Gdx.files.internal("assets/led_orange.tga"))
 
         batch = SpriteBatch()
 
@@ -171,16 +171,16 @@ class TextOnly : Game() {
             call r1, FFh;
             return;
 
-            :to_nibble; # push argument first; '0' to 0h, '1' to 1h, etc.; garbles r7; stack top has return value
+            :to_nibble; # push argument first; '0' to 0h, '1' to 1h, etc.; garbles r1, r2, r7; stack top has return value
             pop r2;                         # return addr
             pop r1;                         # actual arg
             loadwordi r8, 39h;              # '9'
 
-            cmp r1, r8;                     # IF :
-                                            # (r1 < r8) aka r1 in '0'..'9' :
+            cmp r1, r8;                     # IF
+                                            # (r1 < r8) aka r1 in '0'..'9' THEN
             loadwordils r7, 48;                 # r1 = r1 - 48
             subls r1, r1, r7;                   #
-                                            # (r1 > r8) :
+                                            # (r1 > r8) THEN
             loadwordigt r7, 55;                 # r1 = r1 - 55
             subgt r1, r1, r7;                   #
                                             # ENDIF
@@ -194,6 +194,10 @@ class TextOnly : Game() {
 
             :code;
 
+            ################
+            ## initialise ##
+            ################
+
             loadbytei r5, 0;                # byte accumulator
             loadbytei r6, 0;                # byte literal read and acc counter (7 downTo 0)
             loadbytei r8, 0;                # constant zero
@@ -204,40 +208,85 @@ class TextOnly : Game() {
             loadwordi r2, 2048;             # allocate buffer, r4 contains address (NOT an offset)
             malloc r4, r2;                  # (2 KBytes)
 
-            :loop;
+            #########
+            :loop; ##
+            #########
 
-            jsri @getchar;                  # r1 = getchar()
-            mov r3, r1;                     # r3 has character just read
+            loadwordi r1, 00000102h;        # r3 <- getchar
+            call r1, FFh;                   #
 
-            push r1;                        # putchar
+            push r3;                        # putchar
             jsri @putchar;                  #
 
-            ## turn byte literal (r3) into nibble ##
-            push r3;                        # r3 before: char just read
-            jsri @to_nibble;                # r3 after : '0' to 0h, '1' to 1h, etc.
-            pop r3;                         #
+            ###################
+            ## function keys ##
+            ###################
+
+            loadbytei r1, 70h;              #
+            cmp r3, r1;                     # IF (r3 == 'p') THEN
+            jz @write_to_mem;                   # goto write_to_mem
+                                            # ENDIF
+
+            ########################
+            :accept_byte_literal; ##
+            ########################
+
+
+            loadwordi r8, 57;               # '9'
+            cmp r3, r8;                     # IF
+                                            # (r3 < r8) aka r1 in '0'..'9' THEN
+            loadwordils r7, 30h;                # r3 = r3 - 48
+            subls r3, r3, r7;                   #
+                                            # (r3 > r8) THEN
+            loadwordigt r7, 55;                 # r3 = r3 - 55
+            subgt r3, r3, r7;                   #
+                                            # ENDIF
+
+            loadbytei r7, 1111b;            # sanitise r3 by
+            and r3, r3, r7;                 # ANDing with 1111b
+
+
+            #######################
+            ## now r3 has nibble ##
+            #######################
 
             loadbytei r2, 1;                # flip about with r6, keep it to r2
             xor r2, r6, r2;                 # r2 = r6 xor 1 (01234567 -> 10325476)
 
             ## accumulate to r5 ##
             loadbytei r7, 4;                #
-            mulint r8, r7, r2;              # r8 = 8, 12, 0, 4 for r6: 2, 3, 0, 1
-            shl r3, r3, r8;                 #
+            mulint r7, r7, r2;              # r8 = 8, 12, 0, 4 for r6: 2, 3, 0, 1
+            shl r3, r3, r7;                 #
             or r5, r5, r3;                  # r5 = r5 or (r3 shl r7)
 
             storewordimem r5, @literalbuffer;# put r5 into literalbuffer
 
             loadbytei r1, 7;                # a number to compare against
-            cmp r6, r1;                     # IF :
-                                            # (r6 == 7) :
-            loadbyteiz r8, 0;                   #
+            cmp r6, r1;                     # IF
+                                            # (r6 == 7) THEN
             loadbyteiz r6, 0;                   # r6 = 0
             loadbyteiz r5, 0;                   # r5 = 0
-                                            # (r6 != 7) :
+                                            # (r6 != 7) THEN
             incnz r6;                           # r6++
                                             # ENDIF
 
+            jmp @loop;
+
+            #################
+            :write_to_mem; ##
+            #################
+
+            loadwordimem r5, @literalbuffer;# deref literalbuffer into r5 (r5 is zero in this case if full word is written in buffer)
+            loadbytei r1, 0;                # write accumulator to r4
+            storeword r5, r4, r1;           #
+            loadbytei r1, 4;                # r4 += 4
+            add r4, r4, r1;                 #
+
+            jsri @reset_buffer;
+            loadbyteiz r6, 0;               # r6 = 0
+            loadbyteiz r5, 0;               # r5 = 0
+
+            jmp @loop;
 
             jmp @loop;
 
@@ -285,8 +334,13 @@ class TextOnly : Game() {
 
 
             // exec lamp
-            if (vm.isRunning) {
+            if (vm.isRunning && !vm.isPaused) {
                 batch.draw(execLed, 51f, 39f)
+            }
+
+            // wait lamp
+            if (vm.isPaused) {
+                batch.draw(waitLed, 51f, 19f)
             }
 
             // draw whatever on the peripheral's memory

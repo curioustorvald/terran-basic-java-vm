@@ -431,20 +431,14 @@ class Assembler(val vm: TerranVM) {
 
     fun assemblyToOpcode(line: String): IntArray {
         fun String.toFloatOrInt(): Int =
-                if (this.startsWith("0x"))
-                    throw IllegalArgumentException("Use h instead of 0x")
-                else if (this.startsWith("0b"))
-                    throw IllegalArgumentException("Use b instead of 0b")
-                else if (this.startsWith(labelMarker)) // label?
-                    getLabel(this).ushr(2)
-                else if (this.matches(regexHexWhole))
-                    this.dropLast(1).replace("_", "").toInt(16)
-                else if (this.matches(regexBinWhole))
-                    this.dropLast(1).replace("_", "").toInt(2)
-                else if (this.matches(regexIntWhole))
-                    this.replace("_", "").toInt()
-                else
+                try {
+                    // it's integer
+                    this.resolveInt()
+                }
+                catch (e: UnsupportedOperationException) {
+                    // it's float
                     this.replace("_", "").toFloat().toRawBits()
+                }
 
 
         val words = line.split(delimiters)
@@ -637,6 +631,11 @@ class Assembler(val vm: TerranVM) {
                     }
 
                     if (cmd.startsWith(labelDefinitionMarker)) {
+
+                        if (line.contains(delimiters)) {
+                            throw IllegalArgumentException("missed semicolon!")
+                        }
+
                         putLabel(cmd.drop(1).toLowerCase(), virtualPC)
                         // will continue to next statements
                     }
@@ -841,6 +840,6 @@ class Assembler(val vm: TerranVM) {
             else if (this.matches(regexIntWhole)) // number?
                 this.toLong().toInt() // because what the fuck Kotlin?
             else
-                throw IllegalArgumentException("Couldn't convert this to integer: '$this'")
+                throw UnsupportedOperationException("Couldn't convert this to integer: '$this'")
 
 }

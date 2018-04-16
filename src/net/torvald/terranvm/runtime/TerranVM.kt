@@ -715,6 +715,7 @@ halt;
                     execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
                     execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
                     execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
+                    execDebugError("pc: $pc; ${pc.toHexString()}")
                     interruptOutOfMem()
                 }
                 catch (e: Exception) {
@@ -726,6 +727,7 @@ halt;
                     execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
                     execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
                     execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
+                    execDebugError("pc: $pc; ${pc.toHexString()}")
                     e.printStackTrace()
                 }
 
