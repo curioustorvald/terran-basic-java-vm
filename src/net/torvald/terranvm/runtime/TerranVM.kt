@@ -621,6 +621,7 @@ halt;
 
 
     var delayInMills: Int? = null
+    var instPerMill: Int? = null
 
 
     fun execDebugMain(any: Any?) { if (DEBUG) println(any) }

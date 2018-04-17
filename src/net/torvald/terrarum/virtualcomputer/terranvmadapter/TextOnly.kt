@@ -38,7 +38,7 @@ class TextOnly : Game() {
     lateinit var memvwr: Memvwr
 
     override fun create() {
-        val vmDelay = 7
+        val vmDelay = 1
 
         background = Texture(Gdx.files.internal("assets/8025_textonly.png"))
         execLed = Texture(Gdx.files.internal("assets/led_green.tga"))
@@ -136,7 +136,7 @@ class TextOnly : Game() {
             string loadertext "LOADER
             ";
             int literalbuffer 0;
-            bytes funckeys 6Bh 70h 72h 74h;
+            int startingptr 0;
 
             .code;
 
@@ -207,6 +207,8 @@ class TextOnly : Game() {
 
             loadwordi r2, 2048;             # allocate buffer, r4 contains address (NOT an offset)
             malloc r4, r2;                  # (2 KBytes)
+            storewordimem r4, @startingptr; #
+            loadbytei r4, 0;                # now r4 contains distance to the starting pointer
 
             #########
             :loop; ##
@@ -214,6 +216,8 @@ class TextOnly : Game() {
 
             loadwordi r1, 00000102h;        # r3 <- getchar
             call r1, FFh;                   #
+
+            ## TODO: if r3 is 'a'..'f', putchar capitals (charCode - 32)
 
             push r3;                        # putchar
             jsri @putchar;                  #
@@ -232,13 +236,13 @@ class TextOnly : Game() {
             ########################
 
 
-            loadwordi r8, 57;               # '9'
+            loadbytei r8, 57;               # '9'
             cmp r3, r8;                     # IF
                                             # (r3 < r8) aka r1 in '0'..'9' THEN
-            loadwordils r7, 30h;                # r3 = r3 - 48
+            loadbyteils r7, 30h;                # r3 = r3 - 48
             subls r3, r3, r7;                   #
                                             # (r3 > r8) THEN
-            loadwordigt r7, 55;                 # r3 = r3 - 55
+            loadbyteigt r7, 55;                 # r3 = r3 - 55
             subgt r3, r3, r7;                   #
                                             # ENDIF
 
@@ -278,7 +282,11 @@ class TextOnly : Game() {
 
             loadwordimem r5, @literalbuffer;# deref literalbuffer into r5 (r5 is zero in this case if full word is written in buffer)
             loadbytei r1, 0;                # write accumulator to r4
-            storeword r5, r4, r1;           #
+
+            loadwordimem r2, @startingptr;  #
+            add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
+            storeword r5, r2, r1;           #
+
             loadbytei r1, 4;                # r4 += 4
             add r4, r4, r1;                 #
 

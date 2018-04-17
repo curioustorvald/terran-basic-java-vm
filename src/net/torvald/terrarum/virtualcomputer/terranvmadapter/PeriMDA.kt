@@ -14,7 +14,10 @@ import java.util.*
 /**
  * Created by minjaesong on 2017-11-18.
  */
-class PeriMDA(val W: Int = 80, val H: Int = 25, val vmExecDelay: Int? = null) : GdxPeripheralWrapper(W * H) {
+class PeriMDA(val W: Int = 80, val H: Int = 25,
+              val vmExecDelay: Int? = null,
+              val vmInstPerMill: Int? = null
+) : GdxPeripheralWrapper(W * H) {
 
     val lcdFont: BitmapFont = LCDFont()
 
