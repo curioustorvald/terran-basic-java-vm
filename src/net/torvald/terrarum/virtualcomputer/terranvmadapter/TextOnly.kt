@@ -137,6 +137,7 @@ class TextOnly : Game() {
             ";
             int literalbuffer 0;
             int startingptr 0;
+            bytes funckeys 6Bh 70h 72h 74h;
 
             .code;
 
@@ -217,10 +218,43 @@ class TextOnly : Game() {
             loadwordi r1, 00000102h;        # r3 <- getchar
             call r1, FFh;                   #
 
-            ## TODO: if r3 is 'a'..'f', putchar capitals (charCode - 32)
 
+            ###############################
+            ## print 'a'..'f' as capital ##
+            ###############################
+
+            loadbytei r1, 61h;              # r1 <- 'a'
+            cmp r3, r1;                     # IF (r3, 'a')
+            jgt @r1_geq_a;                  # 'a'
+            jz  @r1_geq_a;                  # 'b'..'f'
+            jls @r1_less_a;                 # lesser
+            :r1_geq_a;
+            loadbytei r1, 66h;              # r1 <- 'f'
+            cmp r3, r1;                     # IF (r3, 'f')
+            jz  @putchar_capital;           # 'f'
+            jls @putchar_capital;           # 'a'..'e'
+            jgt @putchar_verbatim;          # greater
+            :r1_less_a;
+            ## TODO do something else than putchar_verbatim
+            jmp @putchar_verbatim;
+            jmp @r1_endif;                  # end of this IF, jump to endif label
+            :r1_great_f;
+            ## TODO do something else
+            jmp @r1_endif;                  # end of this IF, jump to endif label
+            :r1_endif;                      # ENDIF
+
+            :putchar_verbatim;
             push r3;                        # putchar
             jsri @putchar;                  #
+            jmp @end_putchar_capital;
+
+            :putchar_capital;
+            loadbytei r1, 32;               #
+            sub r8, r3, r1;                 #
+            push r8;                        # putchar
+            jsri @putchar;                  #
+            :end_putchar_capital;
+
 
             ###################
             ## function keys ##
