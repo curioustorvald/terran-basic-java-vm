@@ -204,24 +204,33 @@ class TerranVM(inMemSize: Int,
         }
     }
 
+
     /**
      * This function assumes all pointers are well placed, without gaps
      *
      * Will throw nullPointerException if program is not loaded
      */
     fun malloc(size: Int): Pointer {
-        val addr = findEmptySlotForMalloc(size)
-        addToMallocList(addr until addr + size)
+        if (size % 4 != 0)
+            return malloc(size.roundToFour())
+        else {
+            val addr = findEmptySlotForMalloc(size)
+            addToMallocList(addr until addr + size)
 
-        return Pointer(this, addr)
+            return Pointer(this, addr)
+        }
     }
     fun calloc(size: Int): Pointer {
-        val addr = findEmptySlotForMalloc(size)
-        addToMallocList(addr until addr + size)
+        if (size % 4 != 0)
+            return malloc(size.roundToFour())
+        else {
+            val addr = findEmptySlotForMalloc(size)
+            addToMallocList(addr until addr + size)
 
-        (0..size - 1).forEach { memory[addr + it] = 0.toByte() }
+            (0..size - 1).forEach { memory[addr + it] = 0.toByte() }
 
-        return Pointer(this, addr)
+            return Pointer(this, addr)
+        }
     }
     fun freeBlock(variable: TBASValue) {
         freeBlock(variable.pointer.memAddr until variable.pointer.memAddr + variable.sizeOf())
@@ -717,6 +726,7 @@ halt;
                     execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
                     execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
                     execDebugError("pc: $pc; ${pc.toHexString()}")
+                    oom.printStackTrace()
                     interruptOutOfMem()
                 }
                 catch (e: Exception) {
@@ -912,3 +922,5 @@ fun ByteArray.search(pattern: ByteArray, start: Int = 0, length: Int = pattern.s
 
     return null
 }
+
+fun Int.roundToFour() = this + ((4 - (this % 4)) % 4)

@@ -123,8 +123,16 @@ class Assembler(val vm: TerranVM) {
                 "INC" to 0b110010,
                 "DEC" to 0b110011,
                 "MALLOC" to 0b110100,
+
                 "FTOI" to 0b110110,
                 "ITOF" to 0b110111,
+                "ITOS" to 0b111000,
+                "STOI" to 0b111001,
+                "FTOS" to 0b111010,
+                "STOF" to 0b111011,
+                "ITOX" to 0b111100,
+                "XTOI" to 0b111101,
+
                 "JSR" to 0b111110,
                 "RETURN" to 0b111111,
 
@@ -269,8 +277,11 @@ class Assembler(val vm: TerranVM) {
                     else if (mathOp == 0b110000 || mathOp == 0b110001 || mathOp == 0b110100) { // MOV and XCHG; MALLOC
                         "rr"
                     }
-                    else if (mathOp == 0b110010 || mathOp == 0b110011 || mathOp == 0b110110 || mathOp == 0b110110) { // INC, DEC, FTOI, ITOF
+                    else if (mathOp == 0b110010 || mathOp == 0b110011) { // INC, DEC
                         "r"
+                    }
+                    else if (mathOp in 54..61) { // FTOI, ITOF, ITOS, STOI, FTOS, STOF, ITOX, XTOI
+                        "rr"
                     }
                     else if (mathOp in 0b1000000..0b1000111) { // load/store
                         "rrr"

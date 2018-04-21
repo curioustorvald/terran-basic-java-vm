@@ -235,6 +235,93 @@ object VMOpcodesRISC {
     @Strictfp fun FTOI(dest: Register, src: Register) { vm.writeregInt(dest, vm.readregFloat(src).toInt()) }
     @Strictfp fun ITOF(dest: Register, src: Register) { vm.writeregFloat(dest, vm.readregInt(src).toFloat()) }
 
+    fun ITOS(dest: Register, src: Register) {
+        val value = vm.readregInt(src)
+        val outString = value.toString()
+        val strLen = outString.length + 1 // incl. null terminator
+        val strPtr = vm.malloc(strLen).memAddr
+        outString.forEachIndexed { index, c ->
+            vm.memory[strPtr + index] = c.toByte()
+        }
+        vm.memory[strPtr + strLen - 1] = 0.toByte()
+        vm.writeregInt(dest, strPtr ushr 2)
+        vm.freeBlock(strPtr..(strPtr + strLen).roundToFour())
+    }
+
+    @Strictfp fun FTOS(dest: Register, src: Register) {
+        val value = vm.readregFloat(src)
+        val outString = value.toString()
+        val strLen = outString.length + 1 // incl. null terminator
+        val strPtr = vm.malloc(strLen).memAddr
+        outString.forEachIndexed { index, c ->
+            vm.memory[strPtr + index] = c.toByte()
+        }
+        vm.memory[strPtr + strLen - 1] = 0.toByte()
+        vm.writeregInt(dest, strPtr ushr 2)
+        vm.freeBlock(strPtr..(strPtr + strLen).roundToFour())
+    }
+
+    fun ITOX(dest: Register, src: Register) {
+        val value = vm.readregInt(src)
+        val outString = value.toString(16).toUpperCase()
+        val strLen = outString.length + 1 // incl. null terminator
+        val strPtr = vm.malloc(strLen).memAddr
+        outString.forEachIndexed { index, c ->
+            vm.memory[strPtr + index] = c.toByte()
+        }
+        vm.memory[strPtr + strLen - 1] = 0.toByte()
+        vm.writeregInt(dest, strPtr ushr 2)
+        vm.freeBlock(strPtr..(strPtr + strLen).roundToFour())
+    }
+
+    fun STOI(dest: Register, src: Register) {
+        var strPtr = vm.readregInt(src) shl 2
+        val sb = StringBuilder()
+
+        var char = 0xff.toChar()
+        while (char != 0.toChar()) {
+            char = vm.memory[strPtr].toUint().toChar()
+            sb.append(char)
+
+            strPtr++
+        }
+
+        val convertedInt = sb.toString().toLong().and(0xFFFFFFFF).toInt()
+        vm.writeregInt(dest, convertedInt)
+    }
+
+    fun STOF(dest: Register, src: Register) {
+        var strPtr = vm.readregInt(src) shl 2
+        val sb = StringBuilder()
+
+        var char = 0xff.toChar()
+        while (char != 0.toChar()) {
+            char = vm.memory[strPtr].toUint().toChar()
+            sb.append(char)
+
+            strPtr++
+        }
+
+        val convertedInt = sb.toString().toLong().and(0xFFFFFFFF).toInt()
+        vm.writeregFloat(dest, Float.fromBits(convertedInt))
+    }
+
+    fun XTOI(dest: Register, src: Register) {
+        var strPtr = vm.readregInt(src) shl 2
+        val sb = StringBuilder()
+
+        var char = 0xff.toChar()
+        while (char != 0.toChar()) {
+            char = vm.memory[strPtr].toUint().toChar()
+            sb.append(char)
+
+            strPtr++
+        }
+
+        val convertedInt = java.lang.Long.parseLong(sb.toString(), 16).and(0xFFFFFFFF).toInt()
+        vm.writeregInt(dest, convertedInt)
+    }
+
     @Strictfp fun ADD(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) + vm.readregFloat(m)) }
     @Strictfp fun SUB(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) - vm.readregFloat(m)) }
     @Strictfp fun MUL(dest: Register, src: Register, m: Register) { vm.writeregFloat(dest, vm.readregFloat(src) * vm.readregFloat(m)) }
@@ -574,8 +661,15 @@ object VMOpcodesRISC {
                         50 -> INC(Rd)
                         51 -> DEC(Rd)
                         52 -> MALLOC(Rd, Rs)
+
                         54 -> FTOI(Rd, Rs)
                         55 -> ITOF(Rd, Rs)
+                        56 -> ITOS(Rd, Rs)
+                        57 -> STOI(Rd, Rs)
+                        58 -> FTOS(Rd, Rs)
+                        59 -> STOF(Rd, Rs)
+                        60 -> ITOX(Rd, Rs)
+                        61 -> XTOI(Rd, Rs)
 
                         62 -> JSR(Rd)
                         63 -> RETURN()
@@ -755,8 +849,16 @@ object VMOpcodesRISC {
             "MOV" to 2,
             "XCHG" to 2,
             "MALLOC" to 2,
+
             "FTOI" to 2,
             "ITOF" to 2,
+
+            "ITOS" to 2,
+            "STOI" to 2,
+            "FTOS" to 2,
+            "STOF" to 2,
+            "ITOX" to 2,
+            "XTOI" to 2,
 
             "INC" to 1,
             "DEC" to 1,
@@ -796,6 +898,12 @@ object VMOpcodesRISC {
             "DEC" to "Int32",
             "FTOI" to "Float",
             "ITOF" to "Int32",
+            "ITOS" to "Int32",
+            "STOI" to "Int32",
+            "FTOS" to "Int32",
+            "STOF" to "Float",
+            "ITOX" to "Int32",
+            "XTOI" to "Int32",
             "ADD" to "Float",
             "SUB" to "Float",
             "MUL" to "Float",

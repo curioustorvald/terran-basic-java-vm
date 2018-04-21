@@ -193,6 +193,9 @@ class TextOnly : Game() {
             push r2;                        # push returning PC address
             return;
 
+
+
+
             :code;
 
             ################
@@ -264,6 +267,10 @@ class TextOnly : Game() {
             cmp r3, r1;                     # IF (r3 == 'p') THEN
             jz @write_to_mem;                   # goto write_to_mem
                                             # ENDIF
+            loadbytei r1, 6Bh;              #
+            cmp r3, r1;                     # IF (r3 == 'k') THEN
+            jz @peek_buffer;                    # goto peek_buffer
+                                            # ENDIF
 
             ########################
             :accept_byte_literal; ##
@@ -315,7 +322,7 @@ class TextOnly : Game() {
             #################
 
             loadwordimem r5, @literalbuffer;# deref literalbuffer into r5 (r5 is zero in this case if full word is written in buffer)
-            loadbytei r1, 0;                # write accumulator to r4
+            loadbytei r1, 0;                #
 
             loadwordimem r2, @startingptr;  #
             add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
@@ -329,6 +336,48 @@ class TextOnly : Game() {
             loadbyteiz r5, 0;               # r5 = 0
 
             jmp @loop;
+
+            ################
+            :peek_buffer; ##
+            ################
+
+            itox r1, r4;                    # r1 = r4 (distance from startingptr) as a String
+            loadwordimem r2, @startingptr;  #
+            add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
+
+            loadwordi r5, 02000000h;        # base BIOS call for print string
+            loadbytei r3, 0;
+
+            ## PRINT 1 ##
+
+            loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
+            or r3, r5, r1;        call r3, FFh; # print distance from startingptr
+
+            ## END OF PRINT 1 ##
+
+            loadbytei r3, 0;
+
+            loadbyte r2, r2, r3;            # r2 now contains whatever byte was contained in old r2
+            itox r2, r2;                    # r2 now contains string pointer for hex str
+
+            ## PRINT 2 ##
+
+            loadhwordi r3, 0220h; call r3, FFh; # print ' '
+            loadhwordi r3, 023Ah; call r3, FFh; # print ':'
+            loadhwordi r3, 0220h; call r3, FFh; # print ' '
+            or r3, r5, r2;        call r3, FFh; # print r2
+            loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
+
+            ## END OF PRINT 2 ##
+
+            jmp @loop;
+
+
+
+
+
+
+
 
             jmp @loop;
 
