@@ -50,7 +50,7 @@ class TextOnly : Game() {
 
         peripheral = PeriMDA(vmExecDelay = vmDelay)
 
-        vm = TerranVM(4096, stdout = peripheral.printStream)
+        vm = TerranVM(8192, stdout = peripheral.printStream)
 
         vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[3] = peripheral
@@ -193,7 +193,20 @@ class TextOnly : Game() {
             push r2;                        # push returning PC address
             return;
 
+            :putchar_verbatim;
+            push r3;                        # putchar
+            jsri @putchar;                  #
+            return;
 
+            :putchar_capital;
+            loadbytei r1, 32;               #
+            sub r8, r3, r1;                 #
+            push r8;                        # putchar
+            jsri @putchar;                  #
+            return;
+
+
+            ############################################################################################################
 
 
             :code;
@@ -214,13 +227,16 @@ class TextOnly : Game() {
             storewordimem r4, @startingptr; #
             loadbytei r4, 0;                # now r4 contains distance to the starting pointer
 
-            #########
-            :loop; ##
-            #########
+
+
+            #################################
+            :loop; ##########################
+            #################################
+
+
 
             loadwordi r1, 00000102h;        # r3 <- getchar
             call r1, FFh;                   #
-
 
             ###############################
             ## print 'a'..'f' as capital ##
@@ -230,47 +246,61 @@ class TextOnly : Game() {
             cmp r3, r1;                     # IF (r3, 'a')
             jgt @r1_geq_a;                  # 'a'
             jz  @r1_geq_a;                  # 'b'..'f'
-            jls @r1_less_a;                 # lesser
+            jls @r1_ls_a;                   # lesser
             :r1_geq_a;
             loadbytei r1, 66h;              # r1 <- 'f'
             cmp r3, r1;                     # IF (r3, 'f')
-            jz  @putchar_capital;           # 'f'
-            jls @putchar_capital;           # 'a'..'e'
-            jgt @putchar_verbatim;          # greater
-            :r1_less_a;
-            ## TODO do something else than putchar_verbatim
-            jmp @putchar_verbatim;
-            jmp @r1_endif;                  # end of this IF, jump to endif label
-            :r1_great_f;
-            ## TODO do something else
-            jmp @r1_endif;                  # end of this IF, jump to endif label
-            :r1_endif;                      # ENDIF
+            jsriz  @putchar_capital;            # 'f'
+            jz @accept_byte_literal;            #
+            jsrils @putchar_capital;            # 'a'..'e'
+            jls @accept_byte_literal;           #
+            jgt @r1_gt_f;                   # greater than f
+                                            # ENDIF
 
-            :putchar_verbatim;
-            push r3;                        # putchar
-            jsri @putchar;                  #
-            jmp @end_putchar_capital;
-
-            :putchar_capital;
-            loadbytei r1, 32;               #
-            sub r8, r3, r1;                 #
-            push r8;                        # putchar
-            jsri @putchar;                  #
-            :end_putchar_capital;
+            :r1_gt_f;                       # alias
+            jmp @function_keys;             # derp
 
 
-            ###################
-            ## function keys ##
-            ###################
+            :r1_ls_a;
+            # TODO compare if r3 in '0'..'9'
+            # putchar and goto accept_byte_literal
+
+            loadbytei r1, 30h;              # r1 <- '0'
+            cmp r3, r1;                     # IF (r3, '0')
+            jls @loop;                          # deny if r3 < '0'
+            loadbytei r1, 39h;              # r1 <- '9'
+            cmp r3, r1;                     # IF (r3, '9')
+            jgt @loop;                          # deny if r3 > '9'
+
+            jsri @putchar_verbatim;         #
+            jmp @accept_byte_literal;       #
+
+
+            ##################
+            :function_keys; ##
+            ##################
 
             loadbytei r1, 70h;              #
             cmp r3, r1;                     # IF (r3 == 'p') THEN
+            jsriz @putchar_verbatim;            # printout
             jz @write_to_mem;                   # goto write_to_mem
+                                            # ENDIF
+            loadbytei r1, 74h;              #
+            cmp r3, r1;                     # IF (r3 == 't') THEN
+            jsriz @putchar_verbatim;            # printout
+            jz @move_pointer;                   # goto move_pointer
                                             # ENDIF
             loadbytei r1, 6Bh;              #
             cmp r3, r1;                     # IF (r3 == 'k') THEN
+            jsriz @putchar_verbatim;            # printout
             jz @peek_buffer;                    # goto peek_buffer
                                             # ENDIF
+            loadbytei r1, 72h;              #
+            cmp r3, r1;                     # IF (r3 == 'r') THEN
+            jsriz @putchar_verbatim;            # printout
+            jz @execute;                    # goto execute
+                                            # ENDIF
+            jnz @loop;                      # deny
 
             ########################
             :accept_byte_literal; ##
@@ -337,6 +367,34 @@ class TextOnly : Game() {
 
             jmp @loop;
 
+            #################
+            :move_pointer; ##
+            #################
+
+            loadwordimem r5, @literalbuffer;# deref literalbuffer into r5 (r5 is zero in this case if full word is written in buffer)
+
+            loadbytei r1, 2;                # make r5 word-aligned
+            ushr r5, r5, r1; shl r5, r5, r1;#
+
+            mov r4, r5;                     # r4 = literalbuffer
+
+            itox r1, r4;                    # r1 = r4 (distance from startingptr) as a String
+
+            loadhwordi r7, 020Ah;           #
+            call r7, FFh;                   # print '\n'
+
+            loadwordi r8, 02000000h;        # base BIOS call for print string
+            or r8, r8, r1;                  #
+            call r8, FFh;                   # print out new offset (aka distance)
+
+            call r7, FFh; # print '\n'      # print '\n' using r7 we overwrote above
+
+            jsri @reset_buffer;
+            loadbyteiz r6, 0;               # r6 = 0
+            loadbyteiz r5, 0;               # r5 = 0
+
+            jmp @loop;
+
             ################
             :peek_buffer; ##
             ################
@@ -345,15 +403,17 @@ class TextOnly : Game() {
             loadwordimem r2, @startingptr;  #
             add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
 
-            loadwordi r5, 02000000h;        # base BIOS call for print string
+            loadwordi r8, 02000000h;        # base BIOS call for print string
             loadbytei r3, 0;
 
             ## PRINT 1 ##
 
             loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
-            or r3, r5, r1;        call r3, FFh; # print distance from startingptr
+            or r3, r8, r1;        call r3, FFh; # print distance from startingptr
 
             ## END OF PRINT 1 ##
+
+            ###### TODO: print out 4 consecutive bytes ######
 
             loadbytei r3, 0;
 
@@ -362,17 +422,18 @@ class TextOnly : Game() {
 
             ## PRINT 2 ##
 
-            loadhwordi r3, 0220h; call r3, FFh; # print ' '
             loadhwordi r3, 023Ah; call r3, FFh; # print ':'
             loadhwordi r3, 0220h; call r3, FFh; # print ' '
-            or r3, r5, r2;        call r3, FFh; # print r2
+            or r3, r8, r2;        call r3, FFh; # print r2
             loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
 
             ## END OF PRINT 2 ##
 
             jmp @loop;
 
-
+            ############
+            :execute; ##
+            ############
 
 
 

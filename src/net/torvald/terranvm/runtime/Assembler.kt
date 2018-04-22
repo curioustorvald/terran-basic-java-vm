@@ -644,7 +644,7 @@ class Assembler(val vm: TerranVM) {
                     if (cmd.startsWith(labelDefinitionMarker)) {
 
                         if (line.contains(delimiters)) {
-                            throw IllegalArgumentException("missed semicolon!")
+                            throw IllegalArgumentException("missed semicolon: for line '$line'")
                         }
 
                         putLabel(cmd.drop(1).toLowerCase(), virtualPC)
