@@ -383,6 +383,9 @@ class TextOnly : Game() {
             loadhwordi r7, 020Ah;           #
             call r7, FFh;                   # print '\n'
 
+            loadhwordi r8, 023Eh;           #
+            call r8, FFh;                   # print '>'
+
             loadwordi r8, 02000000h;        # base BIOS call for print string
             or r8, r8, r1;                  #
             call r8, FFh;                   # print out new offset (aka distance)
@@ -409,22 +412,47 @@ class TextOnly : Game() {
             ## PRINT 1 ##
 
             loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
+            loadhwordi r7, 023Eh; call r7, FFh; # print '>'
             or r3, r8, r1;        call r3, FFh; # print distance from startingptr
 
             ## END OF PRINT 1 ##
-
-            ###### TODO: print out 4 consecutive bytes ######
-
-            loadbytei r3, 0;
-
-            loadbyte r2, r2, r3;            # r2 now contains whatever byte was contained in old r2
-            itox r2, r2;                    # r2 now contains string pointer for hex str
 
             ## PRINT 2 ##
 
             loadhwordi r3, 023Ah; call r3, FFh; # print ':'
             loadhwordi r3, 0220h; call r3, FFh; # print ' '
-            or r3, r8, r2;        call r3, FFh; # print r2
+
+            ## print out 4 consecutive bytes
+
+            loadbytei r3, 0;
+            # loadwordi r8, 02000000h;
+            loadhwordi r7, 0220h;
+
+            loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in old r2
+            itox r1, r1;                    # r1 now contains string pointer for hex str
+            or r1, r1, r8; call r1, FFh;    # printout r1
+
+            # call r2, FFh;                   # printout ' '
+
+            inc r2;                         #
+            loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in old r2
+            itox r1, r1;                    # r1 now contains string pointer for hex str
+            or r1, r1, r8; call r1, FFh;    # printout r1
+
+            # call r2, FFh;                   # printout ' '
+
+            inc r2;                         #
+            loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in old r2
+            itox r1, r1;                    # r1 now contains string pointer for hex str
+            or r1, r1, r8; call r1, FFh;    # printout r1
+
+            # call r2, FFh;                   # printout ' '
+
+            inc r2;                         #
+            loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in old r2
+            itox r1, r1;                    # r1 now contains string pointer for hex str
+            or r1, r1, r8; call r1, FFh;    # printout r1
+
             loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
 
             ## END OF PRINT 2 ##

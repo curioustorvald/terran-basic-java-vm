@@ -263,7 +263,10 @@ object VMOpcodesRISC {
 
     fun ITOX(dest: Register, src: Register) {
         val value = vm.readregInt(src)
-        val outString = value.toString(16).toUpperCase()
+        var outString = value.toString(16).toUpperCase()
+
+        if (outString.length % 2 == 1) outString = "0$outString" // prepend 0 if length of outstring is in odd number
+
         val strLen = outString.length + 1 // incl. null terminator
         val strPtr = vm.malloc(strLen).memAddr
         outString.forEachIndexed { index, c ->
