@@ -180,13 +180,22 @@ object VMOpcodesRISC {
         vm.writeregInt(src, vm.readregInt(dest))
         vm.writeregInt(dest, t)
     }
-    fun SMOV(dest: Register, src: Register) {
+    fun SRR(dest: Register, src: Register) {
         vm.writeregInt(dest, when (src) {
             1 -> vm.pc
             2 -> vm.sp
             3 -> vm.lr
             else -> throw IllegalArgumentException("Unknown special register index: $src")
         })
+    }
+    fun SRW(dest: Register, src: Register) {
+        val reg = vm.readregInt(src)
+        when (dest) {
+            1 -> vm.pc = reg
+            2 -> throw Exception("Security violation") //vm.sp = reg
+            3 -> throw Exception("Security violation") //vm.lr = reg
+            else -> throw IllegalArgumentException("Unknown special register index: $dest")
+        }
     }
     fun SXCHG(dest: Register, src: Register) {
         throw Exception("Security violation")
@@ -691,10 +700,10 @@ object VMOpcodesRISC {
                             }
                         }
 
-                        // SMOV/SXCHG
-                        0b10_110000 -> SMOV(Rd, Rs)
-                        0b10_110001 -> SXCHG(Rd, Rs)
-
+                        // SRR/SXCHG
+                        0b10_000000 -> SRR(Rd, Rs)
+                        0b10_000001 -> SXCHG(Rd, Rs)
+                        0b11_000000 -> SRW(Rd, Rs)
 
                         // not a scope
                         // will also be reached if MEMCPY fromAddr == toAddr == 0
@@ -891,7 +900,11 @@ object VMOpcodesRISC {
             "CALL" to 2,
             "MEMSIZE" to 2,
             "UPTIME" to 1,
-            "INT" to 1
+            "INT" to 1,
+
+            "SRR" to 2,
+            "SXCHG" to 2,
+            "SRW" to 2
     )
 
     private val returnType = hashMapOf(

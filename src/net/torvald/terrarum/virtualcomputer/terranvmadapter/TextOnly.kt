@@ -450,7 +450,7 @@ class TextOnly : Game() {
 
             inc r2;                         #
             loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in old r2
-            itox r1, r1;                    # r1 now contains string pointer for hex str
+            itox r1, r1;                    # r1 now contains string pointer for hex strW
             or r1, r1, r8; call r1, FFh;    # printout r1
 
             loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
@@ -463,9 +463,10 @@ class TextOnly : Game() {
             :execute; ##
             ############
 
+            loadwordimem r2, @startingptr;  #
+            add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
 
-
-
+            srw r1, r2;                     # pc <- r2
 
 
             jmp @loop;

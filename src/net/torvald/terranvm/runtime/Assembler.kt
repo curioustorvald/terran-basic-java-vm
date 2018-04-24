@@ -175,8 +175,9 @@ class Assembler(val vm: TerranVM) {
 
                 "HALT" to 0,
 
-                "SMOV"  to 0b10110000,
-                "SXCHG" to 0b10110001,
+                "SRR"   to 0b10000000,
+                "SXCHG" to 0b10000001,
+                "SRW"   to 0b11000000,
 
                 // Load and Store to memory //
 
@@ -289,7 +290,7 @@ class Assembler(val vm: TerranVM) {
                     else if (mathOp == 0b1001000) { // memcpy
                         "rrrrr"
                     }
-                    else if (mathOp in 0b10110000..0b10110001) { // SMOV and SXCHG
+                    else if (mathOp in 0b10000000..0b10000001 || mathOp == 0b11000000) { // SRR and SXCHG
                         "rr"
                     }
                     else {
