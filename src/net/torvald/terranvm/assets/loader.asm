@@ -5,6 +5,8 @@
 ## ALL INPUT ARE LOWER-CASE
 ## Addressing within buffer is relative; actual commands will require absolute memory adderss
 ##
+## The commands are executed whenever you hit the letter. In fact, RETURN key is never being used.
+##
 ## Syntax:
 ##      [0-9A-F]{0,8}[KPRT]
 ##
@@ -147,7 +149,7 @@ jmp @function_keys;             # derp
 
 
 :r1_ls_a;
-# TODO compare if r3 in '0'..'9'
+# compare if r3 in '0'..'9'
 # putchar and goto accept_byte_literal
 
 loadbytei r1, 30h;              # r1 <- '0'

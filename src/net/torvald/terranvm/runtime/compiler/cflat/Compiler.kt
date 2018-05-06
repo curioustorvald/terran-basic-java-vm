@@ -655,7 +655,7 @@ object Cflat {
     }
 
     fun buildTree(lineStructures: List<LineStructure>): SyntaxTreeNode {
-        fun debug1(any: Any) { if (false) println(any) }
+        fun debug1(any: Any) { if (true) println(any) }
 
 
         ///////////////////////////
@@ -688,10 +688,10 @@ object Cflat {
             val nextLineDepth = if (index != lineStructures.lastIndex) lineStructures[index + 1].depth else null
 
             debug1("buildtree!!  tokens: $tokens")
-
+            debug1("call #$index from buildTree()")
             val nodeBuilt = asTreeNode(lineNum, tokens)
             getWorkingNode().addStatement(nodeBuilt)
-
+            debug1("end call #$index from buildTree()")
 
             if (nextLineDepth != null) {
                 // has code block
@@ -986,7 +986,7 @@ object Cflat {
                     }
 
 
-                    // TODO type-awareness
+                    // TODO type-awareness of INT and FLOAT
 
                     newcmds[4] = IntermediateRepresentation(lineNumber, oldCmd)
 
@@ -1568,7 +1568,7 @@ object Cflat {
         // if TRUE, it's not a function call/def (e.g. foobar = funccall ( arg arg arg )
 
 
-        debug1("line $lineNumber; functionCallTokens: $functionCallTokens; contains tokens?: $functionCallTokensContainsTokens")
+        debug1("!!##[asTreeNode] line $lineNumber; functionCallTokens: $functionCallTokens; contains tokens?: $functionCallTokensContainsTokens")
 
         /////////////////////////////
         // unwrap (((((parens))))) //
@@ -1661,8 +1661,8 @@ object Cflat {
         //////////////////////
         // as Function Call // (also works as keyworded code block (e.g. if, for, while))
         //////////////////////
-        else if (!functionCallTokensContainsTokens && functionCallTokens != null && functionCallTokens.size == 1 &&
-                functionCallTokens.last() in codeBlockKeywords) { // e.g. if ( , while ( ,
+        else if (tokens.size >= 3 /* foo, (, ); guaranteed to be at least three */ && tokens[1] == "(" &&
+                !functionCallTokensContainsTokens && functionCallTokens != null && functionCallTokens.size == 1) { // e.g. if ( , while ( ,
             val funcName = functionCallTokens.last()
 
 
@@ -1707,6 +1707,7 @@ object Cflat {
             functionCallArguments.forEach {
                 debug1("!! forEach $it")
 
+                debug1("call from asTreeNode().asFunctionCall")
                 val argNodeLeaf = asTreeNode(lineNumber, it); argNodeLeaf.isPartOfArgumentsNode = true
                 funcCallNode.addArgument(argNodeLeaf)
             }
@@ -1731,6 +1732,7 @@ object Cflat {
                     }
 
                     newTokens.add("("); newTokens.add(")")
+                    debug1("call from asTreeNode().filterIllegalLines")
                     return asTreeNode(lineNumber, newTokens)
                 }
             }
@@ -1966,7 +1968,9 @@ object Cflat {
     fun turnInfixTokensIntoTree(lineNumber: Int, tokens: List<String>): SyntaxTreeNode {
         // based on https://stackoverflow.com/questions/1946896/conversion-from-infix-to-prefix
 
-        fun debug(any: Any) { if (false) println(any) }
+        // FIXME: differentiate parens for function call from grouping
+
+        fun debug(any: Any) { if (true) println(any) }
 
 
         fun precedenceOf(token: String): Int {
@@ -1992,8 +1996,10 @@ object Cflat {
             fun popAsTree(): SyntaxTreeNode {
                 val rawElem = treeArgsStack.pop()
 
-                if (rawElem is String)
+                if (rawElem is String) {
+                    debug("call from turnInfixTokensIntoTree().addToTree().popAsTree()")
                     return asTreeNode(lineNumber, listOf(rawElem))
+                }
                 else if (rawElem is SyntaxTreeNode)
                     return rawElem
                 else
@@ -2074,8 +2080,10 @@ object Cflat {
 
         return if (treeArgsStack.peek() is SyntaxTreeNode)
                 treeArgsStack.peek() as SyntaxTreeNode
-        else
+        else {
+            debug("call from turnInfixTokensIntoTree().if (treeArgsStack.peek() is SyntaxTreeNode).else")
             asTreeNode(lineNumber, listOf(treeArgsStack.peek() as String))
+        }
     }
 
 

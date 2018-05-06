@@ -70,6 +70,8 @@ class TextOnly : Game() {
                 return 3.3333333333333;
             }
 
+            functionfunc();
+
             z = returnsomething();
         """.trimIndent()
         val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
