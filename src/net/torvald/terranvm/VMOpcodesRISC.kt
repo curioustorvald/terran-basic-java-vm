@@ -485,7 +485,7 @@ object VMOpcodesRISC {
      * Push whatever value in the dest register into the stack
      */
     fun PUSH(dest: Register) {
-        if (vm.sp < vm.stackSize) {
+        if (vm.sp < vm.stackSize!!) {
             val value = vm.readregInt(dest)
             vm.memory[vm.ivtSize + 4 * vm.sp    ] = value.byte1()
             vm.memory[vm.ivtSize + 4 * vm.sp + 1] = value.byte2()
@@ -504,7 +504,7 @@ object VMOpcodesRISC {
      * Push memory address offset immediate into the stack
      */
     fun PUSHWORDI(offset: Int) {
-        if (vm.sp < vm.stackSize) {
+        if (vm.sp < vm.stackSize!!) {
             vm.memory[vm.ivtSize + 4 * vm.sp    ] = offset.byte1()
             vm.memory[vm.ivtSize + 4 * vm.sp + 1] = offset.byte2()
             vm.memory[vm.ivtSize + 4 * vm.sp + 2] = offset.byte3()

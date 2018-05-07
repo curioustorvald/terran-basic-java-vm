@@ -32,8 +32,12 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         000000 : 00 00 00 00 00 00 00 48 00 00 00 50 00 00 00 58 | .......H...P...X
          */
 
-        sb.append("stack: ${vm.ivtSize.toHexString()}..${(vm.ivtSize + vm.stackSize - 1).toHexString()} (size: ${vm.stackSize} bytes)\n")
-
+        if (vm.stackSize != null) {
+            sb.append("stack: ${vm.ivtSize.toHexString()}..${(vm.ivtSize + vm.stackSize!! - 1).toHexString()} (size: ${vm.stackSize} bytes)\n")
+        }
+        else {
+            sb.append("stack: not defined")
+        }
 
         // registers
         for (r in 1..8) {

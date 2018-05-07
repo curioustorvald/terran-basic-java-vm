@@ -99,7 +99,7 @@ class Assembler(val vm: TerranVM) {
 
         private var currentSection = ".CODE"
 
-        val asmSections = hashSetOf<String>(".CODE", ".DATA")
+        val asmSections = hashSetOf<String>(".CODE", ".DATA", ".STACK")
 
 
         val bitmaskRd = 0b00000001110000000000000000000000
@@ -348,7 +348,8 @@ class Assembler(val vm: TerranVM) {
         }
     }
 
-
+    private var stackSize: Int? = null
+    private var sectionChangeCount = -1
 
 
 
@@ -516,7 +517,7 @@ class Assembler(val vm: TerranVM) {
         return intArrayOf(resultingOpcode)
     }
 
-    operator fun invoke(userProgram: String): ByteArray {
+    operator fun invoke(userProgram: String): ProgramImage {
 
         resetStatus()
         val ret = ArrayList<Byte>()
@@ -567,7 +568,15 @@ class Assembler(val vm: TerranVM) {
 
                 if (asmSections.contains(cmd)) { // sectioning commands
                     currentSection = cmd
+                    sectionChangeCount++
                     // will continue to next statements
+                }
+                else if (currentSection == ".STACK") {
+                    if (stackSize != null) throw Error("Stack already been defined with size of $stackSize")
+                    if (sectionChangeCount != 0) throw Error("Stack definition must be the first command of the program")
+
+                    stackSize = words[0].toInt()
+                    virtualPC += 4 * stackSize!!
                 }
                 else if (currentSection == ".DATA") { // setup DB
 
@@ -705,6 +714,11 @@ class Assembler(val vm: TerranVM) {
                     currentSection = cmd
                     // will continue to next statements
                 }
+                else if (currentSection == ".STACK") {
+                    repeat(stackSize ?: 0) {
+                        addWord(-1)
+                    }
+                }
                 else if (currentSection == ".DATA") { // setup DB
 
                     // insert JMP instruction that jumps to .code section
@@ -827,7 +841,7 @@ class Assembler(val vm: TerranVM) {
 
         debug("======== Assembler: Done! ========")
 
-        return ret.toByteArray()
+        return ProgramImage(stackSize ?: 0, ret.toByteArray())
     }
 
     private fun String.toRegInt() =
@@ -855,3 +869,8 @@ class Assembler(val vm: TerranVM) {
                 throw UnsupportedOperationException("Couldn't convert this to integer: '$this'")
 
 }
+
+/**
+ * @param bytes entire image of the program, including stack area
+ */
+data class ProgramImage(val stackSize: Int, val bytes: ByteArray)

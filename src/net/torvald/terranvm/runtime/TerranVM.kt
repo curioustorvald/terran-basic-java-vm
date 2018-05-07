@@ -19,7 +19,7 @@ typealias Number = Double
  * Created by minjaesong on 2017-05-09.
  */
 class TerranVM(inMemSize: Int,
-               var stackSize: Int = inMemSize.ushr(4).shl(2),
+               //var stackSize: Int = inMemSize.ushr(4).shl(2),
                var stdout: OutputStream = System.out,
                var stdin: InputStream = System.`in`,
                var suppressWarnings: Boolean = false,
@@ -32,6 +32,9 @@ class TerranVM(inMemSize: Int,
 
     private val DEBUG = true
     private val ERROR = true
+
+    var stackSize: Int? = null
+        private set
 
     class Pointer(val parent: TerranVM, memoryAddress: Int, type: PointerType = Pointer.PointerType.BYTE, val noCast: Boolean = false) {
         /*
@@ -289,7 +292,7 @@ class TerranVM(inMemSize: Int,
     internal val memory = ByteArray(memSize)
 
     val ivtSize = 4 * TerranVM.interruptCount
-    val programSpaceStart: Int; get() = ivtSize + stackSize
+    val programSpaceStart: Int; get() = ivtSize
     var userSpaceStart: Int? = null // lateinit
         private set
 
@@ -404,7 +407,11 @@ class TerranVM(inMemSize: Int,
         hardReset()
     }
 
-    fun loadProgram(opcodes: ByteArray) {
+    fun loadProgram(programImage: ProgramImage) {
+        val opcodes = programImage.bytes
+        stackSize = programImage.stackSize
+
+
         if (opcodes.size + programSpaceStart >= memory.size) {
             throw Error("Out of memory -- required: ${opcodes.size + programSpaceStart} (${opcodes.size} for program), installed: ${memory.size}")
         }
@@ -422,7 +429,7 @@ class TerranVM(inMemSize: Int,
         memory[opcodes.size + programSpaceStart + 3] = 0
 
 
-        pc = programSpaceStart
+        pc = programSpaceStart + stackSize!! * 4
         userSpaceStart = programSpaceStart + opcodes.size + 1
 
         userSpaceStart = userSpaceStart!! + setDefaultInterrupts() // renew userSpaceStart after interrupts
@@ -442,7 +449,7 @@ loadhwordi r1, 024Dh; call r1, FFh; # M
 loadhwordi r1, 0245h; call r1, FFh; # E
 loadhwordi r1, 024Dh; call r1, FFh; # M
 halt;
-""")
+""").bytes
         val intSegfault = assembler("""
 loadhwordi r1, 0253h; call r1, FFh; # S
 loadhwordi r1, 0245h; call r1, FFh; # E
@@ -450,7 +457,7 @@ loadhwordi r1, 0247h; call r1, FFh; # G
 loadhwordi r1, 0246h; call r1, FFh; # F
 loadhwordi r1, 0255h; call r1, FFh; # U
 halt;
-""")
+""").bytes
         val intDivZero = assembler("""
 loadhwordi r1, 0244h; call r1, FFh; # D
 loadhwordi r1, 0249h; call r1, FFh; # I
@@ -458,7 +465,7 @@ loadhwordi r1, 0256h; call r1, FFh; # V
 loadhwordi r1, 022Fh; call r1, FFh; # /
 loadhwordi r1, 0230h; call r1, FFh; # 0
 halt;
-""")
+""").bytes
         val intIllegalOp = assembler("""
 loadhwordi r1, 0249h; call r1, FFh; # I
 loadhwordi r1, 024Ch; call r1, FFh; # L
@@ -466,7 +473,7 @@ loadhwordi r1, 024Ch; call r1, FFh; # L
 loadhwordi r1, 024Fh; call r1, FFh; # O
 loadhwordi r1, 0250h; call r1, FFh; # P
 halt;
-""")
+""").bytes
         val intStackOverflow = assembler("""
 loadhwordi r1, 0253h; call r1, FFh; # S
 loadhwordi r1, 0254h; call r1, FFh; # T
@@ -474,7 +481,7 @@ loadhwordi r1, 024Fh; call r1, FFh; # O
 loadhwordi r1, 0256h; call r1, FFh; # V
 loadhwordi r1, 0246h; call r1, FFh; # F
 halt;
-""")
+""").bytes
         val intMathFuck = assembler("""
 loadhwordi r1, 024Dh; call r1, FFh; # M
 loadhwordi r1, 0254h; call r1, FFh; # T
@@ -482,7 +489,7 @@ loadhwordi r1, 0246h; call r1, FFh; # F
 loadhwordi r1, 0243h; call r1, FFh; # C
 loadhwordi r1, 024Bh; call r1, FFh; # K
 halt;
-""")
+""").bytes
 
         val intOOMPtr = malloc(intOOM.size)
         val intSegfaultPtr = malloc(intSegfault.size)
@@ -617,14 +624,9 @@ halt;
         // reset system uptime timer
         uptimeHolder = 0L
 
-        // erase memory
+        // wipe memory
         for (i in 0 until memSize step 4) {
             System.arraycopy(bytes_00000000, 0, memory, i, 4)
-        }
-
-        // erase-mark stack area with FF for easier debugging with memvwr
-        for (i in 0 until stackSize step 4) {
-            System.arraycopy(bytes_ffffffff, 0, memory, ivtSize + i, 4)
         }
     }
 

@@ -1,3 +1,7 @@
+package net.torvald.terranvm.assets
+
+object Loader {
+    operator fun invoke() = """
 ## LOADER
 ##
 ## The most basic firmware that reads hexadecimal machine code, writes them to the memory and then executes it
@@ -19,6 +23,11 @@
 ## Created by minjaesong on 2018-04-16
 
 
+
+## TODO: support backspace key
+
+
+.stack; 16;
 
 .data;
 string loadertext "LOADER
@@ -357,3 +366,5 @@ srw r1, r2;                     # pc <- r2
 
 
 jmp @loop;
+"""
+}
