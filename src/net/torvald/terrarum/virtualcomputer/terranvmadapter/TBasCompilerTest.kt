@@ -13,15 +13,15 @@ import net.torvald.terranvm.assets.Loader
 import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
 import net.torvald.terranvm.runtime.TerranVM
-import net.torvald.terranvm.runtime.compiler.cflat.Cflat
+import net.torvald.terranvm.runtime.compiler.tbasic.Tbasic
 import net.torvald.terranvm.runtime.toUint
 import net.torvald.terranvm.toReadableBin
 import net.torvald.terranvm.toReadableOpcode
 
 /**
- * Created by minjaesong on 2017-11-17.
+ * Created by minjaesong on 2018-05-08.
  */
-class TextOnly : Game() {
+class TBasCompilerTest : Game() {
 
     lateinit var background: Texture
     lateinit var execLed: Texture
@@ -59,104 +59,16 @@ class TextOnly : Game() {
 
 
         val assembler = Assembler(vm)
+        val tbas = Tbasic()
 
 
-        /*val testProgram = """
-            float x;
-            float y;
-            float z;
-            float z1;
-
-            float returnsomething() {
-                return 3.3333333333333;
-            }
-
-            functionfunc();
-
-            z = returnsomething();
-        """.trimIndent()
-        val program = Cflat.buildTree(Cflat.tokenise(Cflat.preprocess(testProgram)))
-
-        println(program)
-
-        val notatedProgram = Cflat.treeToProperNotation(program)
-
-        val programInIR = Cflat.notationToIR(notatedProgram)
-        val programInNewIR = Cflat.preprocessIR(programInIR)
-        val programASM = Cflat.IRtoASM(programInNewIR)
-        val programImage = assembler(programASM.joinToString("\n"))
-        val code = programImage.bytes*/
-
-
-        val programImage = assembler(Loader())
-        val code = programImage.bytes
-
-
-        //val mdaFiller = assembler("loadbytei r1, 0;loadbytei r2, 3;:loope;inc r1;storebyte r1, r1, r2;jmp @loope;")
-
-
-        /*val intFloatTest = assembler("""
-            #loadbytei r1, 42;
-            #loadbytei r2, 42f;
-            loadwordi r1, 42;
-            loadwordi r2, 42f;
-        """.trimIndent())*/
-
-        /*val biosEchoTest = assembler("""
-            jmp @code;
-
-            :getchar; # r1 <- char
-            loadwordi r1, 00000100h;
-            call r1, FFh;
-            return;
-
-            :putchar; # push char first before call; garbles r2
-            pop r2; # return addr
-            pop r1; # actual arg
-            push r2;
-            loadwordi r2, 00000200h;
-            or r1, r1, r2;
-            call r1, FFh;
-            return;
-
-
-            :code;
-
-            loadhwordi r1, 40h; push r1;
-            loadhwordi r1, 43h; push r1;
-            loadhwordi r1, 42h; push r1;
-            loadhwordi r1, 41h; push r1;
-            jsri @putchar;
-            jsri @putchar;
-            jsri @putchar;
-            jsri @putchar;
-
-            :loop;
-            jsri @getchar;
-            push r1;
-            jsri @putchar;
-            jmp @loop;
-
-        """.trimIndent())*/
-
-
-        println("ASM size: ${code.size} (word-aligned: ${if (code.size % 4 == 0) "yes" else "HELL NAW!"})")
-        code.printASM()
-
-        vm.loadProgram(programImage)
-        vm.delayInMills = vmDelay
+        val basPrg = """10 PRINT "HELLO WORLD""""
+        val lineStructure = tbas.tokeniseLine(basPrg)
+        println(lineStructure)
 
 
 
-        memvwr = Memvwr(vm)
-
-
-        Gdx.input.inputProcessor = TVMInputProcessor(vm)
-
-
-        vmThread = Thread(vm)
-        vmThread.start()
-
+        System.exit(0)
     }
 
     private val height: Int; get() = Gdx.graphics.height
@@ -213,7 +125,6 @@ class TextOnly : Game() {
     override fun dispose() {
         background.dispose()
         execLed.dispose()
-        waitLed.dispose()
     }
 
     private inline fun SpriteBatch.inUse(action: () -> Unit) {
@@ -260,15 +171,6 @@ class TextOnly : Game() {
 
 }
 
-fun ByteArray.printASM() {
-    for (i in 0 until this.size step 4) {
-        val b = this[i].toUint() or this[i + 1].toUint().shl(8)  or this[i + 2].toUint().shl(16)  or this[i + 3].toUint().shl(24)
-
-        print("${b.toReadableBin()}; ")
-        print("${b.toReadableOpcode()}\n")
-    }
-}
-
 fun main(args: Array<String>) {
     val config = LwjglApplicationConfiguration()
     config.width = 1106
@@ -276,5 +178,5 @@ fun main(args: Array<String>) {
     config.foregroundFPS = 0
     config.resizable = false
 
-    LwjglApplication(TextOnly(), config)
+    LwjglApplication(TBasCompilerTest(), config)
 }

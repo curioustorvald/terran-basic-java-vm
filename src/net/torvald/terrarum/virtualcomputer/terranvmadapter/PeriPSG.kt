@@ -34,7 +34,7 @@ import net.torvald.terranvm.runtime.GdxPeripheralWrapper
  *
  * Created by minjaesong on 2017-12-17.
  */
-class PeriPSG : GdxPeripheralWrapper(24) {
+open class PeriPSG : GdxPeripheralWrapper(24) {
 
     override fun render(batch: SpriteBatch, delta: Float, offsetX: Float, offsetY: Float) { }
 

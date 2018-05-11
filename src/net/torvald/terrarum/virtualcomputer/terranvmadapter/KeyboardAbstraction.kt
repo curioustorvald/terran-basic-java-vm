@@ -9,7 +9,7 @@ import net.torvald.terranvm.runtime.toUint
 /**
  * Created by minjaesong on 2017-11-23.
  */
-class KeyboardAbstraction(val vm: TerranVM) : GdxPeripheralWrapper(16) {
+open class KeyboardAbstraction(val vm: TerranVM) : GdxPeripheralWrapper(16) {
 
 
     private var getKeyRequested = false

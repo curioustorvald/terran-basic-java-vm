@@ -36,7 +36,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
             sb.append("stack: ${vm.ivtSize.toHexString()}..${(vm.ivtSize + vm.stackSize!! - 1).toHexString()} (size: ${vm.stackSize} bytes)\n")
         }
         else {
-            sb.append("stack: not defined")
+            sb.append("stack: not defined\n")
         }
 
         // registers

@@ -443,6 +443,7 @@ class TerranVM(inMemSize: Int,
     private fun setDefaultInterrupts(): Int {
         val assembler = Assembler(this)
         val intOOM = assembler("""
+            .code;
 loadhwordi r1, 024Eh; call r1, FFh; # N
 loadhwordi r1, 024Fh; call r1, FFh; # O
 loadhwordi r1, 024Dh; call r1, FFh; # M
@@ -451,6 +452,7 @@ loadhwordi r1, 024Dh; call r1, FFh; # M
 halt;
 """).bytes
         val intSegfault = assembler("""
+            .code;
 loadhwordi r1, 0253h; call r1, FFh; # S
 loadhwordi r1, 0245h; call r1, FFh; # E
 loadhwordi r1, 0247h; call r1, FFh; # G
@@ -459,6 +461,7 @@ loadhwordi r1, 0255h; call r1, FFh; # U
 halt;
 """).bytes
         val intDivZero = assembler("""
+            .code;
 loadhwordi r1, 0244h; call r1, FFh; # D
 loadhwordi r1, 0249h; call r1, FFh; # I
 loadhwordi r1, 0256h; call r1, FFh; # V
@@ -467,6 +470,7 @@ loadhwordi r1, 0230h; call r1, FFh; # 0
 halt;
 """).bytes
         val intIllegalOp = assembler("""
+            .code;
 loadhwordi r1, 0249h; call r1, FFh; # I
 loadhwordi r1, 024Ch; call r1, FFh; # L
 loadhwordi r1, 024Ch; call r1, FFh; # L
@@ -475,6 +479,7 @@ loadhwordi r1, 0250h; call r1, FFh; # P
 halt;
 """).bytes
         val intStackOverflow = assembler("""
+            .code;
 loadhwordi r1, 0253h; call r1, FFh; # S
 loadhwordi r1, 0254h; call r1, FFh; # T
 loadhwordi r1, 024Fh; call r1, FFh; # O
@@ -483,6 +488,7 @@ loadhwordi r1, 0246h; call r1, FFh; # F
 halt;
 """).bytes
         val intMathFuck = assembler("""
+            .code;
 loadhwordi r1, 024Dh; call r1, FFh; # M
 loadhwordi r1, 0254h; call r1, FFh; # T
 loadhwordi r1, 0246h; call r1, FFh; # F

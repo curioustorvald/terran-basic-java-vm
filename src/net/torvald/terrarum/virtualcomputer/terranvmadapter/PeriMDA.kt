@@ -14,13 +14,12 @@ import java.util.*
 /**
  * Created by minjaesong on 2017-11-18.
  */
-class PeriMDA(val W: Int = 80, val H: Int = 25,
-              val vmExecDelay: Int? = null,
-              val vmInstPerMill: Int? = null
-) : GdxPeripheralWrapper(W * H) {
-
-    val lcdFont: BitmapFont = LCDFont()
-
+open class PeriMDA(val W: Int = 80, val H: Int = 25, 
+                   val vmExecDelay: Int? = null, 
+                   val vmInstPerMill: Int? = null, 
+                   newMemSize: Int? = null,
+                   val font: BitmapFont? = LCDFont()
+) : GdxPeripheralWrapper(newMemSize ?: (W * H)) {
 
     var cursorBlink = true
     var cursorX = 0
@@ -30,6 +29,7 @@ class PeriMDA(val W: Int = 80, val H: Int = 25,
     var scrollY = 0
 
     /**
+     * 0x000t: change "page"/framebuffer
      * 0x00bb: cursorblink; 00: false, ff: true
      * 0x01bb: change graphics mode (if supported)
      * 0x02bb: text cursor X position 0-255
@@ -79,12 +79,12 @@ class PeriMDA(val W: Int = 80, val H: Int = 25,
         for (y in 0 until H) {
             for (x in 0 until W) {
                 val char = getByte(x, y).toChar()
-                lcdFont.draw(batch, "$char", offsetX + 12 * x, height - 16 - (offsetY + 16 * y))
+                font?.draw(batch, "$char", offsetX + 12 * x, height - 16 - (offsetY + 16 * y))
             }
         }
 
         if (cursorBlink && blinkOn) {
-            lcdFont.draw(batch, "${0xdb.toChar()}", offsetX + 12 * (cursorX), height - 16 - (offsetY + 16 * minOf(cursorY, H - 1)))
+            font?.draw(batch, "${0xdb.toChar()}", offsetX + 12 * (cursorX), height - 16 - (offsetY + 16 * minOf(cursorY, H - 1)))
         }
     }
 
@@ -178,7 +178,7 @@ class PeriMDA(val W: Int = 80, val H: Int = 25,
     }
 
     override fun dispose() {
-        lcdFont.dispose()
+        font?.dispose()
     }
 
     val TABSIZE = 4

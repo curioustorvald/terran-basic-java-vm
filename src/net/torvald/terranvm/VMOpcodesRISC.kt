@@ -426,14 +426,18 @@ object VMOpcodesRISC {
      * @param fromOff memory address to read
      * @param toOff   memory address to write
      */
-    fun MEMCPY(dest: Register, src: Register, len: Register, fromAddr: Register, toAddr: Register) {
-        val srcMem = if (vm.readregInt(src) == 0) vm.memory else vm.peripherals[vm.readregInt(src)]!!.memory
-        val destMem = if (vm.readregInt(dest) == 0) vm.memory else vm.peripherals[vm.readregInt(dest)]!!.memory
-        val cpyLen = vm.readregInt(len)
+    fun MEMCPY(dsl: Register, fromAddr: Register, toAddr: Register) {
+        val dsl = vm.readregInt(dsl)
+        val src = dsl.and(0xFF)
+        val dest = dsl.ushr(8).and(0xFF)
+        val len = dsl.ushr(16).and(0xFFFF)
+
+        val srcMem = if (src == 0) vm.memory else vm.peripherals[src]!!.memory
+        val destMem = if (dest == 0) vm.memory else vm.peripherals[dest]!!.memory
         val fromAddr = vm.readregInt(fromAddr)
         val toAddr = vm.readregInt(toAddr)
 
-        System.arraycopy(srcMem, fromAddr, destMem, toAddr, cpyLen)
+        System.arraycopy(srcMem, fromAddr, destMem, toAddr, len)
     }
 
 
@@ -605,8 +609,6 @@ object VMOpcodesRISC {
         val Rd = opcode.and(0b00000001110000000000000000000000).ushr(22) + 1
         val Rs = opcode.and(0b00000000001110000000000000000000).ushr(19) + 1
         val Rm = opcode.and(0b00000000000001110000000000000000).ushr(16) + 1
-        val R4 = opcode.and(0b00000000000000001110000000000000).ushr(13) + 1
-        val R5 = opcode.and(0b00000000000000000001110000000000).ushr(10) + 1
         val cond = opcode.ushr(29)
         val offset = opcode.and(0x3F_FFFF)
 
@@ -625,8 +627,12 @@ object VMOpcodesRISC {
 
         execInCond { when (opcode.ushr(25).and(0b1111)) {
             0b0000 -> {
+                // Memory copy
+                if (opcode.and(0b1111111111) == 0b0001001000) {
+                    MEMCPY(Rd, Rs, Rm)
+                }
                 // Mathematical and Register data transfer
-                if (opcode.and(0xFF00) == 0) {
+                else if (opcode.and(0xFF00) == 0) {
                     when (opcode.and(0xFF)) {
                         0 -> HALT()
 
@@ -707,12 +713,8 @@ object VMOpcodesRISC {
 
                         // not a scope
                         // will also be reached if MEMCPY fromAddr == toAddr == 0
-                        else -> throw NullPointerException()
+                        else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
                     }
-                }
-                // Memory copy
-                else if (opcode.and(0b1111111111) == 0b0001001000) {
-                    MEMCPY(Rd, Rs, Rm, R4, R5)
                 }
                 else {
                     throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
@@ -875,7 +877,7 @@ object VMOpcodesRISC {
             "INC" to 1,
             "DEC" to 1,
 
-            "MEMCPY" to 5,
+            "MEMCPY" to 3,
             "CMP" to 2,
             "CMPII" to 2,
             "CMPIF" to 2,

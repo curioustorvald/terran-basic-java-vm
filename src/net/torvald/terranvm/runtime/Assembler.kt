@@ -29,7 +29,6 @@ import net.torvald.terranvm.toReadableOpcode
  *
  * Supported sections:
  * - data
- * - func
  * - code
  *
  * Indentation after section header is optional (and you probably don't want it anyway).
@@ -246,7 +245,7 @@ class Assembler(val vm: TerranVM) {
 
                 // Assembler-specific commands //
 
-                "NOP" to 0b000_0000_000_000_000_0000000000_100000 // MOV r1, r1
+                "NOP" to 0b000_0000_000_000_000_0000000000_110000 // MOV r1, r1
         )
         val opcodes = HashMap<String, Int>()
 
@@ -288,7 +287,7 @@ class Assembler(val vm: TerranVM) {
                         "rrr"
                     }
                     else if (mathOp == 0b1001000) { // memcpy
-                        "rrrrr"
+                        "rrr"
                     }
                     else if (mathOp in 0b10000000..0b10000001 || mathOp == 0b11000000) { // SRR and SXCHG
                         "rr"
@@ -465,7 +464,7 @@ class Assembler(val vm: TerranVM) {
         var resultingOpcode = opcodes[cmd]!!
 
 
-        if (line == "NOP") {
+        if (line.toUpperCase() == "NOP") {
             return assemblyToOpcode("MOV r1, r1")
         }
         else {
