@@ -28,6 +28,11 @@ class PoketchDotHelper(val pictW: Int, val pictH: Int) : JFrame() {
     val menuPanel = JPanel()
 
     init {
+        if (pictW % 8 != 0) {
+            throw IllegalArgumentException("Picture width must be multiple of 8")
+        }
+
+
         pixelsCheckBox.forEach {
             pixelsGrid.add(it)
         }
@@ -89,7 +94,7 @@ class PoketchDotHelper(val pictW: Int, val pictH: Int) : JFrame() {
                 appended++
 
 
-                if (appended == 8) {
+                if (appended == pictW / 4) {
                     appended = 0
                     sb.append('\n')
                 }
@@ -102,5 +107,5 @@ class PoketchDotHelper(val pictW: Int, val pictH: Int) : JFrame() {
 }
 
 fun main(args: Array<String>) {
-    PoketchDotHelper(8,24)
+    PoketchDotHelper(24,10)
 }

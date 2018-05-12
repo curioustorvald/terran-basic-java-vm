@@ -104,8 +104,6 @@ class Assembler(val vm: TerranVM) {
         val bitmaskRd = 0b00000001110000000000000000000000
         val bitmaskRs = 0b00000000001110000000000000000000
         val bitmaskRm = 0b00000000000001110000000000000000
-        val bitmaskR4 = 0b00000000000000001110000000000000
-        val bitmaskR5 = 0b00000000000000000001110000000000
         val bitmaskCond = 0b11100000000000000000000000000000
         val conditions: HashMap<String, Int> = hashMapOf(
                 "" to 0,
@@ -616,15 +614,15 @@ class Assembler(val vm: TerranVM) {
                         "BYTES" -> {
                             (2..words.lastIndex).forEach {
                                 if (words[it].matches(regexDecBinHexWhole) && words[it].resolveInt() in 0..255) { // byte literal
-                                    //debug("--> Byte literal payload: ${words[it].toInt()}")
+                                    debug("--> Byte literal payload: ${words[it]}")
                                     // write bytes
                                     virtualPC += 1
                                 }
-                                /*else if (words[it].startsWith(labelMarker)) {
-                                    //debug("--> Byte literal payload (label): ${words[it]}")
+                                else if (words[it].startsWith(labelMarker)) {
+                                    debug("--> Byte label payload: ${words[it]}")
                                     // write bytes
                                     virtualPC += 4
-                                }*/
+                                }
                                 else {
                                     throw IllegalArgumentException("Illegal byte literal ${words[it]}")
                                 }
@@ -768,7 +766,10 @@ class Assembler(val vm: TerranVM) {
                             number.toLittle().forEach { ret.add(it) }
                         }
                         "INT" -> {
-                            val int = words[2].toInt()
+                            val int = if (words[2].startsWith(labelMarker)) {
+                                labelTable[words[2]] ?: throw NullPointerException("Undefined label: ${words[2]}")
+                            }
+                            else words[2].toInt()
 
                             debug("--> Int payload: '$int'")
 
@@ -781,12 +782,12 @@ class Assembler(val vm: TerranVM) {
                                     debug("--> Byte literal payload: ${words[it].resolveInt()}")
                                     addByte(words[it].resolveInt().toByte())
                                 }
-                                /*else if (words[it].startsWith(labelMarker)) {
+                                else if (words[it].startsWith(labelMarker)) {
                                     debug("--> Byte literal payload (label): ${words[it]}")
                                     getLabel(words[it]).toLittle().forEach {
                                         ret.add(it)
                                     }
-                                }*/
+                                }
                                 else {
                                     throw IllegalArgumentException("Illegal byte literal ${words[it]}")
                                 }
