@@ -240,6 +240,18 @@ object VMOpcodesRISC {
     }
 
     fun HALT() { vm.terminate = true }
+    fun YIELD() {
+        if (vm.isPaused) {
+            throw Error("VM is already paused")
+        }
+        vm.yieldFlagged = true
+    }
+    fun PAUSE() {
+        if (vm.isPaused) {
+            throw Error("VM is already paused")
+        }
+        vm.pauseExec()
+    }
 
     @Strictfp fun FTOI(dest: Register, src: Register) { vm.writeregInt(dest, vm.readregFloat(src).toInt()) }
     @Strictfp fun ITOF(dest: Register, src: Register) { vm.writeregFloat(dest, vm.readregInt(src).toFloat()) }
@@ -635,6 +647,8 @@ object VMOpcodesRISC {
                 else if (opcode.and(0xFF00) == 0) {
                     when (opcode.and(0xFF)) {
                         0 -> HALT()
+                        32 -> YIELD()
+                        42 -> PAUSE()
 
                         1 -> ADD(Rd, Rs, Rm)
                         2 -> SUB(Rd, Rs, Rm)

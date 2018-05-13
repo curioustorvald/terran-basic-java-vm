@@ -171,6 +171,8 @@ class Assembler(val vm: TerranVM) {
                 "NOT" to 0b011111,
 
                 "HALT" to 0,
+                "YIELD" to 32,
+                "PAUSE" to 42,
 
                 "SRR"   to 0b10000000,
                 "SXCHG" to 0b10000001,

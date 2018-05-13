@@ -24,7 +24,7 @@ class TerranVM(inMemSize: Int,
                var stdin: InputStream = System.`in`,
                var suppressWarnings: Boolean = false,
          // following is an options for TerranVM's micro operation system
-               val tbasic_remove_string_dupes: Boolean = false // only meaningful for TBASIC TODO: turning this on makes it run faster?!
+               val doNotInstallInterrupts: Boolean = false
 ) : Runnable {
     private val memSize = inMemSize.ushr(2).shl(2)
     val bytes_ffffffff = (-1).toLittle()
@@ -141,7 +141,7 @@ class TerranVM(inMemSize: Int,
             (0..7).forEach { parent.memory[memAddr + it] = long.ushr(8 * it).and(0xFF).toByte() }
         }
         fun write(byteArray: ByteArray) {
-            if (parent.memory.size < memAddr + byteArray.size) throw ArrayIndexOutOfBoundsException("Out of memory; couldn't install default interrupts")
+            if (parent.memory.size < memAddr + byteArray.size) throw ArrayIndexOutOfBoundsException("Out of memory")
             System.arraycopy(byteArray, 0, parent.memory, memAddr, byteArray.size)
         }
         fun write(string: String) {
@@ -440,9 +440,13 @@ class TerranVM(inMemSize: Int,
         warn("Program loaded; pc: $pcHex, userSpaceStart: $userSpaceStart (${userSpaceStart?.toHexString()})")
     }
 
+    /**
+     * @return size of the interrupts. 0 if doNotInstallInterrupts == true
+     */
     private fun setDefaultInterrupts(): Int {
-        val assembler = Assembler(this)
-        val intOOM = assembler("""
+        if (!doNotInstallInterrupts) {
+            val assembler = Assembler(this)
+            val intOOM = assembler("""
             .code;
 loadhwordi r1, 024Eh; call r1, FFh; # N
 loadhwordi r1, 024Fh; call r1, FFh; # O
@@ -451,7 +455,7 @@ loadhwordi r1, 0245h; call r1, FFh; # E
 loadhwordi r1, 024Dh; call r1, FFh; # M
 halt;
 """).bytes
-        val intSegfault = assembler("""
+            val intSegfault = assembler("""
             .code;
 loadhwordi r1, 0253h; call r1, FFh; # S
 loadhwordi r1, 0245h; call r1, FFh; # E
@@ -460,7 +464,7 @@ loadhwordi r1, 0246h; call r1, FFh; # F
 loadhwordi r1, 0255h; call r1, FFh; # U
 halt;
 """).bytes
-        val intDivZero = assembler("""
+            val intDivZero = assembler("""
             .code;
 loadhwordi r1, 0244h; call r1, FFh; # D
 loadhwordi r1, 0249h; call r1, FFh; # I
@@ -469,7 +473,7 @@ loadhwordi r1, 022Fh; call r1, FFh; # /
 loadhwordi r1, 0230h; call r1, FFh; # 0
 halt;
 """).bytes
-        val intIllegalOp = assembler("""
+            val intIllegalOp = assembler("""
             .code;
 loadhwordi r1, 0249h; call r1, FFh; # I
 loadhwordi r1, 024Ch; call r1, FFh; # L
@@ -478,7 +482,7 @@ loadhwordi r1, 024Fh; call r1, FFh; # O
 loadhwordi r1, 0250h; call r1, FFh; # P
 halt;
 """).bytes
-        val intStackOverflow = assembler("""
+            val intStackOverflow = assembler("""
             .code;
 loadhwordi r1, 0253h; call r1, FFh; # S
 loadhwordi r1, 0254h; call r1, FFh; # T
@@ -487,7 +491,7 @@ loadhwordi r1, 0256h; call r1, FFh; # V
 loadhwordi r1, 0246h; call r1, FFh; # F
 halt;
 """).bytes
-        val intMathFuck = assembler("""
+            val intMathFuck = assembler("""
             .code;
 loadhwordi r1, 024Dh; call r1, FFh; # M
 loadhwordi r1, 0254h; call r1, FFh; # T
@@ -497,43 +501,46 @@ loadhwordi r1, 024Bh; call r1, FFh; # K
 halt;
 """).bytes
 
-        val intOOMPtr = malloc(intOOM.size)
-        val intSegfaultPtr = malloc(intSegfault.size)
-        val intDivZeroPtr = malloc(intDivZero.size)
-        val intIllegalOpPtr = malloc(intIllegalOp.size)
-        val intStackOvflPtr = malloc(intStackOverflow.size)
-        val intMathErrPtr = malloc(intMathFuck.size)
+            val intOOMPtr = malloc(intOOM.size)
+            val intSegfaultPtr = malloc(intSegfault.size)
+            val intDivZeroPtr = malloc(intDivZero.size)
+            val intIllegalOpPtr = malloc(intIllegalOp.size)
+            val intStackOvflPtr = malloc(intStackOverflow.size)
+            val intMathErrPtr = malloc(intMathFuck.size)
 
-        intOOMPtr.write(intOOM)
-        intSegfaultPtr.write(intSegfault)
-        intDivZeroPtr.write(intDivZero)
-        intIllegalOpPtr.write(intIllegalOp)
-        intStackOvflPtr.write(intStackOverflow)
-        intMathErrPtr.write(intMathFuck)
+            intOOMPtr.write(intOOM)
+            intSegfaultPtr.write(intSegfault)
+            intDivZeroPtr.write(intDivZero)
+            intIllegalOpPtr.write(intIllegalOp)
+            intStackOvflPtr.write(intStackOverflow)
+            intMathErrPtr.write(intMathFuck)
 
-        r3 = 0
+            r3 = 0
 
-        r1 = intOOMPtr.memAddr
-        r2 = INT_OUT_OF_MEMORY * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 3)
-        r1 = intSegfaultPtr.memAddr
-        r2 = INT_SEGFAULT * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 3)
-        r1 = intDivZeroPtr.memAddr
-        r2 = INT_DIV_BY_ZERO * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 3)
-        r1 = intIllegalOpPtr.memAddr
-        r2 = INT_ILLEGAL_OP * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 3)
-        r1 = intStackOvflPtr.memAddr
-        r2 = INT_STACK_OVERFLOW * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 3)
-        r1 = intMathErrPtr.memAddr
-        r2 = INT_MATH_ERROR * 4
-        VMOpcodesRISC.STOREWORD(2, 1, 3)
+            r1 = intOOMPtr.memAddr
+            r2 = INT_OUT_OF_MEMORY * 4
+            VMOpcodesRISC.STOREWORD(2, 1, 3)
+            r1 = intSegfaultPtr.memAddr
+            r2 = INT_SEGFAULT * 4
+            VMOpcodesRISC.STOREWORD(2, 1, 3)
+            r1 = intDivZeroPtr.memAddr
+            r2 = INT_DIV_BY_ZERO * 4
+            VMOpcodesRISC.STOREWORD(2, 1, 3)
+            r1 = intIllegalOpPtr.memAddr
+            r2 = INT_ILLEGAL_OP * 4
+            VMOpcodesRISC.STOREWORD(2, 1, 3)
+            r1 = intStackOvflPtr.memAddr
+            r2 = INT_STACK_OVERFLOW * 4
+            VMOpcodesRISC.STOREWORD(2, 1, 3)
+            r1 = intMathErrPtr.memAddr
+            r2 = INT_MATH_ERROR * 4
+            VMOpcodesRISC.STOREWORD(2, 1, 3)
 
 
-        return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
+            return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
+        }
+
+        return 0;
     }
 
     fun softReset() {
@@ -578,6 +585,8 @@ halt;
         lr = 0
         lr2 = 0
         //... but don't reset the uptime
+        resumeExec()
+        yieldRequested = false
     }
 
     fun swapRegisterSet() {
@@ -645,6 +654,8 @@ halt;
     fun execDebugError(any: Any?) { if (ERROR) System.err.println(any) }
 
     private var pauseRequested = false
+    private var yieldRequested = false
+    var yieldFlagged = false
     var isPaused = false // is this actually paused?
         private set
 
@@ -653,12 +664,17 @@ halt;
     }
 
     fun resumeExec() {
-        vmThread!!.resume()
+        vmThread?.resume()
         isPaused = false
     }
 
+    /**
+     * resume execution with resumeExec()
+     */
+    fun requestToYield() {
+        yieldRequested = true
+    }
 
-    val lock = this as java.lang.Object
 
     val pcHex: String; get() = pc.toLong().and(0xffffffff).toString(16).toUpperCase() + "h"
 
@@ -694,6 +710,14 @@ halt;
                     isPaused = true
                     vmThread!!.suspend() // fuck it, i'll use this anyway
                     pauseRequested = false
+                }
+
+                if (yieldRequested && yieldFlagged) {
+                    println("[TerranVM] VM is paused due to yield request")
+                    isPaused = true
+                    vmThread!!.suspend() // fuck it, i'll use this anyway
+                    yieldRequested = false
+                    yieldFlagged = false
                 }
 
 
