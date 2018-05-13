@@ -31,7 +31,7 @@ open class PeriRTC(val vm: TerranVM) : VMPeripheralWrapper(0) {
      *
      * 5: day of the month
      *
-     * 6: month (0 - January)
+     * 6: month (1 - January)
      *
      * 7: weekday (0 - Monday, 6 - Sunday, 7 - World-day for The World Calendar, if the base system supports it)
      *
@@ -54,7 +54,7 @@ open class PeriRTC(val vm: TerranVM) : VMPeripheralWrapper(0) {
             3 -> cal.get(Calendar.MINUTE)
             4 -> cal.get(Calendar.HOUR_OF_DAY)
             5 -> cal.get(Calendar.DAY_OF_MONTH)
-            6 -> cal.get(Calendar.MONTH)
+            6 -> cal.get(Calendar.MONTH) + 1
             7 -> Math.floorMod(cal.get(Calendar.DAY_OF_WEEK).minus(Calendar.MONDAY), 7)
             8 -> cal.get(Calendar.YEAR)
 

@@ -44,7 +44,7 @@ class PoketchTest : Game() {
 
         peripheral = Poketch()
 
-        vm = TerranVM(4096, stdout = peripheral.printStream)
+        vm = TerranVM(4096, stdout = peripheral.printStream, doNotInstallInterrupts = true)
 
         //vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[TerranVM.IRQ_RTC] = PeriRTC(vm)
@@ -142,20 +142,18 @@ ffh,c3h,ffh,c3h,ffh,c3h,ffh,c3h;
 bytes clockColon,
 C3h,C3h,C3h,C3h;
 
-## ("Mon", "Tys", "Mid", "Tor", "Fre", "Lau", "Sun", "Ver") ##
-
 bytes numbers_0_9_LSB,
-18h,50h,13h,F3h,F3h,F3h,F3h,F3h,F0h,F8h,
-FBh,F3h,F3h,F3h,F3h,F3h,F3h,F3h,F3h,F3h,
-07h,03h,F3h,F3h,83h,07h,3Fh,3Fh,03h,03h,
-07h,03h,F3h,F3h,83h,83h,F3h,F3h,03h,07h,
-C3h,83h,13h,33h,03h,03h,F3h,F3h,F3h,F3h,
-03h,03h,3Fh,07h,03h,F3h,F3h,F3h,03h,07h,
-87h,07h,3Fh,3Fh,07h,03h,33h,33h,03h,87h,
-03h,03h,F3h,E7h,E7h,E7h,CFh,CFh,CFh,CFh,
-87h,03h,33h,33h,03h,03h,33h,33h,03h,87h,
-87h,03h,33h,33h,03h,83h,F3h,F3h,83h,87h,
-87h,03h,33h,33h,33h,33h,33h,33h,03h,87h;
+E1h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h, # 0
+DFh,CFh,CFh,CFh,CFh,CFh,CFh,CFh,CFh,CFh, # 1
+E0h,C0h,CFh,CFh,C1h,E0h,FCh,FCh,C0h,C0h, # 2
+E0h,C0h,CFh,CFh,C1h,C1h,CFh,CFh,C0h,E0h, # 3
+C3h,C1h,C8h,CCh,C0h,C0h,CFh,CFh,CFh,CFh, # 4
+C0h,C0h,FCh,E0h,C0h,CFh,CFh,CFh,C0h,E0h, # 5
+E1h,E0h,FCh,FCh,E0h,C0h,CCh,CCh,C0h,E1h, # 6
+C0h,C0h,CFh,E7h,E7h,E7h,F3h,F3h,F3h,F3h, # 7
+E1h,C0h,CCh,CCh,C0h,C0h,CCh,CCh,C0h,E1h, # 8
+E1h,C0h,CCh,CCh,C0h,C1h,CFh,CFh,C1h,E1h, # 9
+C1h,E0h; # dash
 
 bytes celcius_LSB,
 18h,50h,13h,F3h,F3h,F3h,F3h,F3h,F0h,F8h,
@@ -169,21 +167,21 @@ bytes dash,
 FFh,FFh,FFh,FFh,83h,07h,FFh,FFh,FFh,FFh;
 
 bytes ADEFILMNORSTUVY,
-E1h,C0h,CCh,CCh,C0h,C0h,CCh,CCh,CCh,CCh,
-E0h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E0h,
-C0h,C0h,FCh,FCh,E0h,E0h,FCh,FCh,C0h,C0h,
-C0h,C0h,FCh,FCh,E0h,E0h,FCh,FCh,FCh,FCh,
-C0h,C0h,F3h,F3h,F3h,F3h,F3h,F3h,C0h,C0h,
-FCh,FCh,FCh,FCh,FCh,FCh,FCh,FCh,C0h,C0h,
-DEh,CCh,C0h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,
-CEh,CCh,C8h,C0h,C0h,C4h,CCh,CCh,CCh,CCh,
-E1h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h,
-E0h,C0h,CCh,CCh,C0h,E0h,C4h,CCh,CCh,CCh,
-C1h,C0h,FCh,FCh,E0h,C1h,CFh,CFh,C0h,E0h,
-C0h,C0h,F3h,F3h,F3h,F3h,F3h,F3h,F3h,F3h,
-CCh,CCh,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h,
-CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h,E1h,F3h,
-CCh,CCh,CCh,CCh,C0h,E1h,F3h,F3h,F3h,F3h;
+E1h,C0h,CCh,CCh,C0h,C0h,CCh,CCh,CCh,CCh, # A
+E0h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E0h, # D
+C0h,C0h,FCh,FCh,E0h,E0h,FCh,FCh,C0h,C0h, # E
+C0h,C0h,FCh,FCh,E0h,E0h,FCh,FCh,FCh,FCh, # F
+C0h,C0h,F3h,F3h,F3h,F3h,F3h,F3h,C0h,C0h, # I
+FCh,FCh,FCh,FCh,FCh,FCh,FCh,FCh,C0h,C0h, # L
+DEh,CCh,C0h,C0h,CCh,CCh,CCh,CCh,CCh,CCh, # M
+CEh,CCh,C8h,C0h,C0h,C4h,CCh,CCh,CCh,CCh, # N
+E1h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h, # O
+E0h,C0h,CCh,CCh,C0h,E0h,C4h,CCh,CCh,CCh, # R
+C1h,C0h,FCh,FCh,E0h,C1h,CFh,CFh,C0h,E0h, # S
+C0h,C0h,F3h,F3h,F3h,F3h,F3h,F3h,F3h,F3h, # T
+CCh,CCh,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h, # U
+CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h,E1h,F3h, # V
+CCh,CCh,CCh,CCh,C0h,E1h,F3h,F3h,F3h,F3h; # Y
 
 int months, 0;
 int weekday, 0;
@@ -191,52 +189,74 @@ int days, 0;
 int hours, 0;
 int minutes, 0;
 bytes charTable,
- 60, 80, 70,              # Mon
-110,140,100,              # Tys
- 60, 40, 10,              # Mid
-110, 80, 90,              # Tor
- 30, 90, 20,              # Fre
- 50,  0,120,              # Lau
-100,120, 70,              # Sun
-130  20  90;              # Ver
-
-int clock0addr, @clock0lsb;          # must be pre-multiplied by 4
-int clock1addr, @clock1lsb;          # must be pre-multiplied by 4
-int clock2addr, @clock2lsb;          # must be pre-multiplied by 4
-int clock3addr, @clock3lsb;          # must be pre-multiplied by 4
-int clock4addr, @clock4lsb;          # must be pre-multiplied by 4
-int clock5addr, @clock5lsb;          # must be pre-multiplied by 4
-int clock6addr, @clock6lsb;          # must be pre-multiplied by 4
-int clock7addr, @clock7lsb;          # must be pre-multiplied by 4
-int clock8addr, @clock8lsb;          # must be pre-multiplied by 4
-int clock9addr, @clock9lsb;          # must be pre-multiplied by 4
-
+ 60, 80, 70, #### Mon
+110,140,100, #### Tys
+ 60, 40, 10, #### Mid
+110, 80, 90, #### Tor
+ 30, 90, 20, #### Fre
+ 50,  0,120, #### Lau
+100,120, 70, #### Sun
+130  20  90; #### Ver
 
 
 .code;
-loadwordi r3, @clock0Addr;           # r3 = (offset)
-loadbytei r5, 4;                     # const four
-mulint r3, r3, r5;                      # multiply r3 by 4; r3 = address
-loadwordimem r1, @clock0Addr;        # r1 = value
-loadbytei r4, 10;                    # loop count
-loadbytei r5, 4;                     # const four
-loadbytei r6, 0;                     # const zero
-## loop
-:premultiply_by_four1;
-cmp r4, r6;
-jz @end_of_premultiply_by_four1;
-loadword r1, r3, r6;
-mulint r1, r1, r5;                   # multiply by 4 to the value
-storeword r1, r3, r6;
-addint r3, r3, r5;                   # increment address (r3) by 4
-dec r4;                              # r4--
-jmp @premultiply_by_four1;
-:end_of_premultiply_by_four1;
 
+
+loadbytei r7, 0;                     # conmon const 0, used for loops
+loadbytei r5, 11;                    # common const; width of scanline in bytes
 
 
 loadhwordi r1, 1001h;                #
 call r1, 3;                          # clear screen
+
+
+
+##################
+## DRAW A COLON ##
+##################
+
+
+## pre-loop
+loadwordi r1, 00010300h;             # memcpy -- length: 1; destination: 3; source: 0
+loadwordi r3, @clockColon;           # copy from
+loadbytei r2, 2;                     # constant 2
+shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
+loadbytei r2, 1;                     # constant 1
+loadhwordi r4, 577; loadbytei r6, 4; # copy to (x- and y-position of the image; 1 == 8 px horizontally)
+subint r3, r3, r2; subint r4, r4, r5;# r3 += 1, r4 += 11; pre-subtract for loop
+
+## loop
+:loop0;
+cmp r6, r7;
+jz @end_of_loop0;
+addint r3, r3, r2; addint r4, r4, r5;# r3 += 1, r4 += 11
+memcpy r1, r3, r4;
+dec r6;
+jmp @loop0;
+:end_of_loop0;
+
+## pre-loop
+loadwordi r3, @clockColon;           # copy from
+loadbytei r2, 2;                     # constant 2
+shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
+loadbytei r2, 1;                     # constant 1
+loadhwordi r4, 709; loadbytei r6, 4; # copy to (x- and y-position of the image; 1 == 8 px horizontally)
+subint r3, r3, r2; subint r4, r4, r5;# r3 += 1, r4 += 11; pre-subtract for loop
+
+## loop
+:loop00;
+cmp r6, r7;
+jz @end_of_loop00;
+addint r3, r3, r2; addint r4, r4, r5;# r3 += 1, r4 += 11
+memcpy r1, r3, r4;
+dec r6;
+jmp @loop00;
+:end_of_loop00;
+
+
+
+:clock_loop;
+
 
 loadbytei r1, 6;                     #
 call r1, 2;                          #
@@ -258,11 +278,6 @@ loadbytei r1, 3;                     #
 call r1, 2;                          #
 storewordimem r1, @minutes;          #
 
-
-
-
-loadbytei r5, 11;                    # common const; width of scanline in bytes
-loadbytei r7, 0;                     # conmon const 0, used for loops
 
 
 
@@ -364,63 +379,166 @@ jmp @loop_print_single_char_for_weekname3;
 :end_of_loop_print_single_char_for_weekname3;
 
 
-##################
-## DRAW A COLON ##
-##################
+#########################
+## DRAW MONTH AND DATE ##
+#########################
 
-
-## pre-loop
 loadwordi r1, 00010300h;             # memcpy -- length: 1; destination: 3; source: 0
-loadwordi r3, @clockColon;           # copy from
-loadbytei r2, 2;                     # constant 2
-shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
-loadbytei r2, 1;                     # constant 1
-loadhwordi r4, 577; loadbytei r6, 4; # copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 1, r4 += 11; pre-subtract for loop
 
-## loop
-:loop0;
-cmp r6, r7;
-jz @end_of_loop0;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 1, r4 += 11
-memcpy r1, r3, r4;
-dec r6;
-jmp @loop0;
-:end_of_loop0;
 
 ## pre-loop
-loadwordi r3, @clockColon;           # copy from
-loadbytei r2, 2;                     # constant 2
-shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
-loadbytei r2, 1;                     # constant 1
-loadhwordi r4, 709; loadbytei r6, 4; # copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 1, r4 += 11; pre-subtract for loop
+loadwordimem r8, @months;            # r8 <- months
+loadbytei r6, 10;                    #
+divint r8, r8, r6;                   # r8 <- (months) / 10
+mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, offset)
+
+cmp r8, r7;
+jz @end_of_loop_print_single_char_for_mmdd1; # do not print if month 1-9
+
+loadwordi r2, @numbers_0_9_LSB;      # where is the font
+loadbytei r4, 4;
+mulint r2, r2, r4;                   # r2 *= 4
+addint r2, r2, r8;                   # r2 <- memAddr to current character
+
+loadbytei r4, 10;                    # height of the font, also loop counter
+loadhwordi r6, 358;                  # where to print
 
 ## loop
-:loop00;
-cmp r6, r7;
-jz @end_of_loop00;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 1, r4 += 11
-memcpy r1, r3, r4;
-dec r6;
-jmp @loop00;
-:end_of_loop00;
+:loop_print_single_char_for_mmdd1;
+cmp r4, r7;
+jz @end_of_loop_print_single_char_for_mmdd1;
+memcpy r1, r2, r6;
+dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+jmp @loop_print_single_char_for_mmdd1;
+
+:end_of_loop_print_single_char_for_mmdd1;
+
+########################################################################################################################
+
+## pre-loop
+loadwordimem r8, @months;            # r8 <- months
+loadbytei r6, 10;                    #
+modint r8, r8, r6;                   # r8 <- (months) % 10
+mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, offset)
 
 
-loadbytei r2, 2;                     # constant 2
-loadwordi r1, 00020300h;             # memcpy -- length: 2; destination: 3; source: 0
+loadwordi r2, @numbers_0_9_LSB;      # where is the font
+loadbytei r4, 4;
+mulint r2, r2, r4;                   # r2 *= 4
+addint r2, r2, r8;                   # r2 <- memAddr to current character
 
+loadbytei r4, 10;                    # height of the font, also loop counter
+loadhwordi r6, 359;                  # where to print
+
+## loop
+:loop_print_single_char_for_mmdd2;
+cmp r4, r7;
+jz @end_of_loop_print_single_char_for_mmdd2;
+memcpy r1, r2, r6;
+dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+jmp @loop_print_single_char_for_mmdd2;
+
+:end_of_loop_print_single_char_for_mmdd2;
+
+########################################################################################################################
+
+## pre-loop
+loadwordi r8, 100;
+
+loadwordi r2, @numbers_0_9_LSB;      # where is the font
+loadbytei r4, 4;
+mulint r2, r2, r4;                   # r2 *= 4
+addint r2, r2, r8;                   # r2 <- memAddr to current character
+
+loadbytei r4, 2;                     # height of the font, also loop counter
+loadhwordi r6, 393;                  # where to print
+
+## loop
+:loop_print_single_char_for_mmdd3;
+cmp r4, r7;
+jz @end_of_loop_print_single_char_for_mmdd3;
+memcpy r1, r2, r6;
+dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+jmp @loop_print_single_char_for_mmdd3;
+
+:end_of_loop_print_single_char_for_mmdd3;
+
+########################################################################################################################
+
+## pre-loop
+loadwordimem r8, @days;              # r8 <- days
+loadbytei r6, 10;                    #
+divint r8, r8, r6;                   # r8 <- (days) / 10
+mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, offset)
+
+
+loadwordi r2, @numbers_0_9_LSB;      # where is the font
+loadbytei r4, 4;
+mulint r2, r2, r4;                   # r2 *= 4
+addint r2, r2, r8;                   # r2 <- memAddr to current character
+
+loadbytei r4, 10;                    # height of the font, also loop counter
+loadhwordi r6, 361;                  # where to print
+
+## loop
+:loop_print_single_char_for_mmdd4;
+cmp r4, r7;
+jz @end_of_loop_print_single_char_for_mmdd4;
+memcpy r1, r2, r6;
+dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+jmp @loop_print_single_char_for_mmdd4;
+
+:end_of_loop_print_single_char_for_mmdd4;
+
+########################################################################################################################
+
+## pre-loop
+loadwordimem r8, @days;              # r8 <- days
+loadbytei r6, 10;                    #
+modint r8, r8, r6;                   # r8 <- (days) % 10
+mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, offset)
+
+
+loadwordi r2, @numbers_0_9_LSB;      # where is the font
+loadbytei r4, 4;
+mulint r2, r2, r4;                   # r2 *= 4
+addint r2, r2, r8;                   # r2 <- memAddr to current character
+
+loadbytei r4, 10;                    # height of the font, also loop counter
+loadhwordi r6, 362;                  # where to print
+
+## loop
+:loop_print_single_char_for_mmdd5;
+cmp r4, r7;
+jz @end_of_loop_print_single_char_for_mmdd5;
+memcpy r1, r2, r6;
+dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+jmp @loop_print_single_char_for_mmdd5;
+
+:end_of_loop_print_single_char_for_mmdd5;
 
 
 ##################
 ## DRAW A CLOCK ##
 ##################
 
+loadbytei r2, 2;                     # constant 2
+loadwordi r1, 00020300h;             # memcpy -- length: 2; destination: 3; source: 0
+
 ########################################################################################################################
 
 ## pre-loop
-loadwordi r3, @clock0lsb;            # copy from
+loadwordimem r8, @hours;             # r8 <- hours
+loadbytei r6, 10;                    #
+divint r8, r8, r6;                   # r8 <- (hours) / 10
+
+loadbytei r6, 48;                    # size of glyph in bytes
+mulint r8, r6, r8;                   # r8 <- offset from clock0lsb
+
+loadwordi r3, @clock0lsb;            # get actual bytes from address (clock0lsb + offset)
 shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
+addint r3, r3, r8;                   # move the cursor (r3) to the starting position
+
 loadhwordi r4, 529; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
 subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
@@ -437,8 +555,17 @@ jmp @loop1;
 ########################################################################################################################
 
 ## pre-loop
-loadwordi r3, @clock6lsb;            # copy from
+loadwordimem r8, @hours;             # r8 <- hours
+loadbytei r6, 10;                    #
+modint r8, r8, r6;                   # r8 <- (hours) % 10
+
+loadbytei r6, 48;                    # size of glyph in bytes
+mulint r8, r6, r8;                   # r8 <- offset from clock0lsb
+
+loadwordi r3, @clock0lsb;            # get actual bytes from address (clock0lsb + offset)
 shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
+addint r3, r3, r8;                   # move the cursor (r3) to the starting position
+
 loadhwordi r4, 531; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
 subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
@@ -455,8 +582,17 @@ jmp @loop2;
 ########################################################################################################################
 
 ## pre-loop
-loadwordi r3, @clock4lsb;            # copy from
+loadwordimem r8, @minutes;           # r8 <- minutes
+loadbytei r6, 10;                    #
+divint r8, r8, r6;                   # r8 <- (minutes) / 10
+
+loadbytei r6, 48;                    # size of glyph in bytes
+mulint r8, r6, r8;                   # r8 <- offset from clock0lsb
+
+loadwordi r3, @clock0lsb;            # get actual bytes from address (clock0lsb + offset)
 shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
+addint r3, r3, r8;                   # move the cursor (r3) to the starting position
+
 loadhwordi r4, 534; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
 subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
@@ -473,8 +609,17 @@ jmp @loop3;
 ########################################################################################################################
 
 ## pre-loop
-loadwordi r3, @clock7lsb;            # copy from
+loadwordimem r8, @minutes;           # r8 <- minutes
+loadbytei r6, 10;                    #
+modint r8, r8, r6;                   # r8 <- (minutes) % 10
+
+loadbytei r6, 48;                    # size of glyph in bytes
+mulint r8, r6, r8;                   # r8 <- offset from clock0lsb
+
+loadwordi r3, @clock0lsb;            # get actual bytes from address (clock0lsb + offset)
 shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
+addint r3, r3, r8;                   # move the cursor (r3) to the starting position
+
 loadhwordi r4, 536; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
 subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
@@ -490,7 +635,8 @@ jmp @loop4;
 
 ########################################################################################################################
 
-nop;
+# yield;
+jmp @clock_loop;
 
         """)
 
