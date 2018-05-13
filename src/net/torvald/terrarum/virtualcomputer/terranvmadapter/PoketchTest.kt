@@ -44,7 +44,7 @@ class PoketchTest : Game() {
 
         peripheral = Poketch()
 
-        vm = TerranVM(4096, stdout = peripheral.printStream, doNotInstallInterrupts = true)
+        vm = TerranVM(2048, stdout = peripheral.printStream, doNotInstallInterrupts = true)
 
         //vm.peripherals[TerranVM.IRQ_KEYBOARD] = KeyboardAbstraction(vm)
         vm.peripherals[TerranVM.IRQ_RTC] = PeriRTC(vm)
@@ -55,7 +55,7 @@ class PoketchTest : Game() {
 
 
         val program = assembler("""
-.stack; 4;
+.stack; 0;
 
 .data;
 
@@ -139,9 +139,6 @@ c3h,c3h,c3h,c3h,03h,c0h,03h,c0h,
 ffh,c3h,ffh,c3h,ffh,c3h,ffh,c3h,
 ffh,c3h,ffh,c3h,ffh,c3h,ffh,c3h;
 
-bytes clockColon,
-C3h,C3h,C3h,C3h;
-
 bytes numbers_0_9_LSB,
 E1h,C0h,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h, # 0
 DFh,CFh,CFh,CFh,CFh,CFh,CFh,CFh,CFh,CFh, # 1
@@ -217,42 +214,24 @@ call r1, 3;                          # clear screen
 
 
 ## pre-loop
-loadwordi r1, 00010300h;             # memcpy -- length: 1; destination: 3; source: 0
-loadwordi r3, @clockColon;           # copy from
-loadbytei r2, 2;                     # constant 2
-shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
-loadbytei r2, 1;                     # constant 1
+loadbytei r1, 132;                   # constant 132
+loadbytei r3, C3h;                   # inline glyph for colon
+loadbytei r2, 3;                     # constant 3
 loadhwordi r4, 577; loadbytei r6, 4; # copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 1, r4 += 11; pre-subtract for loop
 
 ## loop
 :loop0;
 cmp r6, r7;
 jz @end_of_loop0;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 1, r4 += 11
-memcpy r1, r3, r4;
-dec r6;
+storebyte r3, r4, r2;                # directly write to peri
+addint r4, r4, r1;
+storebyte r3, r4, r2;                # directly write to peri
+subint r4, r4, r1;
+
+addint r4, r4, r5;                   # r4 += 11
+dec r6;                              # r6--
 jmp @loop0;
 :end_of_loop0;
-
-## pre-loop
-loadwordi r3, @clockColon;           # copy from
-loadbytei r2, 2;                     # constant 2
-shl r3, r3, r2;                      # multiply r3 by four (label is offset but MEMCPY expects actual address
-loadbytei r2, 1;                     # constant 1
-loadhwordi r4, 709; loadbytei r6, 4; # copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 1, r4 += 11; pre-subtract for loop
-
-## loop
-:loop00;
-cmp r6, r7;
-jz @end_of_loop00;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 1, r4 += 11
-memcpy r1, r3, r4;
-dec r6;
-jmp @loop00;
-:end_of_loop00;
-
 
 
 :clock_loop;
@@ -299,7 +278,6 @@ loadwordimem r8, @weekday;           # weekday in index, 0 for Mon
 mulint r8, r8, r6;                   # r8 *= 3; offset of the word from charTable
 
 loadwordi r2, @charTable;            # where is the character table
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 # add 1 to advance to the next char
@@ -307,15 +285,15 @@ loadbyte r2, r2, r7;                 # dereference r2
 
 addint r2, r2, r3;                   # r2 += r3; current glyph data to draw by memcpy
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 355;                  # where to print
 
 ## loop
 :loop_print_single_char_for_weekname1;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_weekname1;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_weekname1;
 
 :end_of_loop_print_single_char_for_weekname1;
@@ -328,7 +306,6 @@ loadwordimem r8, @weekday;           # weekday in index, 0 for Mon
 mulint r8, r8, r6;                   # r8 *= 3; offset of the word from charTable
 
 loadwordi r2, @charTable;            # where is the character table
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 inc r2;
@@ -336,15 +313,15 @@ loadbyte r2, r2, r7;                 # dereference r2
 
 addint r2, r2, r3;                   # r2 += r3; current glyph data to draw by memcpy
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 356;                  # where to print
 
 ## loop
 :loop_print_single_char_for_weekname2;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_weekname2;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_weekname2;
 
 :end_of_loop_print_single_char_for_weekname2;
@@ -357,7 +334,6 @@ loadwordimem r8, @weekday;           # weekday in index, 0 for Mon
 mulint r8, r8, r6;                   # r8 *= 3; offset of the word from charTable
 
 loadwordi r2, @charTable;            # where is the character table
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 inc r2; inc r2;
@@ -365,15 +341,15 @@ loadbyte r2, r2, r7;                 # dereference r2
 
 addint r2, r2, r3;                   # r2 += r3; current glyph data to draw by memcpy
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 357;                  # where to print
 
 ## loop
 :loop_print_single_char_for_weekname3;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_weekname3;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_weekname3;
 
 :end_of_loop_print_single_char_for_weekname3;
@@ -396,19 +372,18 @@ cmp r8, r7;
 jz @end_of_loop_print_single_char_for_mmdd1; # do not print if month 1-9
 
 loadwordi r2, @numbers_0_9_LSB;      # where is the font
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 358;                  # where to print
 
 ## loop
 :loop_print_single_char_for_mmdd1;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_mmdd1;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_mmdd1;
 
 :end_of_loop_print_single_char_for_mmdd1;
@@ -423,19 +398,18 @@ mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, 
 
 
 loadwordi r2, @numbers_0_9_LSB;      # where is the font
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 359;                  # where to print
 
 ## loop
 :loop_print_single_char_for_mmdd2;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_mmdd2;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_mmdd2;
 
 :end_of_loop_print_single_char_for_mmdd2;
@@ -446,19 +420,18 @@ jmp @loop_print_single_char_for_mmdd2;
 loadwordi r8, 100;
 
 loadwordi r2, @numbers_0_9_LSB;      # where is the font
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 
-loadbytei r4, 2;                     # height of the font, also loop counter
+loadbytei r8, 2;                     # height of the font, also loop counter
 loadhwordi r6, 393;                  # where to print
 
 ## loop
 :loop_print_single_char_for_mmdd3;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_mmdd3;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_mmdd3;
 
 :end_of_loop_print_single_char_for_mmdd3;
@@ -473,19 +446,18 @@ mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, 
 
 
 loadwordi r2, @numbers_0_9_LSB;      # where is the font
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 361;                  # where to print
 
 ## loop
 :loop_print_single_char_for_mmdd4;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_mmdd4;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_mmdd4;
 
 :end_of_loop_print_single_char_for_mmdd4;
@@ -500,19 +472,18 @@ mulint r8, r8, r6;                   # r8 *= 10 to get the right glyph (i mean, 
 
 
 loadwordi r2, @numbers_0_9_LSB;      # where is the font
-loadbytei r4, 4;
 mulint r2, r2, r4;                   # r2 *= 4
 addint r2, r2, r8;                   # r2 <- memAddr to current character
 
-loadbytei r4, 10;                    # height of the font, also loop counter
+loadbytei r8, 10;                    # height of the font, also loop counter
 loadhwordi r6, 362;                  # where to print
 
 ## loop
 :loop_print_single_char_for_mmdd5;
-cmp r4, r7;
+cmp r8, r7;
 jz @end_of_loop_print_single_char_for_mmdd5;
 memcpy r1, r2, r6;
-dec r4; addint r6, r6, r5; inc r2;   # r4--; r6 += 11, r2++
+dec r8; addint r6, r6, r5; inc r2;   # r8--; r6 += 11, r2++
 jmp @loop_print_single_char_for_mmdd5;
 
 :end_of_loop_print_single_char_for_mmdd5;
@@ -540,14 +511,13 @@ shl r3, r3, r2;                      # multiply r3 by four (label is offset but 
 addint r3, r3, r8;                   # move the cursor (r3) to the starting position
 
 loadhwordi r4, 529; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
 ## loop
 :loop1;
 cmp r6, r7;
 jz @end_of_loop1;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 memcpy r1, r3, r4;
+addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 dec r6;
 jmp @loop1;
 :end_of_loop1;
@@ -567,14 +537,13 @@ shl r3, r3, r2;                      # multiply r3 by four (label is offset but 
 addint r3, r3, r8;                   # move the cursor (r3) to the starting position
 
 loadhwordi r4, 531; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
 ## loop
 :loop2;
 cmp r6, r7;
 jz @end_of_loop2;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 memcpy r1, r3, r4;
+addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 dec r6;
 jmp @loop2;
 :end_of_loop2;
@@ -594,14 +563,13 @@ shl r3, r3, r2;                      # multiply r3 by four (label is offset but 
 addint r3, r3, r8;                   # move the cursor (r3) to the starting position
 
 loadhwordi r4, 534; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
 ## loop
 :loop3;
 cmp r6, r7;
 jz @end_of_loop3;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 memcpy r1, r3, r4;
+addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 dec r6;
 jmp @loop3;
 :end_of_loop3;
@@ -621,14 +589,13 @@ shl r3, r3, r2;                      # multiply r3 by four (label is offset but 
 addint r3, r3, r8;                   # move the cursor (r3) to the starting position
 
 loadhwordi r4, 536; loadbytei r6, 24;# copy to (x- and y-position of the image; 1 == 8 px horizontally)
-subint r3, r3, r2; subint r4, r4, r5;# r3 += 2, r4 += 11; pre-subtract for loop
 
 ## loop
 :loop4;
 cmp r6, r7;
 jz @end_of_loop4;
-addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 memcpy r1, r3, r4;
+addint r3, r3, r2; addint r4, r4, r5;# r3 += 2, r4 += 11
 dec r6;
 jmp @loop4;
 :end_of_loop4;
