@@ -1,8 +1,11 @@
 package net.torvald.terranvm.runtime
 
 import net.torvald.terranvm.*
+import net.torvald.terranvm.assets.FreshNewParametreRAM
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.Serializable
+import java.nio.charset.Charset
 import kotlin.collections.ArrayList
 
 
@@ -23,9 +26,22 @@ class TerranVM(inMemSize: Int,
                var stdout: OutputStream = System.out,
                var stdin: InputStream = System.`in`,
                var suppressWarnings: Boolean = false,
-         // following is an options for TerranVM's micro operation system
-               val doNotInstallInterrupts: Boolean = false
-) : Runnable {
+               // following is an options for TerranVM's micro operation system
+               val doNotInstallInterrupts: Boolean = false,
+               // to load from saved shits
+               val parametreRAM: ByteArray = FreshNewParametreRAM(),
+               internal val memory: ByteArray = ByteArray(inMemSize),
+               private val mallocList: ArrayList<Int> = ArrayList<Int>(64),
+               var terminate: Boolean = false,
+               var isRunning: Boolean = false,
+               private val contextHolder: HashMap<Int, Context> = hashMapOf( 0 to Context() ), // main context is always ID 0
+               private var uptimeHolder: Long = 0L
+) : Runnable, Serializable {
+
+    var context: Context = contextHolder[0]!!
+        private set
+    private var contextID: Int = 0
+
     private val memSize = inMemSize.ushr(2).shl(2)
     val bytes_ffffffff = (-1).toLittle()
     val bytes_00000000 = byteArrayOf(0, 0, 0, 0)
@@ -174,23 +190,25 @@ class TerranVM(inMemSize: Int,
     fun memSliceBySize(from: Int, size: Int): ByteArray = memory.sliceArray(from until from + size)
     fun memSlice(from: Int, to: Int): ByteArray = memory.sliceArray(from..to)
 
-    private val mallocList = ArrayList<Int>(64) // can be as large as memSize
+    //private val mallocList = ArrayList<Int>(64) // can be as large as memSize
 
-    private inline fun addToMallocList(range: IntRange) { range.forEach { mallocList.add(it) } }
-    private inline fun removeFromMallocList(range: IntRange) { range.forEach { mallocList.remove(it) } }
+    private fun addToMallocList(range: IntRange) { range.forEach { mallocList.add(it) } }
+    private fun removeFromMallocList(range: IntRange) { range.forEach { mallocList.remove(it) } }
 
     /**
      * Return starting position of empty space
      */
     private fun findEmptySlotForMalloc(size: Int): Int {
+        val veryStartPoint = ivtSize
+
         if (mallocList.isEmpty())
-            return userSpaceStart!!
+            return veryStartPoint
 
         mallocList.sort()
 
         val candidates = ArrayList<Pair<Int, Int>>() // startingPos, size
         for (it in 1..mallocList.lastIndex) {
-            val gap = mallocList[it] - 1 - (if (it == 0) userSpaceStart!! else mallocList[it - 1])
+            val gap = mallocList[it] - 1 - (if (it == 0) veryStartPoint else mallocList[it - 1])
 
             if (gap >= size) {
                 candidates.add(Pair(mallocList[it] + 1, gap))
@@ -289,36 +307,36 @@ class TerranVM(inMemSize: Int,
      *  Memory-mapped peripherals must be mapped to their own memory hardware. In other words,
      *      they don't share your computer's main memory.
      */
-    internal val memory = ByteArray(memSize)
+    //internal val memory = ByteArray(memSize)
 
     val ivtSize = 4 * TerranVM.interruptCount
-    val programSpaceStart: Int; get() = ivtSize
-    var userSpaceStart: Int? = null // lateinit
-        private set
 
-    var terminate = false
-    var isRunning = false
-        private set
+    init {
+        // initialise default (index zero) program start position with IVT size
+        // must match with "veryStartPoint" of findEmptySlotForMalloc
+        context.st = ivtSize
+    }
 
-    // general-purpose registers (32 bit)
-    var r1: Int = 0
-    var r2: Int = 0
-    var r3: Int = 0
-    var r4: Int = 0
-    var r5: Int = 0
-    var r6: Int = 0
-    var r7: Int = 0
-    var r8: Int = 0
+    //var userSpaceStart: Int? = null // lateinit
+    //    private set
 
-    // internal registers (for context switching?)
-    var r11: Int = 0
-    var r12: Int = 0
-    var r13: Int = 0
-    var r14: Int = 0
-    var r15: Int = 0
-    var r16: Int = 0
-    var r17: Int = 0
-    var r18: Int = 0
+    //var terminate = false
+    //var isRunning = false
+    //    private set
+
+    var r1: Int; get() = context.r1; set(value) { context.r1= value }
+    var r2: Int; get() = context.r2; set(value) { context.r2= value }
+    var r3: Int; get() = context.r3; set(value) { context.r3= value }
+    var r4: Int; get() = context.r4; set(value) { context.r4= value }
+    var r5: Int; get() = context.r5; set(value) { context.r5= value }
+    var r6: Int; get() = context.r6; set(value) { context.r6= value }
+    var r7: Int; get() = context.r7; set(value) { context.r7= value }
+    var r8: Int; get() = context.r8; set(value) { context.r8= value }
+    var cp: Int; get() = context.cp; set(value) { context.cp= value } // compare register
+    var pc: Int; get() = context.pc; set(value) { context.pc= value } // program counter
+    var sp: Int; get() = context.sp; set(value) { context.sp= value } // stack pointer
+    var lr: Int; get() = context.lr; set(value) { context.lr= value } // link register
+    var st: Int; get() = context.st; set(value) { context.st= value } // starting point
 
     fun writeregFloat(register: Int, data: Float) {
         when (register) {
@@ -371,20 +389,7 @@ class TerranVM(inMemSize: Int,
         else -> throw IllegalArgumentException("No such register: r$register")
     }
 
-    // memory registers (32-bit)
-    var rCMP = 0 // compare register
-    var rCMP2 = 0
-    //var m2 = 0 // string counter?
-    //var m3 = 0 // general-use flags or variable
-    //var m4 = 0 // general-use flags or variable
-    var pc = 0 // program counter
-    var pc2 = 0
-    var sp = 0 // stack pointer
-    var sp2 = 0
-    var lr = 0 // link register
-    var lr2 = 0
-
-    private var uptimeHolder = 0L
+    //private var uptimeHolder = 0L
     val uptime: Int // uptime register
         get() {
             val currentTime = System.currentTimeMillis()
@@ -397,7 +402,7 @@ class TerranVM(inMemSize: Int,
         if (memSize > 4.MB()) {
             warn("VM memory size might be too large — recommended max is 4 MBytes")
         }
-        else if (memSize < 512) { // arbitrary amount (note - ATtiny has at least 2K Flash + 128 EEPROM + 128 SRAM. Atari 2600 had 128)
+        else if (memSize < 512) { // arbitrary amount: maximum allowed by FlowerPot instruction set (256 16-bit words)
             throw Error("VM memory size too small — minimum allowed is 512 bytes")
         }
         else if (memSize > 16.MB()) {
@@ -405,39 +410,79 @@ class TerranVM(inMemSize: Int,
         }
 
         hardReset()
+        if (!doNotInstallInterrupts) {
+            setDefaultInterrupts()
+        }
+
+        VMOpcodesRISC.invoke(this)
     }
 
+    fun loadProgramDynamic(programImage: ProgramImage, contextID: Int? = null) {
+        val newContextID = contextID ?: contextHolder.size
+
+        val newContext = if (contextID == null) {
+            contextHolder[newContextID] = Context()
+            contextHolder[newContextID]!!
+        }
+        else {
+            contextHolder[contextID]!!
+        }
+
+
+        val newPrgStartingPtr = malloc(programImage.bytes.size).memAddr
+
+
+        newContext.st = newPrgStartingPtr + stackSize!! * 4
+        newContext.pc = newContext.st + programImage.stackSize * 4
+
+
+        val opcodes = programImage.bytes
+
+        if (opcodes.size + newContext.st >= memory.size) {
+            throw Error("Out of memory -- required: ${opcodes.size + newContext.st} (${opcodes.size} for program), installed: ${memory.size}")
+        }
+
+
+        System.arraycopy(opcodes, 0, memory, newPrgStartingPtr, opcodes.size)
+        // HALT guard
+        memory[opcodes.size + newContext.st] = 0
+        memory[opcodes.size + newContext.st + 1] = 0
+        memory[opcodes.size + newContext.st + 2] = 0
+        memory[opcodes.size + newContext.st + 3] = 0
+
+
+
+        warn("Program loaded; context ID: $newContextID, pc: $pcHex")
+    }
+
+
+    /**
+     * Loads program as current context ID
+     */
     fun loadProgram(programImage: ProgramImage) {
         val opcodes = programImage.bytes
-        stackSize = programImage.stackSize
 
-
-        if (opcodes.size + programSpaceStart >= memory.size) {
-            throw Error("Out of memory -- required: ${opcodes.size + programSpaceStart} (${opcodes.size} for program), installed: ${memory.size}")
+        if (opcodes.size + st >= memory.size) {
+            throw Error("Out of memory -- required: ${opcodes.size + st} (${opcodes.size} for program), installed: ${memory.size}")
         }
 
         softReset()
 
-        VMOpcodesRISC.invoke(this)
+        val newProgramPtr = malloc(opcodes.size)
 
 
-        System.arraycopy(opcodes, 0, memory, programSpaceStart, opcodes.size)
+        System.arraycopy(opcodes, 0, memory, newProgramPtr.memAddr, opcodes.size)
         // HALT guard
-        memory[opcodes.size + programSpaceStart] = 0
-        memory[opcodes.size + programSpaceStart + 1] = 0
-        memory[opcodes.size + programSpaceStart + 2] = 0
-        memory[opcodes.size + programSpaceStart + 3] = 0
+        memory[opcodes.size + st] = 0
+        memory[opcodes.size + st + 1] = 0
+        memory[opcodes.size + st + 2] = 0
+        memory[opcodes.size + st + 3] = 0
 
 
-        pc = programSpaceStart + stackSize!! * 4
-        userSpaceStart = programSpaceStart + opcodes.size + 1
-
-        userSpaceStart = userSpaceStart!! + setDefaultInterrupts() // renew userSpaceStart after interrupts
-        userSpaceStart = userSpaceStart!!.ushr(2).shl(2) + 4 // manually align
-        mallocList.clear()
+        pc = st + stackSize!! * 4
 
 
-        warn("Program loaded; pc: $pcHex, userSpaceStart: $userSpaceStart (${userSpaceStart?.toHexString()})")
+        warn("Program loaded; context ID: $contextID, pc: $pcHex")
     }
 
     /**
@@ -546,8 +591,6 @@ halt;
     fun softReset() {
         println("[TerranVM] SOFT RESET")
 
-
-        userSpaceStart = null
         terminate = false
 
         // reset malloc table
@@ -563,72 +606,16 @@ halt;
         r7 = 0
         r8 = 0
 
-        r11 = 0
-        r12 = 0
-        r13 = 0
-        r14 = 0
-        r15 = 0
-        r16 = 0
-        r17 = 0
-        r18 = 0
-
-        rCMP = 0
-        rCMP2 = 0
-        //m2 = 0
-        //m3 = 0
-        //m4 = 0
-        //strCntr = 0
+        cp = 0
         pc = 0
-        pc2 = 0
         sp = 0
-        sp2 = 0
         lr = 0
-        lr2 = 0
+        st = 0
         //... but don't reset the uptime
         resumeExec()
         yieldRequested = false
     }
 
-    fun swapRegisterSet() {
-        val t1 = r1
-        val t2 = r2
-        val t3 = r3
-        val t4 = r4
-        val t5 = r5
-        val t6 = r6
-        val t7 = r7
-        val t8 = r8
-        val tCMP = rCMP
-        val tpc = pc
-        val tsp = sp
-        val tlr = lr
-
-        r1 = r11
-        r2 = r12
-        r3 = r13
-        r4 = r14
-        r5 = r15
-        r6 = r16
-        r7 = r17
-        r8 = r18
-        rCMP = rCMP2
-        pc = pc2
-        sp = sp2
-        lr = lr2
-
-        r11 = t1
-        r12 = t2
-        r13 = t3
-        r14 = t4
-        r15 = t5
-        r16 = t6
-        r17 = t7
-        r18 = t8
-        rCMP2 = tCMP
-        pc2 = tpc
-        sp2 = tsp
-        lr = tlr
-    }
 
     fun hardReset() {
         softReset()
@@ -687,111 +674,128 @@ halt;
 
         execDebugMain("Execution stanted; PC: $pcHex")
 
-        if (userSpaceStart != null) {
 
-            isRunning = true
-            uptimeHolder = System.currentTimeMillis()
-
-
-            while (!terminate) {
-                //if (DEBUG && runcnt >= 500) break
-                //runcnt++
+        isRunning = true
+        uptimeHolder = System.currentTimeMillis()
 
 
-                if (vmThread == null) {
-                    vmThread = Thread.currentThread()
-                }
+        while (!terminate) {
+            //if (DEBUG && runcnt >= 500) break
+            //runcnt++
 
 
-                //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
-
-                if (pauseRequested) {
-                    println("[TerranVM] execution paused")
-                    isPaused = true
-                    vmThread!!.suspend() // fuck it, i'll use this anyway
-                    pauseRequested = false
-                }
-
-                if (yieldRequested && yieldFlagged) {
-                    println("[TerranVM] VM is paused due to yield request")
-                    isPaused = true
-                    vmThread!!.suspend() // fuck it, i'll use this anyway
-                    yieldRequested = false
-                    yieldFlagged = false
-                }
-
-
-
-                if (pc >= memory.size) {
-                    val oldpc = pc
-                    execDebugError("Out of memory: Illegal PC; pc ${oldpc.toLong().and(0xffffffff).toString(16).toUpperCase()}h")
-                    interruptOutOfMem()
-                }
-                else if (pc < 0) {
-                    val oldpc = pc
-                    execDebugError("Segmentation fault: Illegal PC; pc ${oldpc.toLong().and(0xffffffff).toString(16).toUpperCase()}h")
-                    interruptSegmentationFault()
-                }
-
-
-                var opcode = memory[pc].toUint() or memory[pc + 1].toUint().shl(8) or memory[pc + 2].toUint().shl(16) or memory[pc + 3].toUint().shl(24)
-
-
-                execDebugMain("pc: $pcHex; opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
-
-
-                // execute
-                pc += 4
-
-                // invoke function
-                try {
-                    VMOpcodesRISC.decodeAndExecute(opcode)
-                }
-                catch (oom: ArrayIndexOutOfBoundsException) {
-                    execDebugError("[TBASRT] out-of-bound memory address access: from opcode ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
-                    execDebugError("r1: $r1; ${r1.to8HexString()}; ${readregFloat(1)}f")
-                    execDebugError("r2: $r2; ${r2.to8HexString()}; ${readregFloat(2)}f")
-                    execDebugError("r3: $r3; ${r3.to8HexString()}; ${readregFloat(3)}f")
-                    execDebugError("r4: $r4; ${r4.to8HexString()}; ${readregFloat(4)}f")
-                    execDebugError("r5: $r5; ${r5.to8HexString()}; ${readregFloat(5)}f")
-                    execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
-                    execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
-                    execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
-                    execDebugError("pc: $pc; ${pc.toHexString()}")
-                    oom.printStackTrace()
-                    interruptOutOfMem()
-                }
-                catch (e: Exception) {
-                    execDebugError("r1: $r1; ${r1.to8HexString()}; ${readregFloat(1)}f")
-                    execDebugError("r2: $r2; ${r2.to8HexString()}; ${readregFloat(2)}f")
-                    execDebugError("r3: $r3; ${r3.to8HexString()}; ${readregFloat(3)}f")
-                    execDebugError("r4: $r4; ${r4.to8HexString()}; ${readregFloat(4)}f")
-                    execDebugError("r5: $r5; ${r5.to8HexString()}; ${readregFloat(5)}f")
-                    execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
-                    execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
-                    execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
-                    execDebugError("pc: $pc; ${pc.toHexString()}")
-                    e.printStackTrace()
-                }
-
-
-                if (opcode == 0) {
-                    execDebugMain("HALT at PC $pcHex")
-                }
-
-
-
-
-                if (delayInMills != null) {
-                    Thread.sleep(delayInMills!!.toLong())
-                }
+            if (vmThread == null) {
+                vmThread = Thread.currentThread()
             }
 
-            isRunning = false
+
+            //print("["); (userSpaceStart!!..849).forEach { print("${memory[it].toUint()} ") }; println("]")
+
+            if (pauseRequested) {
+                println("[TerranVM] execution paused")
+                isPaused = true
+                vmThread!!.suspend() // fuck it, i'll use this anyway
+                pauseRequested = false
+            }
+
+            if (yieldRequested && yieldFlagged) {
+                println("[TerranVM] VM is paused due to yield request")
+                isPaused = true
+                vmThread!!.suspend() // fuck it, i'll use this anyway
+                yieldRequested = false
+                yieldFlagged = false
+            }
+
+
+
+            if (pc >= memory.size) {
+                val oldpc = pc
+                execDebugError("Out of memory: Illegal PC; pc ${oldpc.toLong().and(0xffffffff).toString(16).toUpperCase()}h")
+                interruptOutOfMem()
+            }
+            else if (pc < 0) {
+                val oldpc = pc
+                execDebugError("Segmentation fault: Illegal PC; pc ${oldpc.toLong().and(0xffffffff).toString(16).toUpperCase()}h")
+                interruptSegmentationFault()
+            }
+
+
+            var opcode = memory[pc].toUint() or memory[pc + 1].toUint().shl(8) or memory[pc + 2].toUint().shl(16) or memory[pc + 3].toUint().shl(24)
+
+
+            execDebugMain("pc: $pcHex; opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+
+
+            // execute
+            pc += 4
+
+            // invoke function
+            try {
+                VMOpcodesRISC.decodeAndExecute(opcode)
+            }
+            catch (oom: ArrayIndexOutOfBoundsException) {
+                execDebugError("[TBASRT] out-of-bound memory address access: from opcode ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                execDebugError("r1: $r1; ${r1.to8HexString()}; ${readregFloat(1)}f")
+                execDebugError("r2: $r2; ${r2.to8HexString()}; ${readregFloat(2)}f")
+                execDebugError("r3: $r3; ${r3.to8HexString()}; ${readregFloat(3)}f")
+                execDebugError("r4: $r4; ${r4.to8HexString()}; ${readregFloat(4)}f")
+                execDebugError("r5: $r5; ${r5.to8HexString()}; ${readregFloat(5)}f")
+                execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
+                execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
+                execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
+                execDebugError("pc: $pc; ${pc.toHexString()}")
+                oom.printStackTrace()
+                interruptOutOfMem()
+            }
+            catch (e: Exception) {
+                execDebugError("r1: $r1; ${r1.to8HexString()}; ${readregFloat(1)}f")
+                execDebugError("r2: $r2; ${r2.to8HexString()}; ${readregFloat(2)}f")
+                execDebugError("r3: $r3; ${r3.to8HexString()}; ${readregFloat(3)}f")
+                execDebugError("r4: $r4; ${r4.to8HexString()}; ${readregFloat(4)}f")
+                execDebugError("r5: $r5; ${r5.to8HexString()}; ${readregFloat(5)}f")
+                execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
+                execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
+                execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
+                execDebugError("pc: $pc; ${pc.toHexString()}")
+                e.printStackTrace()
+            }
+
+
+            if (opcode == 0) {
+                execDebugMain("HALT at PC $pcHex")
+            }
+
+
+
+
+            if (delayInMills != null) {
+                Thread.sleep(delayInMills!!.toLong())
+            }
         }
+
+        isRunning = false
     }
 
+    fun performContextSwitch(contextID: Int) {
+        if (!contextHolder.containsKey(contextID)) {
+            // if specified context is not there, create one right away
+            contextHolder[contextID] = Context()
+        }
 
+        context = contextHolder[contextID]!!
+
+
+        warn("Context switch ${this.contextID} --> $contextID")
+
+
+        this.contextID = contextID
+
+
+
+        if (delayInMills != null) {
+            Thread.sleep(delayInMills!!.toLong())
+        }
+    }
 
 
 
@@ -802,42 +806,42 @@ halt;
     // CONSTANTS //
     ///////////////
     companion object {
-        val charset = Charsets.UTF_8
+        val charset: Charset = Charset.forName("CP437")
 
-        val interruptCount = 24
+        const val interruptCount = 24
         
-        val INT_DIV_BY_ZERO = 0
-        val INT_ILLEGAL_OP = 1
-        val INT_OUT_OF_MEMORY = 2
-        val INT_STACK_OVERFLOW = 3
-        val INT_MATH_ERROR = 4
-        val INT_SEGFAULT = 5
-        val INT_KEYPRESS = 6
-        val INT_PERI_INPUT = 7
-        val INT_PERI_OUTPUT = 8
-        val INT_INTERRUPT = 9
-        val INT_SERIAL0 = 10
-        val INT_SERIAL1 = 11
+        const val INT_DIV_BY_ZERO = 0
+        const val INT_ILLEGAL_OP = 1
+        const val INT_OUT_OF_MEMORY = 2
+        const val INT_STACK_OVERFLOW = 3
+        const val INT_MATH_ERROR = 4
+        const val INT_SEGFAULT = 5
+        const val INT_KEYPRESS = 6
+        const val INT_PERI_INPUT = 7
+        const val INT_PERI_OUTPUT = 8
+        const val INT_INTERRUPT = 9
+        const val INT_SERIAL0 = 10
+        const val INT_SERIAL1 = 11
 
-        val INT_RASTER_FBUFFER = 16 // required to fire interrupt following every screen refresh
+        const val INT_RASTER_FBUFFER = 16 // required to fire interrupt following every screen refresh
 
 
 
-        val IRQ_SYSTEM_TIMER = 0
-        val IRQ_KEYBOARD = 1
-        val IRQ_RTC = 2
-        val IRQ_PRIMARY_DISPLAY = 3
-        val IRQ_SERIAL_1 = 6
-        val IRQ_SERIAL_2 = 7
-        val IRQ_DISK_A = 8
-        val IRQ_DISK_B = 9
-        val IRQ_DISK_C = 10
-        val IRQ_DISK_D = 11
-        val IRQ_SCSI_1 = 12
-        val IRQ_SCSI_2 = 13
-        val IRQ_SCSI_3 = 14
-        val IRQ_SCSI_4 = 15
-        val IRQ_BIOS = 255
+        const val IRQ_SYSTEM_TIMER = 0
+        const val IRQ_KEYBOARD = 1
+        const val IRQ_RTC = 2
+        const val IRQ_PRIMARY_DISPLAY = 3
+        const val IRQ_SERIAL_1 = 6
+        const val IRQ_SERIAL_2 = 7
+        const val IRQ_DISK_A = 8
+        const val IRQ_DISK_B = 9
+        const val IRQ_DISK_C = 10
+        const val IRQ_DISK_D = 11
+        const val IRQ_SCSI_1 = 12
+        const val IRQ_SCSI_2 = 13
+        const val IRQ_SCSI_3 = 14
+        const val IRQ_SCSI_4 = 15
+        const val IRQ_BIOS = 255
     }
 
 
@@ -855,6 +859,24 @@ halt;
     fun interruptPeripheralOutput() { VMOpcodesRISC.JSRI(memSliceBySize(INT_PERI_OUTPUT * 4, 4).toLittleInt().ushr(2)) }
     fun interruptStopExecution() { VMOpcodesRISC.JSRI(memSliceBySize(INT_INTERRUPT * 4, 4).toLittleInt().ushr(2)) }
 
+
+
+
+    data class Context(
+            var r1: Int = 0,
+            var r2: Int = 0,
+            var r3: Int = 0,
+            var r4: Int = 0,
+            var r5: Int = 0,
+            var r6: Int = 0,
+            var r7: Int = 0,
+            var r8: Int = 0,
+            var cp: Int = 0, // compare register
+            var pc: Int = 0, // program counter
+            var sp: Int = 0, // stack pointer
+            var lr: Int = 0, // link register
+            var st: Int = 0  // starting point, word-wise
+    )
 }
 
 fun Int.KB() = this shl 10

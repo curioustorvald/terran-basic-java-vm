@@ -28,7 +28,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
         /*
         stack: 60h..1FFh
         r1: 00000000h; 0; 0.0f
-        rCMP: -1
+        cp: -1
         000000 : 00 00 00 00 00 00 00 48 00 00 00 50 00 00 00 58 | .......H...P...X
          */
 
@@ -50,9 +50,9 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
             )
         }
 
-        sb.append("rCMP: " +
-                "${vm.rCMP.to8HexString()}; " +
-                "${vm.rCMP}\n"
+        sb.append("cp: " +
+                "${vm.cp.to8HexString()}; " +
+                "${vm.cp}\n"
         )
 
 

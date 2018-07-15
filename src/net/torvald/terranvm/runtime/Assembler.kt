@@ -527,7 +527,7 @@ class Assembler(val vm: TerranVM) {
         }
 
 
-        val programSpaceStart = vm.programSpaceStart
+        val programSpaceStart = vm.st
         fun getPC() = programSpaceStart + ret.size
         fun addWord(i: Int) {
             i.toLittle().forEach { ret.add(it) }
@@ -543,7 +543,7 @@ class Assembler(val vm: TerranVM) {
 
         // pass 1: pre-scan for labels
         debug("\n\n== Pass 1 ==\n\n")
-        var virtualPC = vm.programSpaceStart
+        var virtualPC = vm.st
 
         debug("*** Start PC: $virtualPC ***")
 

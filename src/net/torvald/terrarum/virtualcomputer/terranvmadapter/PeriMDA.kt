@@ -196,4 +196,9 @@ open class PeriMDA(val W: Int = 80, val H: Int = 25,
     val ASCII_DC3 = 19  // foreground colour 2
     val ASCII_DC4 = 20  // foreground colour 3
     val ASCII_DLE = 16  // error message colour
+
+
+    override fun inquireBootstrapper(): ByteArray? {
+        return null
+    }
 }

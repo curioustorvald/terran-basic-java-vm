@@ -53,4 +53,8 @@ open class KeyboardAbstraction(val vm: TerranVM) : GdxPeripheralWrapper(16) {
 
         vm.pauseExec()
     }
+
+    override fun inquireBootstrapper(): ByteArray? {
+        return null
+    }
 }

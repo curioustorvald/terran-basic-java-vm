@@ -64,4 +64,9 @@ open class PeriRTC(val vm: TerranVM) : VMPeripheralWrapper(0) {
             else -> throw IllegalArgumentException("Unknown argument: ${arg.to8HexString()}")
         }
     }
+
+
+    override fun inquireBootstrapper(): ByteArray? {
+        return null
+    }
 }

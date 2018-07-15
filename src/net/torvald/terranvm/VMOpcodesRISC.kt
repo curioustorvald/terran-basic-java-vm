@@ -457,7 +457,7 @@ object VMOpcodesRISC {
     fun CMP(dest: Register, src: Register, lr: Int) {
         val lhand = if (lr and 0b10 != 0) vm.readregFloat(dest).toDouble() else vm.readregInt(dest).toDouble()
         val rhand = if (lr and 0b01 != 0) vm.readregFloat(src).toDouble() else vm.readregInt(src).toDouble()
-        vm.rCMP = if (lhand == rhand) 0 else if (lhand > rhand) 1 else -1
+        vm.cp = if (lhand == rhand) 0 else if (lhand > rhand) 1 else -1
     }
 
 
@@ -579,10 +579,10 @@ object VMOpcodesRISC {
 
 
     fun JMP(offset: Int) { vm.pc = offset shl 2 }
-    fun JZ (offset: Int) { if (vm.rCMP == 0) JMP(offset) }
-    fun JNZ(offset: Int) { if (vm.rCMP != 0) JMP(offset) }
-    fun JGT(offset: Int) { if (vm.rCMP >  0) JMP(offset) }
-    fun JLS(offset: Int) { if (vm.rCMP <  0) JMP(offset) }
+    fun JZ (offset: Int) { if (vm.cp == 0) JMP(offset) }
+    fun JNZ(offset: Int) { if (vm.cp != 0) JMP(offset) }
+    fun JGT(offset: Int) { if (vm.cp >  0) JMP(offset) }
+    fun JLS(offset: Int) { if (vm.cp <  0) JMP(offset) }
     fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + (offset shl 2), 0xFFFFFF) }
     fun JBW(offset: Int) { vm.pc = Math.floorMod(vm.pc - (offset shl 2), 0xFFFFFF) }
 
@@ -628,10 +628,10 @@ object VMOpcodesRISC {
         fun execInCond(action: () -> Unit) {
             when (cond) {
                 0 -> action()
-                1 -> if (vm.rCMP == 0) action()
-                2 -> if (vm.rCMP != 0) action()
-                3 -> if (vm.rCMP >  0) action()
-                4 -> if (vm.rCMP <  0) action()
+                1 -> if (vm.cp == 0) action()
+                2 -> if (vm.cp != 0) action()
+                3 -> if (vm.cp >  0) action()
+                4 -> if (vm.cp <  0) action()
                 else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
             }
         }

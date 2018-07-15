@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import net.torvald.terranvm.assets.BiosSetup
 import net.torvald.terranvm.assets.Loader
 import net.torvald.terranvm.runtime.Assembler
 import net.torvald.terranvm.runtime.GdxPeripheralWrapper
@@ -88,7 +89,7 @@ class TextOnly : Game() {
         val code = programImage.bytes*/
 
 
-        val programImage = assembler(Loader())
+        val programImage = assembler(BiosSetup())
         val code = programImage.bytes
 
 

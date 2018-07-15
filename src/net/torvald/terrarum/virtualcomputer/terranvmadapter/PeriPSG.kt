@@ -49,4 +49,8 @@ open class PeriPSG : GdxPeripheralWrapper(24) {
 
     override fun call(arg: Int) {
     }
+
+    override fun inquireBootstrapper(): ByteArray? {
+        return null
+    }
 }

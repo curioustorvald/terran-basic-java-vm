@@ -102,4 +102,8 @@ class Poketch : PeriMDA(11, 10, 25, null, 1760, null) {
         super.dispose()
     }
 
+    override fun inquireBootstrapper(): ByteArray? {
+        return null
+    }
+
 }

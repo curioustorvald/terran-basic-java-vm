@@ -180,11 +180,6 @@ CCh,CCh,CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h, # U
 CCh,CCh,CCh,CCh,CCh,CCh,C0h,E1h,E1h,F3h, # V
 CCh,CCh,CCh,CCh,C0h,E1h,F3h,F3h,F3h,F3h; # Y
 
-int months, 0;
-int weekday, 0;
-int days, 0;
-int hours, 0;
-int minutes, 0;
 bytes charTable,
  60, 80, 70, #### Mon
 110,140,100, #### Tys
@@ -195,6 +190,11 @@ bytes charTable,
 100,120, 70, #### Sun
 130  20  90; #### Ver
 
+int months, 0;
+int weekday, 0;
+int days, 0;
+int hours, 0;
+int minutes, 0;
 
 .code;
 
