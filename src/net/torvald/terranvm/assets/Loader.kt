@@ -15,10 +15,10 @@ object Loader {
 ##      [0-9A-F]{0,8}[KPRT]
 ##
 ## Commands:
-##      K: peek what word is in the current address
-##      P: poke a word to the buffer and increment buffer's program counter
-##      R: execute opcode starting from current buffer's program counter
-##      T: move buffer's program counter
+##      K: read what word is in the current address
+##      P: write a word to memory; advance cursor (takes hexadecimal number)
+##      R: execute opcode starting from current cursor position
+##      T: move cursor of buffer (takes 2, 4, 6, 8 digits of hexadecimal number)
 ##
 ## Created by minjaesong on 2018-04-16
 
@@ -41,7 +41,7 @@ jsri @reset_buffer;
 jmp @code;
 
 :reset_buffer; # garbles r1
-loadbytei r1, 0;
+loadwordi r1, 0;
 storewordimem r1, @literalbuffer;
 return;
 
@@ -82,7 +82,7 @@ loadwordigt r7, 55;                 # r1 = r1 - 55
 subgt r1, r1, r7;                   #
                                 # ENDIF
 
-loadbytei r7, 1111b;            # sanitise r1 by
+loadwordi r7, 1111b;            # sanitise r1 by
 and r1, r1, r7;                 # ANDing with 1111b
 
 push r1;                        # push return value
@@ -95,7 +95,7 @@ jsri @putchar;                  #
 return;
 
 :putchar_capital;
-loadbytei r1, 32;               #
+loadwordi r1, 32;               #
 sub r8, r3, r1;                 #
 push r8;                        # putchar
 jsri @putchar;                  #
@@ -111,17 +111,18 @@ return;
 ## initialise ##
 ################
 
-loadbytei r5, 0;                # byte accumulator
-loadbytei r6, 0;                # byte literal read and acc counter (7 downTo 0)
-loadbytei r8, 0;                # constant zero
+loadwordi r5, 0;                # byte accumulator
+loadwordi r6, 0;                # byte literal read and acc counter (7 downTo 0)
+loadwordi r8, 0;                # constant zero
 
-pushwordi @loadertext;          # print out LOADER
+loadwordi r1, @loadertext;      # print out LOADER
+push r1;                        #
 jsri @putstring;                #
 
 loadwordi r2, 2048;             # allocate buffer, r4 contains address (NOT an offset)
 malloc r4, r2;                  # (2 KBytes)
 storewordimem r4, @startingptr; #
-loadbytei r4, 0;                # now r4 contains distance to the starting pointer
+loadwordi r4, 0;                # now r4 contains distance to the starting pointer
 
 
 
@@ -138,13 +139,13 @@ call r1, FFh;                   #
 ## print 'a'..'f' as capital ##
 ###############################
 
-loadbytei r1, 61h;              # r1 <- 'a'
+loadwordi r1, 61h;              # r1 <- 'a'
 cmp r3, r1;                     # IF (r3, 'a')
 jgt @r1_geq_a;                  # 'a'
 jz  @r1_geq_a;                  # 'b'..'f'
 jls @r1_ls_a;                   # lesser
 :r1_geq_a;
-loadbytei r1, 66h;              # r1 <- 'f'
+loadwordi r1, 66h;              # r1 <- 'f'
 cmp r3, r1;                     # IF (r3, 'f')
 jsriz  @putchar_capital;            # 'f'
 jz @accept_byte_literal;            #
@@ -161,10 +162,10 @@ jmp @function_keys;             # derp
 # compare if r3 in '0'..'9'
 # putchar and goto accept_byte_literal
 
-loadbytei r1, 30h;              # r1 <- '0'
+loadwordi r1, 30h;              # r1 <- '0'
 cmp r3, r1;                     # IF (r3, '0')
 jls @loop;                          # deny if r3 < '0'
-loadbytei r1, 39h;              # r1 <- '9'
+loadwordi r1, 39h;              # r1 <- '9'
 cmp r3, r1;                     # IF (r3, '9')
 jgt @loop;                          # deny if r3 > '9'
 
@@ -176,22 +177,22 @@ jmp @accept_byte_literal;       #
 :function_keys; ##
 ##################
 
-loadbytei r1, 70h;              #
+loadwordi r1, 70h;              #
 cmp r3, r1;                     # IF (r3 == 'p') THEN
 jsriz @putchar_verbatim;            # printout
 jz @write_to_mem;                   # goto write_to_mem
                                 # ENDIF
-loadbytei r1, 74h;              #
+loadwordi r1, 74h;              #
 cmp r3, r1;                     # IF (r3 == 't') THEN
 jsriz @putchar_verbatim;            # printout
 jz @move_pointer;                   # goto move_pointer
                                 # ENDIF
-loadbytei r1, 6Bh;              #
+loadwordi r1, 6Bh;              #
 cmp r3, r1;                     # IF (r3 == 'k') THEN
 jsriz @putchar_verbatim;            # printout
 jz @peek_buffer;                    # goto peek_buffer
                                 # ENDIF
-loadbytei r1, 72h;              #
+loadwordi r1, 72h;              #
 cmp r3, r1;                     # IF (r3 == 'r') THEN
 jsriz @putchar_verbatim;            # printout
 jz @execute;                    # goto execute
@@ -203,17 +204,17 @@ jnz @loop;                      # deny
 ########################
 
 
-loadbytei r8, 57;               # '9'
+loadwordi r8, 57;               # '9'
 cmp r3, r8;                     # IF
                                 # (r3 < r8) aka r1 in '0'..'9' THEN
-loadbyteils r7, 30h;                # r3 = r3 - 48
+loadwordils r7, 30h;                # r3 = r3 - 48
 subls r3, r3, r7;                   #
                                 # (r3 > r8) THEN
-loadbyteigt r7, 55;                 # r3 = r3 - 55
+loadwordigt r7, 55;                 # r3 = r3 - 55
 subgt r3, r3, r7;                   #
                                 # ENDIF
 
-loadbytei r7, 1111b;            # sanitise r3 by
+loadwordi r7, 1111b;            # sanitise r3 by
 and r3, r3, r7;                 # ANDing with 1111b
 
 
@@ -221,22 +222,22 @@ and r3, r3, r7;                 # ANDing with 1111b
 ## now r3 has nibble ##
 #######################
 
-loadbytei r2, 1;                # flip about with r6, keep it to r2
+loadwordi r2, 1;                # flip about with r6, keep it to r2
 xor r2, r6, r2;                 # r2 = r6 xor 1 (01234567 -> 10325476)
 
 ## accumulate to r5 ##
-loadbytei r7, 4;                #
+loadwordi r7, 4;                #
 mulint r7, r7, r2;              # r8 = 8, 12, 0, 4 for r6: 2, 3, 0, 1
 shl r3, r3, r7;                 #
 or r5, r5, r3;                  # r5 = r5 or (r3 shl r7)
 
 storewordimem r5, @literalbuffer;# put r5 into literalbuffer
 
-loadbytei r1, 7;                # a number to compare against
+loadwordi r1, 7;                # a number to compare against
 cmp r6, r1;                     # IF
                                 # (r6 == 7) THEN
-loadbyteiz r6, 0;                   # r6 = 0
-loadbyteiz r5, 0;                   # r5 = 0
+loadwordiz r6, 0;                   # r6 = 0
+loadwordiz r5, 0;                   # r5 = 0
                                 # (r6 != 7) THEN
 incnz r6;                           # r6++
                                 # ENDIF
@@ -248,18 +249,18 @@ jmp @loop;
 #################
 
 loadwordimem r5, @literalbuffer;# deref literalbuffer into r5 (r5 is zero in this case if full word is written in buffer)
-loadbytei r1, 0;                #
+loadwordi r1, 0;                #
 
 loadwordimem r2, @startingptr;  #
 add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
 storeword r5, r2, r1;           #
 
-loadbytei r1, 4;                # r4 += 4
+loadwordi r1, 4;                # r4 += 4
 add r4, r4, r1;                 #
 
 jsri @reset_buffer;
-loadbyteiz r6, 0;               # r6 = 0
-loadbyteiz r5, 0;               # r5 = 0
+loadwordiz r6, 0;               # r6 = 0
+loadwordiz r5, 0;               # r5 = 0
 
 jmp @loop;
 
@@ -269,17 +270,17 @@ jmp @loop;
 
 loadwordimem r5, @literalbuffer;# deref literalbuffer into r5 (r5 is zero in this case if full word is written in buffer)
 
-loadbytei r1, 2;                # make r5 word-aligned
+loadwordi r1, 2;                # make r5 word-aligned
 ushr r5, r5, r1; shl r5, r5, r1;#
 
 mov r4, r5;                     # r4 = literalbuffer
 
 itox r1, r4;                    # r1 = r4 (distance from startingptr) as a String
 
-loadhwordi r7, 020Ah;           #
+loadwordi r7, 020Ah;           #
 call r7, FFh;                   # print '\n'
 
-loadhwordi r8, 023Eh;           #
+loadwordi r8, 023Eh;           #
 call r8, FFh;                   # print '>'
 
 loadwordi r8, 02000000h;        # base BIOS call for print string
@@ -289,8 +290,8 @@ call r8, FFh;                   # print out new offset (aka distance)
 call r7, FFh; # print '\n'      # print '\n' using r7 we overwrote above
 
 jsri @reset_buffer;
-loadbyteiz r6, 0;               # r6 = 0
-loadbyteiz r5, 0;               # r5 = 0
+loadwordiz r6, 0;               # r6 = 0
+loadwordiz r5, 0;               # r5 = 0
 
 jmp @loop;
 
@@ -303,26 +304,26 @@ loadwordimem r2, @startingptr;  #
 add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
 
 loadwordi r8, 02000000h;        # base BIOS call for print string
-loadbytei r3, 0;
+loadwordi r3, 0;
 
 ## PRINT 1 ##
 
-loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
-loadhwordi r7, 023Eh; call r7, FFh; # print '>'
+loadwordi r3, 020Ah; call r3, FFh; # print '\n'
+loadwordi r7, 023Eh; call r7, FFh; # print '>'
 or r3, r8, r1;        call r3, FFh; # print distance from startingptr
 
 ## END OF PRINT 1 ##
 
 ## PRINT 2 ##
 
-loadhwordi r3, 023Ah; call r3, FFh; # print ':'
-loadhwordi r3, 0220h; call r3, FFh; # print ' '
+loadwordi r3, 023Ah; call r3, FFh; # print ':'
+loadwordi r3, 0220h; call r3, FFh; # print ' '
 
 ## print out 4 consecutive bytes
 
-loadbytei r3, 0;
+loadwordi r3, 0;
 # loadwordi r8, 02000000h;
-loadhwordi r7, 0220h;
+loadwordi r7, 0220h;
 
 loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in old r2
 itox r1, r1;                    # r1 now contains string pointer for hex str
@@ -349,7 +350,7 @@ loadbyte r1, r2, r3;            # r1 now contains whatever byte was contained in
 itox r1, r1;                    # r1 now contains string pointer for hex strW
 or r1, r1, r8; call r1, FFh;    # printout r1
 
-loadhwordi r3, 020Ah; call r3, FFh; # print '\n'
+loadwordi r3, 020Ah; call r3, FFh; # print '\n'
 
 ## END OF PRINT 2 ##
 

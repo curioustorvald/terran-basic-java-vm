@@ -332,6 +332,14 @@ class TerranVM(inMemSize: Int,
     var r6: Int; get() = context.r6; set(value) { context.r6= value }
     var r7: Int; get() = context.r7; set(value) { context.r7= value }
     var r8: Int; get() = context.r8; set(value) { context.r8= value }
+    var r9: Int; get() = context.r9; set(value) { context.r9= value }
+    var r10: Int; get() = context.r10; set(value) { context.r10= value }
+    var r11: Int; get() = context.r11; set(value) { context.r11= value }
+    var r12: Int; get() = context.r12; set(value) { context.r12= value }
+    var r13: Int; get() = context.r13; set(value) { context.r13= value }
+    var r14: Int; get() = context.r14; set(value) { context.r14= value }
+    var r15: Int; get() = context.r15; set(value) { context.r15= value }
+
     var cp: Int; get() = context.cp; set(value) { context.cp= value } // compare register
     var pc: Int; get() = context.pc; set(value) { context.pc= value } // program counter
     var sp: Int; get() = context.sp; set(value) { context.sp= value } // stack pointer
@@ -348,6 +356,13 @@ class TerranVM(inMemSize: Int,
             6 -> r6 = data.toRawBits()
             7 -> r7 = data.toRawBits()
             8 -> r8 = data.toRawBits()
+            9 -> r9 = data.toRawBits()
+            10 -> r10 = data.toRawBits()
+            11 -> r11 = data.toRawBits()
+            12 -> r12 = data.toRawBits()
+            13 -> r13 = data.toRawBits()
+            14 -> r14 = data.toRawBits()
+            15 -> r15 = data.toRawBits()
             0 -> throw IllegalArgumentException("Cannot write to '0' register")
             else -> throw IllegalArgumentException("No such register: r$register")
         }
@@ -362,11 +377,19 @@ class TerranVM(inMemSize: Int,
             6 -> r6 = data
             7 -> r7 = data
             8 -> r8 = data
+            9 -> r9 = data
+            10 -> r10 = data
+            11 -> r11 = data
+            12 -> r12 = data
+            13 -> r13 = data
+            14 -> r14 = data
+            15 -> r15 = data
             0 -> throw IllegalArgumentException("Cannot write to '0' register")
             else -> throw IllegalArgumentException("No such register: r$register")
         }
     }
     fun readregInt(register: Int) = when (register) {
+        0 -> 0
         1 -> r1
         2 -> r2
         3 -> r3
@@ -375,9 +398,17 @@ class TerranVM(inMemSize: Int,
         6 -> r6
         7 -> r7
         8 -> r8
+        9 -> r9
+        10 -> r10
+        11 -> r11
+        12 -> r12
+        13 -> r13
+        14 -> r14
+        15 -> r15
         else -> throw IllegalArgumentException("No such register: r$register")
     }
     fun readregFloat(register: Int) = when (register) {
+        0 -> 0f
         1 -> java.lang.Float.intBitsToFloat(r1)
         2 -> java.lang.Float.intBitsToFloat(r2)
         3 -> java.lang.Float.intBitsToFloat(r3)
@@ -386,6 +417,13 @@ class TerranVM(inMemSize: Int,
         6 -> java.lang.Float.intBitsToFloat(r6)
         7 -> java.lang.Float.intBitsToFloat(r7)
         8 -> java.lang.Float.intBitsToFloat(r8)
+        9 -> java.lang.Float.intBitsToFloat(r9)
+        10 -> java.lang.Float.intBitsToFloat(r10)
+        11 -> java.lang.Float.intBitsToFloat(r11)
+        12 -> java.lang.Float.intBitsToFloat(r12)
+        13 -> java.lang.Float.intBitsToFloat(r13)
+        14 -> java.lang.Float.intBitsToFloat(r14)
+        15 -> java.lang.Float.intBitsToFloat(r15)
         else -> throw IllegalArgumentException("No such register: r$register")
     }
 
@@ -410,11 +448,11 @@ class TerranVM(inMemSize: Int,
         }
 
         hardReset()
+        VMOpcodesRISC.invoke(this)
+
         if (!doNotInstallInterrupts) {
             setDefaultInterrupts()
         }
-
-        VMOpcodesRISC.invoke(this)
     }
 
     fun loadProgramDynamic(programImage: ProgramImage, contextID: Int? = null) {
@@ -466,6 +504,8 @@ class TerranVM(inMemSize: Int,
             throw Error("Out of memory -- required: ${opcodes.size + st} (${opcodes.size} for program), installed: ${memory.size}")
         }
 
+        stackSize = programImage.stackSize
+
         softReset()
 
         val newProgramPtr = malloc(opcodes.size)
@@ -493,56 +533,56 @@ class TerranVM(inMemSize: Int,
             val assembler = Assembler(this)
             val intOOM = assembler("""
             .code;
-loadhwordi r1, 024Eh; call r1, FFh; # N
-loadhwordi r1, 024Fh; call r1, FFh; # O
-loadhwordi r1, 024Dh; call r1, FFh; # M
-loadhwordi r1, 0245h; call r1, FFh; # E
-loadhwordi r1, 024Dh; call r1, FFh; # M
+loadwordi r1, 024Eh; call r1, FFh; # N
+loadwordi r1, 024Fh; call r1, FFh; # O
+loadwordi r1, 024Dh; call r1, FFh; # M
+loadwordi r1, 0245h; call r1, FFh; # E
+loadwordi r1, 024Dh; call r1, FFh; # M
 halt;
 """).bytes
             val intSegfault = assembler("""
             .code;
-loadhwordi r1, 0253h; call r1, FFh; # S
-loadhwordi r1, 0245h; call r1, FFh; # E
-loadhwordi r1, 0247h; call r1, FFh; # G
-loadhwordi r1, 0246h; call r1, FFh; # F
-loadhwordi r1, 0255h; call r1, FFh; # U
+loadwordi r1, 0253h; call r1, FFh; # S
+loadwordi r1, 0245h; call r1, FFh; # E
+loadwordi r1, 0247h; call r1, FFh; # G
+loadwordi r1, 0246h; call r1, FFh; # F
+loadwordi r1, 0255h; call r1, FFh; # U
 halt;
 """).bytes
             val intDivZero = assembler("""
             .code;
-loadhwordi r1, 0244h; call r1, FFh; # D
-loadhwordi r1, 0249h; call r1, FFh; # I
-loadhwordi r1, 0256h; call r1, FFh; # V
-loadhwordi r1, 022Fh; call r1, FFh; # /
-loadhwordi r1, 0230h; call r1, FFh; # 0
+loadwordi r1, 0244h; call r1, FFh; # D
+loadwordi r1, 0249h; call r1, FFh; # I
+loadwordi r1, 0256h; call r1, FFh; # V
+loadwordi r1, 022Fh; call r1, FFh; # /
+loadwordi r1, 0230h; call r1, FFh; # 0
 halt;
 """).bytes
             val intIllegalOp = assembler("""
             .code;
-loadhwordi r1, 0249h; call r1, FFh; # I
-loadhwordi r1, 024Ch; call r1, FFh; # L
-loadhwordi r1, 024Ch; call r1, FFh; # L
-loadhwordi r1, 024Fh; call r1, FFh; # O
-loadhwordi r1, 0250h; call r1, FFh; # P
+loadwordi r1, 0249h; call r1, FFh; # I
+loadwordi r1, 024Ch; call r1, FFh; # L
+loadwordi r1, 024Ch; call r1, FFh; # L
+loadwordi r1, 024Fh; call r1, FFh; # O
+loadwordi r1, 0250h; call r1, FFh; # P
 halt;
 """).bytes
             val intStackOverflow = assembler("""
             .code;
-loadhwordi r1, 0253h; call r1, FFh; # S
-loadhwordi r1, 0254h; call r1, FFh; # T
-loadhwordi r1, 024Fh; call r1, FFh; # O
-loadhwordi r1, 0256h; call r1, FFh; # V
-loadhwordi r1, 0246h; call r1, FFh; # F
+loadwordi r1, 0253h; call r1, FFh; # S
+loadwordi r1, 0254h; call r1, FFh; # T
+loadwordi r1, 024Fh; call r1, FFh; # O
+loadwordi r1, 0256h; call r1, FFh; # V
+loadwordi r1, 0246h; call r1, FFh; # F
 halt;
 """).bytes
             val intMathFuck = assembler("""
             .code;
-loadhwordi r1, 024Dh; call r1, FFh; # M
-loadhwordi r1, 0254h; call r1, FFh; # T
-loadhwordi r1, 0246h; call r1, FFh; # F
-loadhwordi r1, 0243h; call r1, FFh; # C
-loadhwordi r1, 024Bh; call r1, FFh; # K
+loadwordi r1, 024Dh; call r1, FFh; # M
+loadwordi r1, 0254h; call r1, FFh; # T
+loadwordi r1, 0246h; call r1, FFh; # F
+loadwordi r1, 0243h; call r1, FFh; # C
+loadwordi r1, 024Bh; call r1, FFh; # K
 halt;
 """).bytes
 
@@ -605,12 +645,19 @@ halt;
         r6 = 0
         r7 = 0
         r8 = 0
+        r9 = 0
+        r10 = 0
+        r11 = 0
+        r12 = 0
+        r13 = 0
+        r14 = 0
+        r15 = 0
 
         cp = 0
         pc = 0
         sp = 0
         lr = 0
-        st = 0
+        st = interruptCount * 4
         //... but don't reset the uptime
         resumeExec()
         yieldRequested = false
@@ -743,11 +790,18 @@ halt;
                 execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
                 execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
                 execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
+                execDebugError("r9: $r9; ${r9.to8HexString()}; ${readregFloat(9)}f")
+                execDebugError("r10: $r10; ${r10.to8HexString()}; ${readregFloat(10)}f")
+                execDebugError("r11: $r11; ${r11.to8HexString()}; ${readregFloat(11)}f")
+                execDebugError("r12: $r12; ${r12.to8HexString()}; ${readregFloat(12)}f")
+                execDebugError("r13: $r13; ${r13.to8HexString()}; ${readregFloat(13)}f")
+                execDebugError("r14: $r14; ${r14.to8HexString()}; ${readregFloat(14)}f")
+                execDebugError("r15: $r15; ${r15.to8HexString()}; ${readregFloat(15)}f")
                 execDebugError("pc: $pc; ${pc.toHexString()}")
                 oom.printStackTrace()
                 interruptOutOfMem()
             }
-            catch (e: Exception) {
+            catch (e: UnknownOpcodeExpection) {
                 execDebugError("r1: $r1; ${r1.to8HexString()}; ${readregFloat(1)}f")
                 execDebugError("r2: $r2; ${r2.to8HexString()}; ${readregFloat(2)}f")
                 execDebugError("r3: $r3; ${r3.to8HexString()}; ${readregFloat(3)}f")
@@ -756,8 +810,16 @@ halt;
                 execDebugError("r6: $r6; ${r6.to8HexString()}; ${readregFloat(6)}f")
                 execDebugError("r7: $r7; ${r7.to8HexString()}; ${readregFloat(7)}f")
                 execDebugError("r8: $r8; ${r8.to8HexString()}; ${readregFloat(8)}f")
+                execDebugError("r9: $r9; ${r9.to8HexString()}; ${readregFloat(9)}f")
+                execDebugError("r10: $r10; ${r10.to8HexString()}; ${readregFloat(10)}f")
+                execDebugError("r11: $r11; ${r11.to8HexString()}; ${readregFloat(11)}f")
+                execDebugError("r12: $r12; ${r12.to8HexString()}; ${readregFloat(12)}f")
+                execDebugError("r13: $r13; ${r13.to8HexString()}; ${readregFloat(13)}f")
+                execDebugError("r14: $r14; ${r14.to8HexString()}; ${readregFloat(14)}f")
+                execDebugError("r15: $r15; ${r15.to8HexString()}; ${readregFloat(15)}f")
                 execDebugError("pc: $pc; ${pc.toHexString()}")
                 e.printStackTrace()
+                VMOpcodesRISC.HALT()
             }
 
 
@@ -871,6 +933,15 @@ halt;
             var r6: Int = 0,
             var r7: Int = 0,
             var r8: Int = 0,
+            var r9: Int = 0,
+            var r10: Int = 0,
+            var r11: Int = 0,
+            var r12: Int = 0,
+            var r13: Int = 0,
+            var r14: Int = 0,
+            var r15: Int = 0,
+
+
             var cp: Int = 0, // compare register
             var pc: Int = 0, // program counter
             var sp: Int = 0, // stack pointer

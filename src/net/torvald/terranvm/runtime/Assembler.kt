@@ -49,7 +49,7 @@ import net.torvald.terranvm.toReadableOpcode
  *
  *
  * ### Literals
- * - Register literals: r1, r2, r3, r4, r5, r6, r7, r8 (starts at 1)
+ * - Register literals: r0 throught r15
  * - Hex literals: CAFEBABEh
  * - Integer literals: 80085
  *
@@ -101,10 +101,6 @@ class Assembler(val vm: TerranVM) {
         val asmSections = hashSetOf<String>(".CODE", ".DATA", ".STACK")
 
 
-        val bitmaskRd = 0b00000001110000000000000000000000
-        val bitmaskRs = 0b00000000001110000000000000000000
-        val bitmaskRm = 0b00000000000001110000000000000000
-        val bitmaskCond = 0b11100000000000000000000000000000
         val conditions: HashMap<String, Int> = hashMapOf(
                 "" to 0,
                 "Z" to 0x20000000,
@@ -173,6 +169,8 @@ class Assembler(val vm: TerranVM) {
                 "HALT" to 0,
                 "YIELD" to 32,
                 "PAUSE" to 42,
+                "JCTX" to 44,
+                "RCTX" to 45,
 
                 "SRR"   to 0b10000000,
                 "SXCHG" to 0b10000001,
@@ -180,12 +178,12 @@ class Assembler(val vm: TerranVM) {
 
                 // Load and Store to memory //
 
-                "LOADBYTE" to 0b0000_000000000_0000000001000_00_0,
-                "LOADHWORD" to 0b0000_000000000_0000000001000_01_0,
-                "LOADWORD" to 0b0000_000000000_0000000001000_10_0,
-                "STOREBYTE" to 0b0000_000000000_0000000001000_00_1,
-                "STOREHWORD" to 0b0000_000000000_0000000001000_01_1,
-                "STOREWORD" to 0b0000_000000000_0000000001000_10_1,
+                "LOADBYTE"   to 0b000_0000_0000_0000_00000001000_00_0,
+                "LOADHWORD"  to 0b000_0000_0000_0000_00000001000_01_0,
+                "LOADWORD"   to 0b000_0000_0000_0000_00000001000_10_0,
+                "STOREBYTE"  to 0b000_0000_0000_0000_00000001000_00_1,
+                "STOREHWORD" to 0b000_0000_0000_0000_00000001000_01_1,
+                "STOREWORD"  to 0b000_0000_0000_0000_00000001000_10_1,
 
                 // Memory copy //
 
@@ -193,34 +191,31 @@ class Assembler(val vm: TerranVM) {
 
                 // Compare //
 
-                "CMP" to 0b0001_000000_0000000000000000000,
-                "CMPII" to 0b0001_000000_0000000000000000000,
-                "CMPIF" to 0b0001_000000_0000000000000000001,
-                "CMPFI" to 0b0001_000000_0000000000000000010,
-                "CMPFF" to 0b0001_000000_0000000000000000011,
+                "CMP"   to 0b000_0000_0000_0000_000001000000_00,
+                "CMPII" to 0b000_0000_0000_0000_000001000000_00,
+                "CMPIF" to 0b000_0000_0000_0000_000001000000_01,
+                "CMPFI" to 0b000_0000_0000_0000_000001000000_10,
+                "CMPFF" to 0b000_0000_0000_0000_000001000000_11,
 
                 // Load and Store byte/halfword/word immediate //
+                //"LOADBYTEI"   to 0b001_0000_0000_00_0000000000000000,
+                //"LOADHWORDI"  to 0b001_0000_0000_00_0000000000000000,
+                //"STOREBYTEI"  to 0b001_0000_0000_10_0000000000000000,
+                "STOREHWORDI" to 0b001_0000_0000_10_0000000000000000,
 
-                "LOADBYTEI" to 0b0001_000_000010_00000000_00000000,
-                "LOADHWORDI" to 0b0001_000_000100_0000000000000000,
-                "STOREBYTEI" to 0b0001_000_000011_00000000_00000000,
-                "STOREHWORDI" to 0b0001_000_000101_0000000000000000,
-
-                "LOADWORDI" to 0b0001_000_000110_0000000000000000,
-                "LOADWORDILO" to 0b0001_000_000110_0000000000000000, // used in Int.toReadableOpcode()
-                "LOADWORDIHI" to 0b0001_000_000111_0000000000000000, // used in Int.toReadableOpcode()
+                "LOADWORDI"   to 0b001_0000_0000_00_0000000000000000,
+                "LOADWORDILO" to 0b001_0000_0000_00_0000000000000000, // used in Int.toReadableOpcode()
+                "LOADWORDIHI" to 0b001_0000_0000_01_0000000000000000, // used in Int.toReadableOpcode()
 
                 // Load and Store a word from register to memory //
 
-                "LOADWORDIMEM" to 0b0010.shl(25),
-                "STOREWORDIMEM" to 0b0011.shl(25),
+                "LOADWORDIMEM" to 0b010.shl(26),
+                "STOREWORDIMEM" to 0b011.shl(26),
 
                 // Push and Pop //
 
-                "PUSH" to 0b0100.shl(25),
-                "POP" to 0b0101.shl(25),
-                "PUSHWORDI" to 0b0110.shl(25),
-                "POPWORDI" to 0b0111.shl(25),
+                "PUSH" to 0b000_0000_0000_0000_00001000000000,
+                "POP"  to 0b000_0000_0000_0000_00001100000000,
 
                 // Conditional jump (WARNING: USES CUSTOM CONDITION HANDLER!) //
 
@@ -234,14 +229,14 @@ class Assembler(val vm: TerranVM) {
 
                 // Jump to Subroutine, Immediate //
 
-                "JSRI" to 0b00010010000000000000000000000000,
+                "JSRI" to 0b101_00000000000000000000000000,
 
                 // Call peripheral //
 
-                "CALL" to 0b1111_000_00000000000000_00000000,
-                "MEMSIZE" to 0b1111_000_00000000000001_00000000,
-                "UPTIME" to 0b1111_000_00000000000001_11111111,
-                "INT" to 0b111111111111111111111_00000000,
+                "CALL"    to 0b110_0000_01000000000001_00000000,
+                "MEMSIZE" to 0b110_0000_01000000000010_00000000,
+                "UPTIME"  to 0b110_0000_01000000000010_11111111,
+                "INT"     to 0x1FFF0000,
 
                 // Assembler-specific commands //
 
@@ -249,16 +244,18 @@ class Assembler(val vm: TerranVM) {
         )
         val opcodes = HashMap<String, Int>()
 
-        val twoLiners = hashSetOf("LOADWORDI", "LOADWORDIZ", "LOADWORDINZ", "LOADWORDIGT", "LOADWORDILS")
+        val twoLiners = hashSetOf(
+                "LOADWORDI", "LOADWORDIZ", "LOADWORDINZ", "LOADWORDIGT", "LOADWORDILS"
+        )
 
         /**
          * @return r: register, b: byte, w: halfword, f: full word (LOADWORDI only!) a: address offset
          */
         fun getOpArgs(opcode: Int): String? {
             val opcode = opcode.and(0x1FFFFFFF) // drop conditions
-            return when (opcode.ushr(25).and(0xF)) {
+            return when (opcode.ushr(26).and(0b111)) {
                 0 -> {
-                    val mathOp = opcode.and(0xFF)
+                    val mathOp = opcode.and(0x3FFF)
                     if (mathOp == 0) {
                         ""
                     }
@@ -286,44 +283,45 @@ class Assembler(val vm: TerranVM) {
                     else if (mathOp in 0b1000000..0b1000111) { // load/store
                         "rrr"
                     }
-                    else if (mathOp == 0b1001000) { // memcpy
-                        "rrr"
-                    }
                     else if (mathOp in 0b10000000..0b10000001 || mathOp == 0b11000000) { // SRR and SXCHG
                         "rr"
+                    }
+                    else if (mathOp in 0x100..0x103) { // compare
+                        "rr"
+                    }
+                    else if (mathOp == 44) { // JCTX
+                        "r"
+                    }
+                    else if (mathOp == 0x200 || mathOp == 0x300) { // PUSH, POP
+                        "r"
                     }
                     else {
                         ""
                     }
                 }
                 1 -> {
-                    val mode = opcode.ushr(17).and(0b11111)
+                    val mode = opcode.ushr(16).and(3)
                     return when (mode) {
-                        0, 0b00100, 0b01000, 0b01100, 0b10000, 0b10100, 0b11000, 0b11100 -> "rr"
-                        1 -> "rb"
-                        2 -> "rw"
-                        3 -> "rf"
-                        else -> return null
+                        0    -> "rf" // LOADWORDILO
+                        1    -> "rf" // LOADWORDIHI
+                        2    -> "rrw" // STOREHWORDI
+                        else -> throw UnknownOpcodeExpection(opcode)
                     }
                 }
-                2, 3 -> "ra" // loadi/storei
-                4, 5 -> "r"  // push/pop
-                6 -> "a" // pushwordi
-                7 -> ""  // popwordi
-                8 -> "a" // conditional jump
-                9 -> "a" // jsri
-                15 -> {
+                2, 3 -> "ra" // LOAD(STORE)WORDIMEM
+                4 -> "a" // conditional jump
+                5 -> "a" // JSRI
+                6 -> { // FEATURE, CALL, MEMSIZE, UPTIME
                     val cond = opcode.ushr(8).and(0x3FFF)
 
-                    if (cond <= 1) {
-                        "rb"
-                    }
-                    else if (cond == 0x3FFF) {
-                        "b"
-                    }
-                    else return null
+                    if (cond !in 0x1000..0x1002) throw UnknownOpcodeExpection(opcode)
+                    else return "rb"
                 }
-                else -> return null
+                7 -> { // INT
+                    if (opcode.ushr(8) == 0x1FFF00) return "b"
+                    else throw UnknownOpcodeExpection(opcode)
+                }
+                else -> throw UnknownOpcodeExpection(opcode)
             }
         }
 
@@ -470,7 +468,8 @@ class Assembler(val vm: TerranVM) {
         else {
 
             val arguments = getOpArgs(resultingOpcode)
-            debug("arguments: $arguments")
+            //debug("arguments of ${resultingOpcode.toReadableBin()}: $arguments")
+            debug("arguments of ${resultingOpcode.toReadableOpcode().split(' ')[0]}: $arguments")
 
             // check if user had provided right number of arguments
             if (words.size != arguments!!.length + 1) {
@@ -499,7 +498,7 @@ class Assembler(val vm: TerranVM) {
                 }
                 else {
                     resultingOpcode = resultingOpcode or when (c) {
-                        'r' -> word.toRegInt().shl(22 - 3 * index)
+                        'r' -> word.toRegInt().shl(22 - 4 * index)
                         'b' -> word.resolveInt().and(0xFF)
                         'w' -> word.resolveInt().and(0xFFFF)
                         'a' -> word.resolveInt().and(0x3FFFFF)
@@ -848,9 +847,7 @@ class Assembler(val vm: TerranVM) {
 
     private fun String.toRegInt() =
             if (this.matches(regexRegisterLiteral))
-                this[1].toInt() - 49 // "r1" -> 0
-            else if (this == "0")
-                -1
+                this[1].toInt() - 48 // "r0" -> 0
             else
                 throw IllegalArgumentException("Illegal register literal: '$this'")
 
@@ -876,3 +873,5 @@ class Assembler(val vm: TerranVM) {
  * @param bytes entire image of the program, including stack area
  */
 data class ProgramImage(val stackSize: Int, val bytes: ByteArray)
+
+class UnknownOpcodeExpection(opcode: Int) : InternalError("Unknown opcode: ${opcode.toReadableBin()}") // can't get readable string because of loophole

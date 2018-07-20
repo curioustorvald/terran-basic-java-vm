@@ -9,10 +9,11 @@ import java.util.*
 
 fun Int.toReadableBin() =
         this.ushr(29).toString(2).padStart(3, '0') + "_" +
-        this.ushr(25).and(0b1111).toString(2).padStart(4, '0') + "_" +
-                this.ushr(22).and(0b111).toString(2).padStart(3, '0') + "_" +
-                this.ushr(16).and(0x3F).toString(2).padStart(6, '0') + "_" +
-                this.and(0xFFFF).toString(2).padStart(16, '0')
+        this.ushr(26).and(0b111).toString(2).padStart(3, '0') + "_" +
+        this.ushr(22).and(0b1111).toString(2).padStart(4, '0') + "_" +
+        this.ushr(18).and(0b1111).toString(2).padStart(4, '0') + "_" +
+        this.ushr(16).and(0b11).toString(2).padStart(2, '0') + "_" +
+        this.and(0xFFFF).toString(2).padStart(16, '0')
 
 fun Int.toBytesBin(): String {
     val sb = StringBuilder()
@@ -46,12 +47,10 @@ fun HashMap<out Any, out Any>.searchFor(value: Any): Any? {
 
 
 fun Int.toReadableOpcode(): String {
-    val Rd = this.and(0b00000001110000000000000000000000).ushr(22) + 1
-    val Rs = this.and(0b00000000001110000000000000000000).ushr(19) + 1
-    val Rm = this.and(0b00000000000001110000000000000000).ushr(16) + 1
-    val R4 = this.and(0b00000000000000001110000000000000).ushr(13) + 1
-    val R5 = this.and(0b00000000000000000001110000000000).ushr(10) + 1
-    val regArray = arrayOf(Rd, Rs, Rm, R4, R5)
+    val Rd = this.and(0b000_000_1111_0000_0000_00000000000000).ushr(22)
+    val Rs = this.and(0b000_000_0000_1111_0000_00000000000000).ushr(18)
+    val Rm = this.and(0b000_000_0000_0000_1111_00000000000000).ushr(14)
+    val regArray = arrayOf(Rd, Rs, Rm)
     val cond = when (this.ushr(29)) {
         0 -> ""
         1 -> "Z"
@@ -64,41 +63,40 @@ fun Int.toReadableOpcode(): String {
         else -> return "(data or unknown opcode)"
     }
 
-    val mode = this.and(0b00011110000000000000000000000000).ushr(25)
+    val mode = this.and(0b000_111_0000_0000_0000_00000000000000).ushr(26)
 
     var opString = when (mode) {
         0 -> {
-            Assembler.opcodes.searchFor(this.and(0b11111111)) ?: return "(data or unknown opcode)"
+            val zeroMode = this.and(0x3FFF)
+            Assembler.opcodes.searchFor(zeroMode) ?: return "(data or unknown opcode)"
         }
         1 -> {
-            Assembler.opcodes.searchFor(1.shl(25) or this.ushr(16).and(0b111).shl(16)) ?: return "(data or unknown opcode)"
+            val oneMode = this.ushr(16).and(0b11)
+
+            when (oneMode) {
+                0 -> "LOADWORDILO"
+                1 -> "LOADWORDIHI"
+                2 -> "STOREHWORDI"
+                else -> "(data or unknown opcode)"
+            }
         }
         2 -> "LOADWORDIMEM"
         3 -> "STOREWORDIMEM"
-        4 -> "PUSH"
-        5 -> "POP"
-        6 -> "PUSHWORDI"
-        7 -> "POPWORDI"
-        8 -> if (cond.isEmpty()) "JMP" else "J"
-        9 -> "JSRI"
-        10 -> if (Rs == 0) "SETBANK" else "INQFEATURE"
-        15 -> {
-            if (this.and(0x100) == 0) {
-                "CALL"
-            }
-            else {
-                if (this.and(0x1FFFFF00) == 0x1FFFFF00) {
-                    "INT"
-                }
-                else if (this.and(0xFF) == 0xFF) {
-                    "UPTIME"
-                }
-                else {
-                    "MEMSIZE"
-                }
+        4 -> if (cond.isEmpty()) "JMP" else "J"
+        5 -> "JSRI"
+        6 -> {
+            val sixMode = this.ushr(8).and(0x3FFF)
+
+            when (sixMode) {
+                in 0x0000..0x0FFF -> "MEMBANK"
+                0x1000 -> "FEATURE"
+                0x1001 ->"CALL"
+                0x1002 -> if (this.and(0xFF) == 255) "UPTIME" else "MEMSIZE"
+                else -> return "(data or unknown opcode)"
             }
         }
-        else -> return "(data or unknown opcode)"
+        7 -> if (this.and(0x1FFFFF_00).ushr(8) == 0x1FFF00) "INT" else return "(data or unknown opcode)"
+        else -> throw InternalError("Gah, another ionised particle!")
     }
 
     // manual replace
@@ -112,13 +110,20 @@ fun Int.toReadableOpcode(): String {
     }
 
 
+    try {
+        Assembler.getOpArgs(this)
+    }
+    catch (e: UnknownOpcodeExpection) {
+        return "(data or unknown opcode)"
+    }
+
     val argInfo = Assembler.getOpArgs(this)
 
     if (argInfo == null) {
         return "(data or unknown opcode)"
     }
 
-    val args = Array(5, { "" })
+    val args = Array(3, { "" })
     val argStr = StringBuilder()
 
     argInfo.forEachIndexed { index, c ->
@@ -225,7 +230,7 @@ object VMOpcodesRISC {
     }
 
     fun MALLOC(dest: Register, size: Register) { vm.writeregInt(dest, vm.malloc(vm.readregInt(size)).memAddr) }
-    fun RETURN() { POPWORDI(); vm.pc = vm.lr shl 2 /* LR must contain OFFSET, not actual address */ }
+    fun RETURN() { POP(0); vm.pc = vm.lr shl 2 /* LR must contain OFFSET, not actual address */ }
     /**
      * Register must contain address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C) but not pre-divided
      */
@@ -235,7 +240,7 @@ object VMOpcodesRISC {
     }
 
     fun JSRI(offset: Int) {
-        PUSHWORDI(vm.pc ushr 2) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
+        _PUSHWORDI(vm.pc ushr 2) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
         JMP(offset)
     }
 
@@ -431,26 +436,6 @@ object VMOpcodesRISC {
         memspace[index + 2] = destValue.byte3()
         memspace[index + 3] = destValue.byte4()
     }
-    /**
-     * @param dest device ID (0 for main memory)
-     * @param src  device ID (0 for main memory)
-     * @param len  size of the memory to copy
-     * @param fromOff memory address to read
-     * @param toOff   memory address to write
-     */
-    fun MEMCPY(dsl: Register, fromAddr: Register, toAddr: Register) {
-        val dsl = vm.readregInt(dsl)
-        val src = dsl.and(0xFF)
-        val dest = dsl.ushr(8).and(0xFF)
-        val len = dsl.ushr(16).and(0xFFFF)
-
-        val srcMem = if (src == 0) vm.memory else vm.peripherals[src]!!.memory
-        val destMem = if (dest == 0) vm.memory else vm.peripherals[dest]!!.memory
-        val fromAddr = vm.readregInt(fromAddr)
-        val toAddr = vm.readregInt(toAddr)
-
-        System.arraycopy(srcMem, fromAddr, destMem, toAddr, len)
-    }
 
 
 
@@ -462,12 +447,6 @@ object VMOpcodesRISC {
 
 
 
-    fun LOADBYTEI(dest: Register, byte: Int) {
-        vm.writeregInt(dest, byte.and(0xFF))
-    }
-    fun LOADHWORDI(dest: Register, halfword: Int) {
-        vm.writeregInt(dest, halfword.and(0xFFFF))
-    }
     fun LOADWORDI(dest: Register, word: Int, isHigh: Boolean) {
         val originalRegisterContents = vm.readregInt(dest)
         vm.writeregInt(dest,
@@ -477,12 +456,11 @@ object VMOpcodesRISC {
                     word.and(0xFFFF) or originalRegisterContents.toLong().and(0xFFFF0000L).toInt()
         )
     }
-    fun STOREBYTEI(dest: Register, peri: Register, byte: Int) {
-        vm.memory[vm.readregInt(dest)] = byte.toByte()
-    }
     fun STOREHWORDI(dest: Register, peri: Register, halfword: Int) {
-        vm.memory[vm.readregInt(dest)] = halfword.and(0xFF).toByte()
-        vm.memory[vm.readregInt(dest) + 1] = halfword.ushr(8).and(0xFF).toByte()
+        val memspace = if (vm.readregInt(peri) == 0) vm.memory else vm.peripherals[vm.readregInt(peri)]!!.memory
+
+        memspace[vm.readregInt(dest)] = halfword.and(0xFF).toByte()
+        memspace[vm.readregInt(dest) + 1] = halfword.ushr(8).and(0xFF).toByte()
     }
     fun LOADWORDIMEM(dest: Register, offset: Int) {
         val index = offset shl 2
@@ -519,7 +497,7 @@ object VMOpcodesRISC {
     /**
      * Push memory address offset immediate into the stack
      */
-    fun PUSHWORDI(offset: Int) {
+    private fun _PUSHWORDI(offset: Int) {
         if (vm.sp < vm.stackSize!!) {
             vm.memory[vm.ivtSize + 4 * vm.sp    ] = offset.byte1()
             vm.memory[vm.ivtSize + 4 * vm.sp + 1] = offset.byte2()
@@ -549,7 +527,12 @@ object VMOpcodesRISC {
         // fill with FF for security
         System.arraycopy(vm.bytes_ffffffff, 0, vm.memory, vm.ivtSize + 4 * vm.sp, 4)
 
-        vm.writeregInt(dest, value.toLittleInt())
+        if (dest == 0) {
+            vm.lr = value.toLittleInt()
+        }
+        else {
+            vm.writeregInt(dest, value.toLittleInt())
+        }
 
         // old code
         //vm.writeregInt(dest, vm.callStack[--vm.sp])
@@ -558,7 +541,7 @@ object VMOpcodesRISC {
     /**
      * Pop whatever value in the stack and write the value to the Link Register
      */
-    fun POPWORDI() {
+    /*fun POPWORDI() {
         vm.sp--
 
         val value = ByteArray(4)
@@ -574,7 +557,7 @@ object VMOpcodesRISC {
 
         // old code
         // vm.lr = vm.callStack[--vm.sp]
-    }
+    }*/
 
 
 
@@ -618,9 +601,9 @@ object VMOpcodesRISC {
 
 
     fun decodeAndExecute(opcode: Int) {
-        val Rd = opcode.and(0b00000001110000000000000000000000).ushr(22) + 1
-        val Rs = opcode.and(0b00000000001110000000000000000000).ushr(19) + 1
-        val Rm = opcode.and(0b00000000000001110000000000000000).ushr(16) + 1
+        val Rd = opcode.and(0b000_000_1111_0000_0000_00000000000000).ushr(22)
+        val Rs = opcode.and(0b000_000_0000_1111_0000_00000000000000).ushr(18)
+        val Rm = opcode.and(0b000_000_0000_0000_1111_00000000000000).ushr(14)
         val cond = opcode.ushr(29)
         val offset = opcode.and(0x3F_FFFF)
 
@@ -632,19 +615,15 @@ object VMOpcodesRISC {
                 2 -> if (vm.cp != 0) action()
                 3 -> if (vm.cp >  0) action()
                 4 -> if (vm.cp <  0) action()
-                else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                else -> throw UnknownOpcodeExpection(opcode)
             }
         }
 
 
-        execInCond { when (opcode.ushr(25).and(0b1111)) {
-            0b0000 -> {
-                // Memory copy
-                if (opcode.and(0b1111111111) == 0b0001001000) {
-                    MEMCPY(Rd, Rs, Rm)
-                }
+        execInCond { when (opcode.ushr(26).and(0b111)) {
+            0b000 -> {
                 // Mathematical and Register data transfer
-                else if (opcode.and(0xFF00) == 0) {
+                if (opcode.and(0x3F00) == 0) {
                     when (opcode.and(0xFF)) {
                         0 -> HALT()
                         32 -> YIELD()
@@ -726,54 +705,50 @@ object VMOpcodesRISC {
                         0b11_000000 -> SRW(Rd, Rs)
 
                         // not a scope
-                        // will also be reached if MEMCPY fromAddr == toAddr == 0
-                        else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                        else -> throw UnknownOpcodeExpection(opcode)
+                    }
+                }
+                // compare
+                else if (opcode.and(0x3F00) in 0x100..0x103) {
+                    val lr = opcode.and(0b11)
+
+                    CMP(Rd, Rs, lr)
+                }
+                // push and pop
+                else if (opcode.and(0x3F00) == 0x200 || opcode.and(0x3F00) == 0x300) {
+                    val c = opcode.ushr(8).and(1)
+
+                    if (c == 0) {
+                        PUSH(Rd)
+                    }
+                    else {
+                        POP(Rd)
                     }
                 }
                 else {
-                    throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                    throw UnknownOpcodeExpection(opcode)
                 }
             }
-            0b0001 -> {
+            // load word immediate
+            0b001 -> {
+                val C = opcode.ushr(17).and(1)
                 val M = opcode.ushr(16).and(1)
-                val byte = opcode.and(0xFF)
                 val halfword = opcode.and(0xFFFF)
 
-                when (opcode.and(0b1100000000000000000).ushr(17)) {
-                    // Compare
-                    0 -> CMP(Rd, Rs, opcode.and(0b11))
-                    // Load and Store byte immediate
-                    1 -> if (M == 0) LOADBYTEI(Rd, byte) else STOREBYTEI(Rd, Rs, byte)
-                    // Load and Store halfword immediate
-                    2 -> if (M == 0) LOADHWORDI(Rd, halfword) else STOREHWORDI(Rd, Rs, halfword)
-                    // Load word immediate
-                    3 -> LOADWORDI(Rd, halfword, M == 1)
-                    else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
-
-                }
+                if (C == 0)
+                    LOADWORDI(Rd, halfword, M == 1)
+                else
+                    STOREHWORDI(Rd, Rs, halfword)
             }
             // Load and Store a word from register to memory
-            0b0010 -> {
+            0b010 -> {
                  LOADWORDIMEM(Rd, offset)
             }
-            0b0011 -> {
+            0b011 -> {
                  STOREWORDIMEM(Rd, offset)
             }
-            // Push and Pop
-            0b0100 -> {
-                 PUSH(Rd)
-            }
-            0b0101 -> {
-                 POP(Rd)
-            }
-            0b0110 -> {
-                 PUSHWORDI(offset)
-            }
-            0b0111 -> {
-                 POPWORDI()
-            }
             // Conditional jump
-            0b1000 -> {
+            0b100 -> {
                 when (cond) {
                     0 -> JMP(offset)
                     1 -> JZ (offset)
@@ -782,32 +757,32 @@ object VMOpcodesRISC {
                     4 -> JLS(offset)
                     5 -> JFW(offset)
                     6 -> JBW(offset)
-                    else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                    else -> throw UnknownOpcodeExpection(opcode)
                 }
             }
             // Jump to Subroutine Immediate
-            0b1001 -> {
+            0b101 -> {
                 JSRI(offset)
             }
             // Call peripheral; Get memory size; Get uptime; Interrupt
-            0b1111 -> {
+            0b110 -> {
                 val irq = opcode.and(0xFF)
                 val cond2 = opcode.ushr(8).and(0x3FFF)
 
-                if (cond2 == 0) {
+                if (cond2 == 0x1001) {
                     CALL(Rd, irq)
                 }
-                else if (cond2 == 1) {
+                else if (cond2 == 0x1002) {
                     MEMSIZE(Rd, irq)
                 }
-                else if (cond2 == 0x3FFF && Rd == 0b111) {
+                else if (cond2 == 0x3F00 && Rd == 0b1111) {
                     INT(irq)
                 }
                 else {
-                    throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+                    throw UnknownOpcodeExpection(opcode)
                 }
             }
-            else -> throw NullPointerException("Unknown opcode: ${opcode.toReadableBin()}; ${opcode.toReadableOpcode()}")
+            else -> throw UnknownOpcodeExpection(opcode)
         } }
     }
 
@@ -828,7 +803,7 @@ object VMOpcodesRISC {
             "LOADBYTE" to 3,
             "LOADHWORD" to 3,
             "LOADWORD" to 3,
-            "LOADBYTEI" to 2,
+            "LOADBYTEI" to 2, // alias of LOADWORDILO
             "LOADHWORDI" to 2,
             "LOADWORDI" to 2,
             "LOADWORDIMEM" to 2,
@@ -891,7 +866,7 @@ object VMOpcodesRISC {
             "INC" to 1,
             "DEC" to 1,
 
-            "MEMCPY" to 3,
+            //"MEMCPY" to 3,
             "CMP" to 2,
             "CMPII" to 2,
             "CMPIF" to 2,
@@ -899,9 +874,9 @@ object VMOpcodesRISC {
             "CMPFF" to 2,
 
             "PUSH" to 1,
-            "PUSHWORDI" to 1,
+            //"PUSHWORDI" to 1,
             "POP" to 1,
-            "POPWORDI" to 0,
+            //"POPWORDI" to 0,
 
             "JMP" to 1,
             "JZ" to 1,
