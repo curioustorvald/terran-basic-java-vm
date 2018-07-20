@@ -788,115 +788,12 @@ object VMOpcodesRISC {
 
 
     fun getArgumentCount(command: String): Int {
-        return if (command.endsWith("NZ") || command.endsWith("GT") || command.endsWith("LS")) {
-            argumentCount[command.dropLast(2)] ?: 0
-        }
-        else if (command.endsWith("Z")) {
-            argumentCount[command.dropLast(1)] ?: 0
-        }
-        else {
-            argumentCount[command] ?: 0
-        }
+        return Assembler.getOpArgs(
+                Assembler.opcodes[command] ?: throw IllegalArgumentException("No such command: $command")
+        )?.length ?: 0
     }
 
-    private val argumentCount = hashMapOf(
-            "LOADBYTE" to 3,
-            "LOADHWORD" to 3,
-            "LOADWORD" to 3,
-            "LOADBYTEI" to 2, // alias of LOADWORDILO
-            "LOADHWORDI" to 2,
-            "LOADWORDI" to 2,
-            "LOADWORDIMEM" to 2,
 
-            "STOREBYTE" to 3,
-            "STOREHWORD" to 3,
-            "STOREWORD" to 3,
-            "STOREBYTEI" to 2,
-            "STOREHWORDI" to 2,
-            "STOREWORDIMEM" to 2,
-
-            "ADD" to 3,
-            "SUB" to 3,
-            "MUL" to 3,
-            "DIV" to 3,
-            "POW" to 3,
-            "MOD" to 3,
-            "ADDINT" to 3,
-            "SUBINT" to 3,
-            "MULINT" to 3,
-            "DIVINT" to 3,
-            "POWINT" to 3,
-            "MODINT" to 3,
-            "SHL" to 3,
-            "SHR" to 3,
-            "USHR" to 3,
-            "AND" to 3,
-            "OR" to 3,
-            "XOR" to 3,
-
-            "ABS" to 2,
-            "SIN" to 2,
-            "COS" to 2,
-            "TAN" to 2,
-            "FLOOR" to 2,
-            "CEIL" to 2,
-            "ROUND" to 2,
-            "LOG" to 2,
-            "SGN" to 2,
-            "SQRT" to 2,
-            "CBRT" to 2,
-            "INV" to 2,
-            "RAD" to 2,
-            "NOT" to 2,
-
-            "MOV" to 2,
-            "XCHG" to 2,
-            "MALLOC" to 2,
-
-            "FTOI" to 2,
-            "ITOF" to 2,
-
-            "ITOS" to 2,
-            "STOI" to 2,
-            "FTOS" to 2,
-            "STOF" to 2,
-            "ITOX" to 2,
-            "XTOI" to 2,
-
-            "INC" to 1,
-            "DEC" to 1,
-
-            //"MEMCPY" to 3,
-            "CMP" to 2,
-            "CMPII" to 2,
-            "CMPIF" to 2,
-            "CMPFI" to 2,
-            "CMPFF" to 2,
-
-            "PUSH" to 1,
-            //"PUSHWORDI" to 1,
-            "POP" to 1,
-            //"POPWORDI" to 0,
-
-            "JMP" to 1,
-            "JZ" to 1,
-            "JNZ" to 1,
-            "JGT" to 1,
-            "JLS" to 1,
-            "JFW" to 1,
-            "JBW" to 1,
-
-            "JSRI" to 1,
-
-            "CALL" to 2,
-            "MEMSIZE" to 2,
-            "UPTIME" to 1,
-            "INT" to 1,
-
-            "SRR" to 2,
-            "SXCHG" to 2,
-            "SRW" to 2
-    )
 
     private val returnType = hashMapOf(
             "MOV" to "Int32",
@@ -953,22 +850,6 @@ object VMOpcodesRISC {
     val returnsFloatCmd = hashSetOf<String>()
 
     init {
-        argumentCount.forEach { t, u ->
-            if (3 == u) {
-                threeArgsCmd.add(t)
-                threeArgsCmd.add(t + "Z")
-                threeArgsCmd.add(t + "NZ")
-                threeArgsCmd.add(t + "GT")
-                threeArgsCmd.add(t + "LS")
-            }
-            else if (2 == u) {
-                twoArgsCmd.add(t)
-                twoArgsCmd.add(t + "Z")
-                twoArgsCmd.add(t + "NZ")
-                twoArgsCmd.add(t + "GT")
-                twoArgsCmd.add(t + "LS")
-            }
-        }
 
         returnType.forEach { t, u ->
             if ("Float" == u) {
