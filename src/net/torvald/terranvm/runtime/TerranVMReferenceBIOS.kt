@@ -105,7 +105,7 @@ class TerranVMReferenceBIOS(val vm: TerranVM) : VMPeripheralHardware {
                     (vm.peripherals[3] as VMPeripheralWrapper).call(0x0800 or data)
                 }
 
-                // MEMCPY
+                // DMA Copy
                 in 0b010_0000_0..0b010_1111_1 -> {
                     val rParams = midLow8Bits.ushr(1).and(15)
                     val rFromAddr = lower8Bits.ushr(4).and(15)
@@ -114,7 +114,9 @@ class TerranVMReferenceBIOS(val vm: TerranVM) : VMPeripheralHardware {
                     val params = vm.readregInt(rParams)
                     val src = params.and(0xFF)
                     val dest = params.ushr(8).and(0xFF)
-                    val len = params.ushr(16).and(0xFFFF)
+                    var len = params.ushr(16).and(0xFFFF)
+
+                    if (len == 0) len = 65536
 
                     val srcMem = if (src == 0) vm.memory else vm.peripherals[src]!!.memory
                     val destMem = if (dest == 0) vm.memory else vm.peripherals[dest]!!.memory

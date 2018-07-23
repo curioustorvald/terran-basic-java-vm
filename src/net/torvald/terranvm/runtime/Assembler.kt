@@ -11,14 +11,11 @@ import net.torvald.terranvm.toReadableOpcode
  * - Any text after # is a comment
  * - Labelling: @label_name
  * - String is surrounded with double quote
- * - Every line must end with ; (@TODO wow, such primitive!)
+ * - Every line must end with one or more `;`s
  *
  * Example program
  * ```
- * .code
- *
- * LOADSTRINLINE 1, Helvetti world!;
- * PRINTSTR;
+ * // TODO
  * ```
  * This prints out 'Helvetti world!' on the standard output.
  *
@@ -28,6 +25,7 @@ import net.torvald.terranvm.toReadableOpcode
  * TBAS Assembly can be divided into _sections_ that the assembler supports. If no section is given, 'code' is assumed.
  *
  * Supported sections:
+ * - stack
  * - data
  * - code
  *
@@ -49,16 +47,20 @@ import net.torvald.terranvm.toReadableOpcode
  *
  *
  * ### Literals
- * - Register literals: r0 throught r15
- * - Hex literals: CAFEBABEh
- * - Integer literals: 80085
+ * - Register literals: `r0` throught `r15`
+ * - Hex literals: `CAFEBABEh`
+ * - Integer literals: `80085`
  *
  * Defining labels:
+ * ```
  * :label_name;
+ * ```
  *
  * Referring labels:
- * \@label_name
- *      label returns memory OFFSET! (not an actual address)
+ * ```
+ * @label_name
+ * ```
+ * label returns memory OFFSET! (not an actual address)
  *
  *
  *
@@ -184,10 +186,6 @@ class Assembler(val vm: TerranVM) {
                 "STOREBYTE"  to 0b000_0000_0000_0000_00000001000_00_1,
                 "STOREHWORD" to 0b000_0000_0000_0000_00000001000_01_1,
                 "STOREWORD"  to 0b000_0000_0000_0000_00000001000_10_1,
-
-                // Memory copy //
-
-                "MEMCPY" to 0b0000_000000000000000_0001001000,
 
                 // Compare //
 

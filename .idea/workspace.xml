@@ -2,7 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7d458e43-04df-482b-879c-88336e290950" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/src/net/torvald/terranvm/VMOpcodesRISC.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/net/torvald/terranvm/VMOpcodesRISC.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/ColourDisplayBase.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriCDA.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/RiscyInstSet32Bit.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/doc/RiscyInstSet32Bit.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/out/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -22,8 +28,8 @@
           <file leaf-file-name="TerranVM.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="462">
-                  <caret line="812" column="28" selection-start-line="812" selection-start-column="28" selection-end-line="812" selection-end-column="28" />
+                <state relative-caret-position="9412">
+                  <caret line="857" column="77" selection-start-line="857" selection-start-column="77" selection-end-line="857" selection-end-column="77" />
                   <folding>
                     <element signature="n#!!block;n#Pointer#0;n#!!block;n#TerranVM#0" />
                   </folding>
@@ -34,7 +40,7 @@
           <file leaf-file-name="Loader.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/assets/Loader.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="600">
+                <state relative-caret-position="819">
                   <caret line="63" column="41" selection-start-line="63" selection-start-column="41" selection-end-line="63" selection-end-column="41" />
                 </state>
               </provider>
@@ -52,17 +58,8 @@
           <file leaf-file-name="BiosSetup.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/assets/BiosSetup.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="577">
-                  <caret line="45" lean-forward="true" selection-start-line="45" selection-end-line="45" />
-                </state>
-              </provider>
-            </entry>
-          </file>
-          <file leaf-file-name="VMPeripheralHardware.kt" pinned="false" current-in-tab="false">
-            <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/VMPeripheralHardware.kt">
-              <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="195">
-                  <caret line="15" column="1" lean-forward="true" selection-start-line="15" selection-start-column="1" selection-end-line="15" selection-end-column="1" />
+                <state relative-caret-position="585">
+                  <caret line="45" selection-start-line="45" selection-end-line="45" />
                 </state>
               </provider>
             </entry>
@@ -70,7 +67,7 @@
           <file leaf-file-name="TextOnly.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/TextOnly.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="758">
+                <state relative-caret-position="3263">
                   <caret line="268" selection-start-line="268" selection-end-line="268" />
                 </state>
               </provider>
@@ -88,8 +85,8 @@
           <file leaf-file-name="VMOpcodesRISC.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/VMOpcodesRISC.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="413">
-                  <caret line="118" lean-forward="true" selection-start-line="118" selection-end-line="118" />
+                <state relative-caret-position="1521">
+                  <caret line="118" selection-start-line="118" selection-end-line="118" />
                   <folding>
                     <element signature="e#30#86#0" expanded="true" />
                   </folding>
@@ -97,26 +94,32 @@
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="BasicDiskDrive.kt" pinned="false" current-in-tab="false">
-            <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/BasicDiskDrive.kt">
+          <file leaf-file-name="Assembler.kt" pinned="false" current-in-tab="false">
+            <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="442">
-                  <caret line="35" selection-start-line="35" selection-end-line="35" />
+                <state relative-caret-position="364">
+                  <caret line="29" column="9" selection-start-line="29" selection-start-column="9" selection-end-line="29" selection-end-column="9" />
                   <folding>
-                    <element signature="e#38#119#0" expanded="true" />
+                    <element signature="e#38#124#0" expanded="true" />
                   </folding>
                 </state>
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="Assembler.kt" pinned="false" current-in-tab="true">
-            <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt">
+          <file leaf-file-name="PeriCDA.kt" pinned="false" current-in-tab="false">
+            <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriCDA.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="1248">
-                  <caret line="120" column="28" lean-forward="true" selection-start-line="120" selection-start-column="28" selection-end-line="120" selection-end-column="28" />
-                  <folding>
-                    <element signature="e#38#124#0" expanded="true" />
-                  </folding>
+                <state relative-caret-position="533">
+                  <caret line="49" column="49" selection-start-line="49" selection-start-column="49" selection-end-line="49" selection-end-column="49" />
+                </state>
+              </provider>
+            </entry>
+          </file>
+          <file leaf-file-name="ColourDisplayBase.kt" pinned="false" current-in-tab="true">
+            <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/ColourDisplayBase.kt">
+              <provider selected="true" editor-type-id="text-editor">
+                <state relative-caret-position="507">
+                  <caret line="39" column="10" selection-start-line="39" selection-start-column="10" selection-end-line="39" selection-end-column="10" />
                 </state>
               </provider>
             </entry>
@@ -128,8 +131,8 @@
           <file leaf-file-name="TerranVM.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="210">
-                  <caret line="386" column="26" lean-forward="true" selection-start-line="386" selection-start-column="26" selection-end-line="386" selection-end-column="26" />
+                <state relative-caret-position="3289">
+                  <caret line="386" column="26" selection-start-line="386" selection-start-column="26" selection-end-line="386" selection-end-column="26" />
                   <folding>
                     <element signature="n#!!block;n#Pointer#0;n#!!block;n#TerranVM#0" />
                   </folding>
@@ -140,8 +143,8 @@
           <file leaf-file-name="Assembler.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="335">
-                  <caret line="253" column="12" selection-start-line="253" selection-start-column="12" selection-end-line="253" selection-end-column="12" />
+                <state relative-caret-position="3315">
+                  <caret line="255" column="12" selection-start-line="255" selection-start-column="12" selection-end-line="255" selection-end-column="12" />
                   <folding>
                     <element signature="e#38#124#0" expanded="true" />
                   </folding>
@@ -152,17 +155,17 @@
           <file leaf-file-name="PoketchTest.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PoketchTest.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="760">
+                <state relative-caret-position="2158">
                   <caret line="183" column="21" selection-start-line="183" selection-start-column="21" selection-end-line="183" selection-end-column="21" />
                 </state>
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="VMOpcodesRISC.kt" pinned="false" current-in-tab="true">
+          <file leaf-file-name="VMOpcodesRISC.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/VMOpcodesRISC.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="-8918">
-                  <caret line="46" lean-forward="true" selection-start-line="46" selection-end-line="46" />
+                <state relative-caret-position="598">
+                  <caret line="46" selection-start-line="46" selection-end-line="46" />
                   <folding>
                     <element signature="e#30#86#0" expanded="true" />
                   </folding>
@@ -173,7 +176,7 @@
           <file leaf-file-name="TerranVMReferenceBIOS.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVMReferenceBIOS.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="654">
+                <state relative-caret-position="1287">
                   <caret line="103" column="59" selection-start-line="103" selection-start-column="59" selection-end-line="103" selection-end-column="59" />
                   <folding>
                     <element signature="e#38#255#0" expanded="true" />
@@ -185,8 +188,17 @@
           <file leaf-file-name="PeriMDA.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriMDA.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="2509">
-                  <caret line="202" column="5" selection-start-line="202" selection-start-column="5" selection-end-line="202" selection-end-column="5" />
+                <state relative-caret-position="260">
+                  <caret line="29" selection-start-line="29" selection-end-line="29" />
+                </state>
+              </provider>
+            </entry>
+          </file>
+          <file leaf-file-name="PeriCDA.kt" pinned="false" current-in-tab="true">
+            <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriCDA.kt">
+              <provider selected="true" editor-type-id="text-editor">
+                <state relative-caret-position="819">
+                  <caret line="162" column="29" selection-start-line="162" selection-start-column="29" selection-end-line="162" selection-end-column="29" />
                 </state>
               </provider>
             </entry>
@@ -194,7 +206,7 @@
           <file leaf-file-name="PeriRTC.kt" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriRTC.kt">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="910">
+                <state relative-caret-position="845">
                   <caret line="70" column="5" selection-start-line="70" selection-start-column="5" selection-end-line="70" selection-end-column="5" />
                   <folding>
                     <element signature="e#62#319#0" expanded="true" />
@@ -212,15 +224,6 @@
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="Poketch.kt" pinned="false" current-in-tab="false">
-            <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/Poketch.kt">
-              <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="845">
-                  <caret line="69" column="45" selection-start-line="69" selection-start-column="45" selection-end-line="69" selection-end-column="45" />
-                </state>
-              </provider>
-            </entry>
-          </file>
         </leaf>
       </split-second>
     </splitter>
@@ -231,43 +234,43 @@
         <option value="Enum" />
         <option value="Kotlin Interface" />
         <option value="Kotlin File" />
-        <option value="Kotlin Class" />
         <option value="Kotlin Object" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>loadbytei</find>
       <find>LOADBYTEI</find>
       <find>MEMCPY(</find>
       <find>BIOS</find>
       <find>LOADWORDILO</find>
-      <find>ushr(22) + 1</find>
+      <find />
       <find>ushr(22)</find>
-      <find>) + 1</find>
+      <find />
       <find>UPTIME</find>
       <find>twoLinea</find>
       <find>twoLiners</find>
-      <find>loadhwordi r1,</find>
-      <find>loadhwordi r1, 024E</find>
+      <find />
+      <find />
       <find>rrw</find>
-      <find>unknown opcode</find>
+      <find />
       <find>VM</find>
       <find>VMOpcodesRISC.in</find>
       <find>storebytei</find>
       <find>resultingOpcode</find>
       <find>loadhwordi</find>
-      <find>fun LOADWORD(</find>
+      <find />
       <find>loadword</find>
-      <find>stackSize =</find>
+      <find />
       <find>decode</find>
       <find>decodeAndExe</find>
-      <find>loadwordi r1, 61h</find>
-      <find>cmp r3, r2</find>
+      <find />
+      <find />
       <find>toRegInt()</find>
-      <find>loadwordi r8, 39h</find>
+      <find />
       <find>memcpy</find>
+      <find>tapest</find>
     </findStrings>
     <replaceStrings>
       <replace />
@@ -307,8 +310,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/doc/introduction.tex" />
-        <option value="$PROJECT_DIR$/doc/quickref.tex" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/VMOpcodes.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/simplec/Compiler.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/tbasic/runtime/compiler/tbasic/Compiler.kt" />
@@ -353,11 +354,13 @@
         <option value="$PROJECT_DIR$/src/net/torvald/terranvm/assets/BiosSetup.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/BasicDiskDrive.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVMReferenceBIOS.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt" />
-        <option value="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/terranvm/assets/Loader.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/TextOnly.kt" />
         <option value="$PROJECT_DIR$/src/net/torvald/terranvm/VMOpcodesRISC.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/ColourDisplayBase.kt" />
+        <option value="$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriCDA.kt" />
       </list>
     </option>
   </component>
@@ -397,7 +400,11 @@
     <navigator proportions="" version="1">
       <foldersAlwaysOnTop value="true" />
     </navigator>
-    <panes />
+    <panes>
+      <pane id="PackagesPane" />
+      <pane id="Scope" />
+      <pane id="ProjectPane" />
+    </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="SearchEverywhereHistoryKey" value="toReada&#9;null&#9;null&#10;toLittle&#9;null&#9;null&#10;uint&#9;null&#9;null&#10;toLittleInt&#9;null&#9;null&#10;toUint&#9;null&#9;null&#10;primitivesKt&#9;FILE&#9;jar://C:/Users/minjaesong/.IdeaIC2017.1/config/plugins/Kotlin/kotlinc/lib/kotlin-runtime-sources.jar!/kotlin/Primitives.kt" />
@@ -407,12 +414,15 @@
     <property name="project.structure.last.edited" value="Libraries" />
     <property name="project.structure.proportion" value="0.15" />
     <property name="project.structure.side.proportion" value="0.32068965" />
-    <property name="settings.editor.selected.configurable" value="preferences.toDoOptions" />
+    <property name="settings.editor.selected.configurable" value="reference.settingsdialog.IDE.editor.colors.Language Defaults" />
   </component>
   <component name="RecentsManager">
     <key name="MoveKotlinTopLevelDeclarationsDialog.RECENTS_KEY">
       <recent name="net.torvald.tbasic.runtime.compiler.c99" />
       <recent name="net.torvald.tbasic" />
+    </key>
+    <key name="CreateClassDialog.RecentsKey">
+      <recent name="net.torvald.terrarum.virtualcomputer.terranvmadapter" />
     </key>
   </component>
   <component name="RunDashboard">
@@ -713,12 +723,11 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1216" extended-state="6" />
+    <frame x="-8" y="-8" width="1936" height="1216" extended-state="7" />
     <editor active="true" />
     <layout>
       <window_info anchor="right" id="Palette" order="4" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.32931355" />
-      <window_info anchor="bottom" id="Messages" order="7" sideWeight="0.4968017" visible="true" weight="0.20408164" />
       <window_info anchor="right" id="Palette&#9;" order="5" />
       <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.50319827" side_tool="true" weight="0.09166667" />
       <window_info anchor="right" id="Maven Projects" order="6" />
@@ -727,30 +736,32 @@
       <window_info anchor="bottom" id="Terminal" order="7" />
       <window_info id="Designer" order="1" />
       <window_info anchor="right" content_ui="combo" id="Project" order="1" sideWeight="0.49488056" weight="0.123667374" />
-      <window_info anchor="bottom" id="Find" order="1" weight="0.3265306" />
       <window_info id="Structure" order="0" side_tool="true" weight="0.141258" />
       <window_info anchor="right" id="Ant Build" order="2" weight="0.25" />
       <window_info id="UI Designer" order="2" />
-      <window_info active="true" anchor="bottom" x="881" y="-545" width="842" height="533" id="Debug" order="3" sideWeight="0.4978678" type="FLOATING" visible="true" weight="0.19851577" />
+      <window_info anchor="bottom" x="881" y="-545" width="842" height="533" id="Debug" order="3" sideWeight="0.4978678" type="FLOATING" weight="0.19851577" />
       <window_info id="Favorites" order="3" sideWeight="0.50511944" side_tool="true" weight="0.15743944" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="3" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
+      <window_info anchor="bottom" id="Messages" order="7" sideWeight="0.4968017" visible="true" weight="0.20408164" />
       <window_info anchor="right" id="LuaJ" order="7" />
+      <window_info anchor="right" auto_hide="true" x="0" y="0" width="434" height="1016" id="Documentation" order="8" side_tool="true" weight="0.32995737" />
       <window_info anchor="right" id="Database" order="8" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.3265306" />
     </layout>
     <layout-to-restore>
       <window_info anchor="right" id="Palette" order="4" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="3" weight="0.25" />
-      <window_info anchor="bottom" id="Version Control" order="9" weight="0.32962963" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.18240741" />
       <window_info anchor="right" content_ui="combo" id="Project" order="1" sideWeight="0.49488056" weight="0.123667374" />
       <window_info id="Structure" order="0" weight="0.141258" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="2" weight="0.25" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.32962963" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.18240741" />
+      <window_info anchor="bottom" id="Version Control" order="9" weight="0.32962963" />
       <window_info id="Designer" order="1" />
       <window_info anchor="right" id="LuaJ" order="7" />
       <window_info id="UI Designer" order="2" />
@@ -788,27 +799,6 @@
     <option name="FILTER_TARGETS" value="false" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/Poketch.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="845">
-          <caret line="69" column="45" selection-start-line="69" selection-start-column="45" selection-end-line="69" selection-end-column="45" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://C:/Program Files/Java/jdk1.8.0_131/src.zip!/java/io/OutputStream.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="156">
-          <caret line="61" column="25" selection-start-line="61" selection-start-column="25" selection-end-line="61" selection-end-column="25" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://C:/Program Files/Java/jdk1.8.0_131/src.zip!/java/awt/Frame.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="274">
-          <caret line="449" column="17" selection-start-line="449" selection-start-column="17" selection-end-line="449" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
     <entry file="jar://C:/Program Files/Java/jdk1.8.0_131/src.zip!/javax/swing/JFrame.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="294">
@@ -986,13 +976,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriMDA.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2509">
-          <caret line="202" column="5" selection-start-line="202" selection-start-column="5" selection-end-line="202" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriPSG.kt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="689">
@@ -1039,9 +1022,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="585">
           <caret line="49" column="17" selection-start-line="49" selection-start-column="17" selection-end-line="49" selection-end-column="17" />
-          <folding>
-            <element signature="e#62#292#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -1049,16 +1029,13 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="442">
           <caret line="35" selection-start-line="35" selection-end-line="35" />
-          <folding>
-            <element signature="e#38#119#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/VMPeripheralHardware.kt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="195">
-          <caret line="15" column="1" lean-forward="true" selection-start-line="15" selection-start-column="1" selection-end-line="15" selection-end-column="1" />
+          <caret line="15" column="1" selection-start-line="15" selection-start-column="1" selection-end-line="15" selection-end-column="1" />
         </state>
       </provider>
     </entry>
@@ -1069,40 +1046,30 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="462">
-          <caret line="812" column="28" selection-start-line="812" selection-start-column="28" selection-end-line="812" selection-end-column="28" />
-          <folding>
-            <element signature="n#!!block;n#Pointer#0;n#!!block;n#TerranVM#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/TextOnly.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="758">
+        <state relative-caret-position="3263">
           <caret line="268" selection-start-line="268" selection-end-line="268" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/assets/Loader.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="600">
+        <state relative-caret-position="819">
           <caret line="63" column="41" selection-start-line="63" selection-start-column="41" selection-end-line="63" selection-end-column="41" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PoketchTest.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="3042">
-          <caret line="251" column="28" selection-start-line="251" selection-start-column="28" selection-end-line="251" selection-end-column="28" />
+        <state relative-caret-position="2158">
+          <caret line="183" column="21" selection-start-line="183" selection-start-column="21" selection-end-line="183" selection-end-column="21" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriRTC.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="910">
+        <state relative-caret-position="845">
           <caret line="70" column="5" selection-start-line="70" selection-start-column="5" selection-end-line="70" selection-end-column="5" />
           <folding>
             <element signature="e#62#319#0" expanded="true" />
@@ -1119,7 +1086,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVMReferenceBIOS.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="654">
+        <state relative-caret-position="1287">
           <caret line="103" column="59" selection-start-line="103" selection-start-column="59" selection-end-line="103" selection-end-column="59" />
           <folding>
             <element signature="e#38#255#0" expanded="true" />
@@ -1129,8 +1096,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/VMOpcodesRISC.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="413">
-          <caret line="118" lean-forward="true" selection-start-line="118" selection-end-line="118" />
+        <state relative-caret-position="598">
+          <caret line="46" selection-start-line="46" selection-end-line="46" />
           <folding>
             <element signature="e#30#86#0" expanded="true" />
           </folding>
@@ -1139,18 +1106,56 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/assets/BiosSetup.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="577">
-          <caret line="45" lean-forward="true" selection-start-line="45" selection-end-line="45" />
+        <state relative-caret-position="585">
+          <caret line="45" selection-start-line="45" selection-end-line="45" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriMDA.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="260">
+          <caret line="29" selection-start-line="29" selection-end-line="29" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/Assembler.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1248">
-          <caret line="120" column="28" lean-forward="true" selection-start-line="120" selection-start-column="28" selection-end-line="120" selection-end-column="28" />
+        <state relative-caret-position="3315">
+          <caret line="255" column="12" selection-start-line="255" selection-start-column="12" selection-end-line="255" selection-end-column="12" />
           <folding>
             <element signature="e#38#124#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/terranvm/runtime/TerranVM.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3289">
+          <caret line="386" column="26" selection-start-line="386" selection-start-column="26" selection-end-line="386" selection-end-column="26" />
+          <folding>
+            <element signature="n#!!block;n#Pointer#0;n#!!block;n#TerranVM#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$KOTLIN_BUNDLED$/lib/kotlin-runtime-sources.jar!/generated/_Arrays.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="335">
+          <caret line="6039" column="28" selection-start-line="6039" selection-start-column="28" selection-end-line="6039" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/ColourDisplayBase.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="507">
+          <caret line="39" column="10" selection-start-line="39" selection-start-column="10" selection-end-line="39" selection-end-column="10" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/net/torvald/terrarum/virtualcomputer/terranvmadapter/PeriCDA.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="819">
+          <caret line="162" column="29" selection-start-line="162" selection-start-column="29" selection-end-line="162" selection-end-column="29" />
         </state>
       </provider>
     </entry>

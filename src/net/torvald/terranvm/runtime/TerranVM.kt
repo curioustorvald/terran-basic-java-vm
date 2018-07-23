@@ -855,7 +855,7 @@ halt;
 
 
         if (delayInMills != null) {
-            Thread.sleep(delayInMills!!.toLong())
+            Thread.sleep(delayInMills!!.toLong() * 18) // arbitrary 18x delay
         }
     }
 
