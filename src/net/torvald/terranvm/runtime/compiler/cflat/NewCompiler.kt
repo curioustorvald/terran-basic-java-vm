@@ -54,7 +54,7 @@ object NewCompiler {
 
 }
 
-typealias Rho = HashMap<String, Int>
+typealias Rho = (String) -> Int // address environment; a function to map a variable name to its memory address
 typealias CodeL = (Rho) -> String
 typealias CodeR = () -> String
 
