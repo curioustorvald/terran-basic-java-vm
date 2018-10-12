@@ -27,7 +27,7 @@ object Loader {
 ## TODO: support backspace key
 
 
-.stack; 16;
+.stack; 12;
 
 .data;
 string loadertext "LOADER

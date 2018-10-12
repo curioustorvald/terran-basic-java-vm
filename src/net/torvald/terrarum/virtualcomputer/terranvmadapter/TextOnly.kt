@@ -89,7 +89,7 @@ class TextOnly : Game() {
         val code = programImage.bytes*/
 
 
-        val programImage = assembler(BiosSetup())
+        val programImage = assembler(Loader())
         val code = programImage.bytes
 
 
