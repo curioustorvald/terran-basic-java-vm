@@ -654,6 +654,8 @@ object Cflat {
         return lineStructures
     }
 
+    val rootNodeName = "cflat_node_root"
+
     fun buildTree(lineStructures: List<LineStructure>): SyntaxTreeNode {
         fun debug1(any: Any) { if (true) println(any) }
 
@@ -662,7 +664,7 @@ object Cflat {
         // STEP 1. Create a tree //
         ///////////////////////////
 
-        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.NOTHING, name = "root", isRoot = true, lineNumber = 1)
+        val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.NOTHING, name = rootNodeName, isRoot = true, lineNumber = 1)
 
         val workingNodes = Stack<SyntaxTreeNode>()
         workingNodes.push(ASTroot)
@@ -729,7 +731,7 @@ object Cflat {
 
 
         fun SyntaxTreeNode.getReadableNodeName(): String {
-            if (this.expressionType == ExpressionType.VARIABLE_LEAF) {
+            if (this.expressionType == ExpressionType.VARIABLE_READ || this.expressionType == ExpressionType.VARIABLE_WRITE) {
                 return "$${this.name}"
             }
             else if (this.name != null && this.literalValue != null) {
@@ -1851,7 +1853,7 @@ object Cflat {
                 // variable literal (VARIABLE_LEAF) // usually function call arguments
                 //////////////////////////////////////
                 else if (word.matches(regexVarNameWhole)) {
-                    val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_LEAF, null, word, lineNumber)
+                    val leafNode = SyntaxTreeNode(ExpressionType.VARIABLE_READ, null, word, lineNumber)
                     return leafNode
                 }
             }
@@ -2208,7 +2210,8 @@ object Cflat {
         // arg2: (if STRUCT) struct identifier (String)
 
         LITERAL_LEAF, // literals, also act as a leaf of the tree; has returnType of null
-        VARIABLE_LEAF // has returnType of null; typical use case: somefunction(somevariable) e.g. println(message)
+        VARIABLE_WRITE, // CodeL; loads memory address to be written onto
+        VARIABLE_READ   // CodeR; the actual value stored in its memory address
     }
     enum class ReturnType {
         INT, FLOAT,
