@@ -20,9 +20,20 @@ object NewCompiler {
 
     val testProgram = """
         int c;
-        c = (3 + 4) * (7 - 2);
+        //c = (3 + 4) * (7 - 2);
+
+        c = 3;
+
+        if (c == 42) {
+            c = 0;
+        }
+        else {
+            c = 1;
+        }
     """.trimIndent()
 
+    // TODO fix lexer so that `if () { } else { }` would be interpreted as `IfElse (s; e1, e2)`
+    
     // lexer and parser goes here //
 
 
@@ -144,6 +155,11 @@ object NewCompiler {
                         "*" -> {{ MUL(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
                         "/" -> {{ DIV(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
                         "=" -> {{ ASSIGN(l, { VAR_L(l, node.arguments[0].name!!, aenv) }, traverse1(node.arguments[1]), aenv) }}
+
+                        "==" -> {{ EQU(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+
+                        "if" -> {{ IF(l, traverse1(node.arguments[0]), traverse1(node.statements[0])) }}
+
                         else -> {{ _REM(l, "Unknown OP or func call is WIP: ${node.name}") }}
                     }
                 }
@@ -215,6 +231,7 @@ object NewCompiler {
                     cond() + "JUMPZ ${labelThen(l, cond)};\n" +
                     invokeWhile() + "JUMP ${labelWhile(l, cond)};\n" +
                     "LABEL ${labelThen(l, cond)};\n"
+    fun EQU(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISEQUAL;\n"
     //fun FOR
     // TODO  for ( e1 ; e2 ; e3 ) s' === e1 ; while ( e2 ) { s' ; e3 ; }
 
