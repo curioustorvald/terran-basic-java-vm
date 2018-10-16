@@ -32,8 +32,8 @@ object NewCompiler {
         }
     """.trimIndent()
 
-    // TODO fix lexer so that `if () { } else { }` would be interpreted as `IfElse (s; e1, e2)`
-    
+    // FIXME in the first =, c is resolved to 100h, but in subsequent =s, c is resolved to 101h
+
     // lexer and parser goes here //
 
 
@@ -112,12 +112,14 @@ object NewCompiler {
         }
         fun addvar(name: String, ln: Int) {
             //println("Add var ${name.toVarName()}")
-            variableAddr[name.toVarName()] = varCnt
+            variableAddr[name.toVarName()] = varCnt + 256 // index starts at 1
             varCnt++
         }
 
 
         // TODO recursion is a key
+        // SyntaxTreeNode has its own traverse function, but our traverse is nothing trivial
+        //      so let's just leave it this way.
         // Traverse order: Self -> Arguments (e1, e2, ...) -> Statements (s)
         fun traverse1(node: Cflat.SyntaxTreeNode) : CodeR {
             val l = node.lineNumber
@@ -159,6 +161,7 @@ object NewCompiler {
                         "==" -> {{ EQU(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
 
                         "if" -> {{ IF(l, traverse1(node.arguments[0]), traverse1(node.statements[0])) }}
+                        "ifelse" -> {{ IFELSE(l, traverse1(node.arguments[0]), traverse1(node.statements[0]), traverse1(node.statements[1])) }}
 
                         else -> {{ _REM(l, "Unknown OP or func call is WIP: ${node.name}") }}
                     }

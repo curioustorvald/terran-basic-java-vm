@@ -629,7 +629,7 @@ object Cflat {
             else if (isCharLiteral && !isLiteralMode) {
                 if (char == '\\') { // escape sequence of char literal
                     sb.append(escapeSequences[lookahead2]!!.toInt())
-                    charCtr++
+                    charCtr += 1
                 }
                 else {
                     sb.append(char.toInt())
@@ -647,7 +647,7 @@ object Cflat {
             }
 
 
-            charCtr++
+            charCtr += 1
         }
 
 
@@ -663,6 +663,7 @@ object Cflat {
         ///////////////////////////
         // STEP 1. Create a tree //
         ///////////////////////////
+        // In this step, we build tree from the line structures parsed by the parser. //
 
         val ASTroot = SyntaxTreeNode(ExpressionType.FUNCTION_DEF, ReturnType.NOTHING, name = rootNodeName, isRoot = true, lineNumber = 1)
 
@@ -707,6 +708,48 @@ object Cflat {
             }
 
 
+        }
+
+        /////////////////////////////////
+        // STEP 1-1. Simplify the tree //
+        /////////////////////////////////
+        // In this step, we modify the tree so translating to IR2 be easier.        //
+        // More specifically, we do:                                                //
+        //  1. "If" (cond) {stmt1} "Else" {stmt2} -> "IfElse" (cond) {stmt1, stmt2} //
+
+        ASTroot.traversePreorderStatements { node, _ ->
+            // JOB #1
+            val ifNodeIndex = node.statements.findAllToIndices { it.name == "if" }
+            var deletionCount = 0
+
+            ifNodeIndex.forEach {
+                // as we do online-delete, precalculated numbers will go off
+                // deletionCount will compensate it.
+                val it = it - deletionCount
+
+                val ifNode   = node.statements[it]
+                val elseNode = node.statements.getOrNull(it + 1)
+                // if filtered IF node has ELSE node appended...
+                if (elseNode != null && elseNode.name == "else") {
+                    val newNode = SyntaxTreeNode(
+                            ifNode.expressionType, ifNode.returnType,
+                            "ifelse",
+                            ifNode.lineNumber,
+                            ifNode.isRoot, ifNode.isPartOfArgumentsNode
+                    )
+
+                    if (ifNode.statements.size > 1) throw InternalError("If node contains 2 or more statements!\n[NODE START]\n$node\n[NODE END]")
+                    if (elseNode.statements.size > 1) throw InternalError("Else node contains 2 or more statements!\n[NODE START]\n$node\n[NODE END]")
+
+                    ifNode.arguments.forEach { newNode.addArgument(it) } // should contain only 1 arg but oh well
+                    newNode.addStatement(ifNode.statements[0])
+                    newNode.addStatement(elseNode.statements[0])
+
+                    node.statements[it] = newNode
+                    node.statements.removeAt(it + 1)
+                    deletionCount += 1
+                }
+            }
         }
 
 
@@ -2190,12 +2233,34 @@ object Cflat {
 
             return sb.toString()
         }
+
+
+        private fun traverseStmtOnly(node: SyntaxTreeNode, action: (SyntaxTreeNode, Int) -> Unit, depth: Int = 0) {
+            //if (node == null) return
+            action(node, depth)
+            node.statements.forEach { traverseStmtOnly(it, action, depth + 1) }
+        }
+
+        fun traversePreorderStatements(action: (SyntaxTreeNode, Int) -> Unit) {
+            this.traverseStmtOnly(this, action)
+        }
     }
 
     private fun String.toRawTreeNode(lineNumber: Int): SyntaxTreeNode {
         val node = SyntaxTreeNode(ExpressionType.LITERAL_LEAF, ReturnType.DATABASE, null, lineNumber)
         node.literalValue = this
         return node
+    }
+
+    inline fun <T> Iterable<T>.findAllToIndices(predicate: (T) -> Boolean): IntArray {
+        val indices = ArrayList<Int>()
+
+        this.forEachIndexed { index, t ->
+            if (predicate(t))
+                indices.add(index)
+        }
+
+        return indices.toIntArray()
     }
 
     enum class ExpressionType {
