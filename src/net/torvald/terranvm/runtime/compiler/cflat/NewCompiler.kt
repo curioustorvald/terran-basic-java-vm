@@ -20,6 +20,12 @@ object NewCompiler {
 
     val testProgram = """
         int c;
+        int d;
+        int shit;
+        int plac;
+        int e_ho;
+        int lder;
+        int r;
         //c = (3 + 4) * (7 - 2);
 
         c = 3;
@@ -32,7 +38,7 @@ object NewCompiler {
         }
     """.trimIndent()
 
-    // FIXME in the first =, c is resolved to 100h, but in subsequent =s, c is resolved to 101h
+    // TODO add issues here
 
     // lexer and parser goes here //
 
@@ -107,13 +113,20 @@ object NewCompiler {
         fun String.toVarName() = "$$this"
 
         val aenv: Rho = { name ->
-            //println("Fetch var ${name.toVarName()}")
+            if (!variableAddr.containsKey(name.toVarName()))
+                throw UnresolvedReference("No such variable defined: $name")
+
+            //println("Fetch var ${name.toVarName()} -> ${variableAddr[name.toVarName()]}")
+
             variableAddr[name.toVarName()]!!
         }
         fun addvar(name: String, ln: Int) {
-            //println("Add var ${name.toVarName()}")
-            variableAddr[name.toVarName()] = varCnt + 256 // index starts at 1
-            varCnt++
+            if (!variableAddr.containsKey(name.toVarName())) {
+                variableAddr[name.toVarName()] = varCnt + 256 // index starts at 100h
+                varCnt++
+            }
+
+            //println("Add var ${name.toVarName()} -> ${variableAddr[name.toVarName()]}")
         }
 
 
