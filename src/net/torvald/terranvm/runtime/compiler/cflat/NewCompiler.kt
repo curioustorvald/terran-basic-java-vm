@@ -3,6 +3,8 @@ package net.torvald.terranvm.runtime.compiler.cflat
 import net.torvald.terranvm.runtime.to8HexString
 import net.torvald.terranvm.runtime.toHexString
 import net.torvald.terranvm.runtime.compiler.cflat.Cflat.ExpressionType.*
+import net.torvald.terranvm.runtime.toUint
+import java.lang.StringBuilder
 import kotlin.UnsupportedOperationException
 import kotlin.collections.HashMap
 
@@ -36,6 +38,8 @@ object NewCompiler {
         else {
             c = 1;
         }
+
+        //d = "Hello, world!";
     """.trimIndent()
 
     // TODO add issues here
@@ -106,7 +110,7 @@ object NewCompiler {
 
     // TREE TO IR1
 
-    fun toIR1(tree: Cflat.SyntaxTreeNode): CodeR {
+    fun toIR1(tree: Cflat.SyntaxTreeNode): Pair<CodeR, Rho> {
         //val parentCode: Sequence<CodeR> = sequenceOf( { "" } )
         val variableAddr = HashMap<String, Int>()
         var varCnt = 0
@@ -144,6 +148,7 @@ object NewCompiler {
                 return when (node.returnType!!) {
                     Cflat.ReturnType.INT -> {{ LIT(l, node.literalValue as Int) }}
                     Cflat.ReturnType.FLOAT -> {{ LIT(l, node.literalValue as Float) }}
+                    Cflat.ReturnType.DATABASE -> {{ LIT(l, node.literalValue as String) }}
                     // TODO Cflat.ReturnType.DATABASE
                     else -> {{ _REM(l, "Unsupported literal with type: ${node.returnType}") }}
                 }
@@ -198,7 +203,7 @@ object NewCompiler {
         }
 
 
-        return traverse1(tree)
+        return traverse1(tree) to aenv
     }
 
 
@@ -225,29 +230,40 @@ object NewCompiler {
     fun DIV(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "DIV;\n"
     fun NEG(l: Int, e: CodeR) = e() + "NEG;\n"
     /** loadconst ; literal ; */
-    fun LIT(l: Int, e: Int) = "LOADCONST ${e.to8HexString()};  # Literal\n" // always ends with 'h'
-    fun LIT(l: Int, e: Float) = "LOADCONST ${e}f; # Literal\n" // always ends with 'f'
+    fun LIT(l: Int, e: Int) = "LOADCONST ${e.toHexString()};-_-_-_ Literal\n" // always ends with 'h'
+    fun LIT(l: Int, e: Float) = "LOADCONST ${e}f;-_-_-_ Literal\n" // always ends with 'f'
+    fun LIT(l: Int, e: String) = LIT(l, e.toByteArray(Charsets.UTF_8))
+    fun LIT(l: Int, e: ByteArray) = "LOADDATA ${e.fold("") { acc, byte -> acc + "${byte.to2Hex()} " }};"
     /** address(int) ; value(word) ; store ; */
     fun ASSIGN(l: Int, e1: CodeL, e2: CodeR, aenv: Rho) = e2() + e1(aenv) + "STORE;\n"
     /** ( address -- value stored in that address ) */ // this is Forth stack notation
-    fun VAR_R(l: Int, varname: String, aenv: Rho) = "LOADCONST ${aenv(varname).toHexString()}; LOAD;  # Read from variable\n" // NOT using 8hexstring is deliberate
+    fun VAR_R(l: Int, varname: String, aenv: Rho) = "LOADCONST ${aenv(varname).toHexString()}; LOAD;-_-_-_ Read from variable\n" // NOT using 8hexstring is deliberate
     /** ( address -- ); memory gets changed */
-    fun VAR_L(l: Int, varname: String, aenv: Rho) = "LOADCONST ${aenv(varname).toHexString()};  # Write to variable, if following command is STORE\n" // NOT using 8hexstring is deliberate; no need for extra store; handled by ASSIGN
+    fun VAR_L(l: Int, varname: String, aenv: Rho) = "LOADCONST ${aenv(varname).toHexString()};-_-_-_ Write to variable, if following command is STORE\n" // NOT using 8hexstring is deliberate; no need for extra store; handled by ASSIGN
     fun NEWVAR(l: Int, type: String, varname: String) = "NEWVAR${type.toUpperCase()} $varname;\n"
     fun JUMP(l: Int, newPC: CodeR) = "JUMP $newPC;\n"
+    // FOR NON-COMPARISON OPS
     fun JUMPZ(l: Int, newPC: CodeR) = "JUMPZ $newPC;\n" // zero means false
     fun JUMPNZ(l: Int, newPC: CodeR) = "JUMPNZ $newPC;\n"
+    // FOR COMPARISON OPS ONLY !!
+    fun JUMPFALSE(l: Int, newPC: CodeR) = "JUMPFALSE $newPC;\n" // zero means false
     fun IF(l: Int, cond: CodeR, invokeTrue: CodeR) =
-            cond() + "JUMPZ ${labelFalse(l, cond)};\n" + invokeTrue() + "LABEL ${labelFalse(l, cond)};\n"
+            cond() + "JUMPFALSE ${labelFalse(l, cond)};\n" + invokeTrue() + "LABEL ${labelFalse(l, cond)};\n"
     fun IFELSE(l: Int, cond: CodeR, invokeTrue: CodeR, invokeFalse: CodeR) =
-            cond() + "JUMPZ ${labelFalse(l, cond)};\n" + invokeTrue() + "JUMP ${labelThen(l, cond)};\n" +
+            cond() + "JUMPFALSE ${labelFalse(l, cond)};\n" + invokeTrue() + "JUMP ${labelThen(l, cond)};\n" +
                     "LABEL ${labelFalse(l, cond)};\n" + invokeFalse() + "LABEL ${labelThen(l, cond)};\n"
     fun WHILE(l: Int, cond: CodeR, invokeWhile: CodeR) =
             "LABEL ${labelWhile(l, cond)};\n" +
-                    cond() + "JUMPZ ${labelThen(l, cond)};\n" +
+                    cond() + "JUMPFALSE ${labelThen(l, cond)};\n" +
                     invokeWhile() + "JUMP ${labelWhile(l, cond)};\n" +
                     "LABEL ${labelThen(l, cond)};\n"
     fun EQU(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISEQUAL;\n"
+    fun NEQ(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISNOTEQUAL;\n"
+    fun LEQ(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISLESSEQUAL;\n"
+    fun GEQ(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISGREATEQUAL;\n"
+    fun GT(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISGREATER;\n"
+    fun LS(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISLESSER;\n"
+
     //fun FOR
     // TODO  for ( e1 ; e2 ; e3 ) s' === e1 ; while ( e2 ) { s' ; e3 ; }
 
@@ -259,6 +275,129 @@ object NewCompiler {
     private fun labelThen(lineNum: Int, code: CodeR) = labelUnit(lineNum, code) + "_THEN"
     private fun labelWhile(lineNum: Int, code: CodeR) = "\$WHILE_" + labelUnit(lineNum, code).drop(1)
 
+
+    // IR2 to ASM
+
+    /**
+        - IR2 conditional:
+        ```
+        IS-Comp
+        JUMPFALSE Lfalse
+        λ. code s_true rho
+        JUMP Lthen
+        LABEL Lfalse
+        λ. code s_false rho
+        LABEL Lthen
+        ...
+        ```
+
+        - ASM conditional:
+        ```
+        λ. <comparison> rho
+        CMP;
+        JZ/JNZ/... Lfalse
+        (do.)
+        ```
+
+        IR2's JUMPFALSE needs to be converted equivalent ASM according to the IS-Comp,
+        for example, ISEQUAL; JUMPZ false === CMP; JNZ false.
+
+        If you do the calculation, ALL THE RETURNING LABEL TAKE FALSE-LABELS. (easy coding wohoo!)
+         */
+    private fun IR2toFalseJumps(compFun: IR2): Array<String> {
+        return when(compFun) {
+            "ISEQUAL" -> arrayOf("JNZ")
+            "ISNOTEQUAL" -> arrayOf("JZ")
+            "ISGREATER" -> arrayOf("JLS", "JZ")
+            "ISLESSER" -> arrayOf("JGT, JZ")
+            "ISGREATEQUAL" -> arrayOf("JLS")
+            "ISLESSEQUAL" -> arrayOf("JGT")
+            else -> throw UnsupportedOperationException("Unacceptable comparison operator: $compFun")
+        }
+    }
+
+    fun toASM(ir2: IR2): String {
+        val irList = ir2.replace(Regex("""-_-_-_[^\n]*\n"""), "") // get rid of debug comment
+                        .replace(Regex("""; *"""), "\n") // get rid of traling spaces after semicolon
+                        .replace(Regex("""\n+"""), "\n") // get rid of empty lines
+                        .split('\n') // CAPTCHA Sarah Connor
+
+
+        val asm = StringBuilder()
+        var prevCompFun = ""
+
+        //return irList.joinToString("\n") // test return irList as one string
+
+        for (c in 0..irList.lastIndex) {
+            val it = irList[c]
+
+            val tokens = it.split(Regex(" +"))
+            val head = tokens[0]
+            val arg1 = tokens.getOrNull(1)
+
+            if (it.isEmpty())
+                continue
+
+            val stmt: List<String>? = when (head) {
+                "HALT" -> { listOf("HALT;") }
+                "LOADCONST" -> { // ( -- immediate )
+                    val l = listOf(
+                            "LOADWORDIHI r1, ${arg1!!.dropLast(5)}h;",
+                            "LOADWORDILO r1, ${arg1.takeLast(5)};",
+                            "PUSH r1;"
+                    )
+
+                    if (arg1.length >= 5) l else l.drop(1)
+                }
+                "LOAD" -> { // ( address -- value in the addr )
+                    listOf("POP r1;",
+                            "LOADWORD r1, r1, r0;"
+                    )
+                }
+                "STORE" -> { // ( value, address -- )
+                    // TODO 'address' is virtual one
+                    listOf("POP r2;",
+                            "POP r1;",
+                            "STOREWORD r1, r2, r0;"
+                    )
+                }
+                "LABEL" -> {
+                    listOf(":$arg1;")
+                }
+                "JUMP" -> {
+                    listOf("JMP @$arg1;")
+                }
+                "ISEQUAL" -> {
+                    prevCompFun = head // it's guaranteed compfunction is followed by JUMPFALSE (see IF/IFELSE/WHILE)
+
+                    listOf("POP r2;",
+                            "POP r1;",
+                            "CMP r1, r2;"
+                    )
+                }
+                "JUMPFALSE" -> {
+                    IR2toFalseJumps(prevCompFun).map { "$it @$arg1;" }
+                }
+                else -> {
+                    listOf("# Unknown IR2: $it")
+                }
+            }
+
+            stmt?.forEachIndexed { index, s ->
+                if (index == 0)
+                    asm.append(s.tabulate() + "# $it\n")
+                else
+                    asm.append(s.tabulate() + "#\n")
+            }
+            stmt?.let { asm.append("\n") }
+        }
+
+        return asm.toString()
+    }
+
+
+    private fun Byte.to2Hex() = this.toUint().toString(16).toUpperCase().padStart(2, '0') + 'h'
+    private fun String.tabulate(columnSize: Int = 48) = this + " ".repeat(maxOf(1, columnSize - this.length))
 }
 
 // IR1 is the bunch of functions above
@@ -280,10 +419,13 @@ fun main(args: Array<String>) {
     println(tree)
 
     //val code = NewCompiler.TEST_VARS
-    val ir1 = NewCompiler.toIR1(tree)
+    val (ir1, aenv) = NewCompiler.toIR1(tree)
     val ir2 = ir1.invoke()
 
     //code.invoke().forEach { println(it.invoke()) } // this is probably not the best sequence comprehension
 
+    println("## IR2: ##")
     println(ir2)
+    println("## ASM: ##")
+    println(NewCompiler.toASM(ir2))
 }

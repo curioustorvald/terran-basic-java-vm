@@ -877,9 +877,27 @@ object VMOpcodesRISC {
             }
 
 
-    private infix fun Float.pow(other: Float) = Math.pow(this.toDouble(), other.toDouble()).toFloat()
+    private infix fun Float.pow(other: Float) = if (this == other && this == 0f) 1f else Math.pow(this.toDouble(), other.toDouble()).toFloat()
     private infix fun Float.fmod(other: Float) = Math.floorMod(this.toInt(), other.toInt()).toFloat()
-    private infix fun Int.pow(other: Int) = Math.pow(this.toDouble(), other.toDouble()).toInt()
+    private infix fun Int.pow(other: Int) =
+            if (other < 0)
+                throw IllegalArgumentException("Exponent less than zero")
+            else { // 0^0 = 1 if you run this code, no need for the special case
+                var result = 1
+                var power = other
+                var base = this
+
+                while (power > 0) {
+                    if (power % 2 == 1)
+                        result *= base
+
+                    power /= 2
+                    base *= base
+                }
+
+                result
+            }
+
     private infix fun Int.fmod(other: Int) = Math.floorMod(this.toInt(), other.toInt()).toInt()
 
     /**
