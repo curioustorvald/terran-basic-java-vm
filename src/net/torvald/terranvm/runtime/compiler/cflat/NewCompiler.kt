@@ -40,13 +40,14 @@ object NewCompiler {
         }
 
         //d = "Hello, world!";
+        float dd;
     """.trimIndent()
 
     // TODO add issues here
 
     // lexer and parser goes here //
 
-
+    /*
     /**
      * An example of (3 + 4) * (7 - 2).
      *
@@ -101,7 +102,7 @@ object NewCompiler {
             }, aenv
             )
         }
-    }
+    }*/
 
     /** Shitty >>= (toilet plunger) */
     private infix fun (CodeR).bind(other: CodeR) = sequenceOf(this, other)
@@ -146,22 +147,21 @@ object NewCompiler {
 
             if (node.expressionType == LITERAL_LEAF) {
                 return when (node.returnType!!) {
-                    Cflat.ReturnType.INT -> {{ LIT(l, node.literalValue as Int) }}
-                    Cflat.ReturnType.FLOAT -> {{ LIT(l, node.literalValue as Float) }}
-                    Cflat.ReturnType.DATABASE -> {{ LIT(l, node.literalValue as String) }}
-                    // TODO Cflat.ReturnType.DATABASE
-                    else -> {{ _REM(l, "Unsupported literal with type: ${node.returnType}") }}
+                    Cflat.ReturnType.INT -> { CodeR { LIT(l, node.literalValue as Int) }}
+                    Cflat.ReturnType.FLOAT -> { CodeR { LIT(l, node.literalValue as Float) }}
+                    Cflat.ReturnType.DATABASE -> { CodeR { LIT(l, node.literalValue as String) }}
+                    else -> { CodeR { _REM(l, "Unsupported literal with type: ${node.returnType}") }}
                 }
             }
             else if (node.expressionType == VARIABLE_READ) {
                 addvar(node.name!!, l)
-                return { VAR_R(l, node.name!!, aenv) }
+                return CodeR { VAR_R(l, node.name!!, aenv) }
             }
             else if (node.expressionType == VARIABLE_WRITE) {
                 if (!variableAddr.containsKey(node.name!!)) {
                     throw UnresolvedReference("No such variable defined: ${node.name!!}")
                 }
-                return { VAR_L(l, node.name!!, aenv) }
+                return CodeR { VAR_L(l, node.name!!, aenv) }
             }
 
             // recursion conditions //
@@ -170,31 +170,31 @@ object NewCompiler {
 
                 return if (node.expressionType == FUNCTION_CALL) {
                     when (node.name) {
-                        "+" -> {{ ADD(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
-                        "-" -> {{ SUB(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
-                        "*" -> {{ MUL(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
-                        "/" -> {{ DIV(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
-                        "=" -> {{ ASSIGN(l, { VAR_L(l, node.arguments[0].name!!, aenv) }, traverse1(node.arguments[1]), aenv) }}
+                        "+" -> { CodeR { ADD(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "-" -> { CodeR { SUB(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "*" -> { CodeR { MUL(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "/" -> { CodeR { DIV(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "=" -> { CodeR { ASSIGN(l, CodeL { VAR_L(l, node.arguments[0].name!!, aenv) }, traverse1(node.arguments[1]), aenv) }}
 
-                        "==" -> {{ EQU(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "==" -> { CodeR { EQU(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
 
-                        "if" -> {{ IF(l, traverse1(node.arguments[0]), traverse1(node.statements[0])) }}
-                        "ifelse" -> {{ IFELSE(l, traverse1(node.arguments[0]), traverse1(node.statements[0]), traverse1(node.statements[1])) }}
+                        "if" -> { CodeR { IF(l, traverse1(node.arguments[0]), traverse1(node.statements[0])) }}
+                        "ifelse" -> { CodeR { IFELSE(l, traverse1(node.arguments[0]), traverse1(node.statements[0]), traverse1(node.statements[1])) }}
 
-                        else -> {{ _REM(l, "Unknown OP or func call is WIP: ${node.name}") }}
+                        else -> { CodeR { _REM(l, "Unknown OP or func call is WIP: ${node.name}") }}
                     }
                 }
                 else if (node.expressionType == INTERNAL_FUNCTION_CALL) {
                     when (node.name) {
                         "#_declarevar" -> {
                             addvar(node.arguments[0].literalValue as String, l)
-                            return { NEWVAR(l, node.arguments[1].literalValue as String, node.arguments[0].literalValue as String) }
+                            return CodeR { NEWVAR(l, node.arguments[1].literalValue as String, node.arguments[0].literalValue as String) }
                         }
-                        else -> { return { _REM(l, "Unknown internal function: ${node.name}") }}
+                        else -> { return CodeR  { _REM(l, "Unknown internal function: ${node.name}") }}
                     }
                 }
                 else if (node.name == Cflat.rootNodeName) {
-                    return { _PARSE_HEAD(node.statements.map { traverse1(it) }) }
+                    return CodeR { _PARSE_HEAD(node.statements.map { traverse1(it) }) }
                 }
                 else {
                     throw UnsupportedOperationException("Unsupported node:\n[NODE START]\n$node\n[NODE END]")
@@ -219,8 +219,6 @@ object NewCompiler {
     // These are the definition of IR1. Invoke this "function" and string will come out, which is IR2.
     // l: Int means Line Number
 
-    // screw the CodeL/CodeR typechecking: I CAN'T EVEN
-
     private fun _REM(l: Int, message: String): IR2 = "\nREM Ln$l : ${message.replace('\n', '$')};\n"
     private fun _PARSE_HEAD(e: List<CodeR>): IR2 = e.fold("") { acc, it -> acc + it.invoke() } + "HALT;\n"
     /** e1 ; e2 ; add ; */
@@ -243,7 +241,7 @@ object NewCompiler {
     fun NEWVAR(l: Int, type: String, varname: String) = "NEWVAR${type.toUpperCase()} $varname;\n"
     fun JUMP(l: Int, newPC: CodeR) = "JUMP $newPC;\n"
     // FOR NON-COMPARISON OPS
-    fun JUMPZ(l: Int, newPC: CodeR) = "JUMPZ $newPC;\n" // zero means false
+    fun JUMPZ(l: Int, newPC: CodeR) = "JUMPZ $newPC;\n"
     fun JUMPNZ(l: Int, newPC: CodeR) = "JUMPNZ $newPC;\n"
     // FOR COMPARISON OPS ONLY !!
     fun JUMPFALSE(l: Int, newPC: CodeR) = "JUMPFALSE $newPC;\n" // zero means false
@@ -316,17 +314,22 @@ object NewCompiler {
         }
     }
 
-    fun toASM(ir2: IR2): String {
-        val irList = ir2.replace(Regex("""-_-_-_[^\n]*\n"""), "") // get rid of debug comment
+    fun toASM(ir2: IR2, addDebugComments: Boolean = true): String {
+        val irList1 = ir2.replace(Regex("""-_-_-_[^\n]*\n"""), "") // get rid of debug comment
                         .replace(Regex("""; *"""), "\n") // get rid of traling spaces after semicolon
                         .replace(Regex("""\n+"""), "\n") // get rid of empty lines
                         .split('\n') // CAPTCHA Sarah Connor
 
+        // put all the newvar into the top of the list
+        fun filterNewvar(s: IR2) = s.startsWith("NEWVAR")
+        val irList = listOf("SECT DATA") + irList1.filter { filterNewvar(it) } + listOf("SECT CODE") + irList1.filterNot { filterNewvar(it) }
 
         val asm = StringBuilder()
         var prevCompFun = ""
 
-        //return irList.joinToString("\n") // test return irList as one string
+        println("[START irList]")
+        println(irList.joinToString("\n")) // test return irList as one string
+        println("[END irList]\n")
 
         for (c in 0..irList.lastIndex) {
             val it = irList[c]
@@ -378,16 +381,31 @@ object NewCompiler {
                 "JUMPFALSE" -> {
                     IR2toFalseJumps(prevCompFun).map { "$it @$arg1;" }
                 }
+                "NEG" -> {
+                    listOf("POP r1;",
+                            "SUB r1, r0, r1",
+                            "PUSH r1"
+                    )
+                }
                 else -> {
                     listOf("# Unknown IR2: $it")
                 }
             }
 
-            stmt?.forEachIndexed { index, s ->
-                if (index == 0)
-                    asm.append(s.tabulate() + "# $it\n")
-                else
-                    asm.append(s.tabulate() + "#\n")
+            // keep this as is
+            if (addDebugComments) {
+                stmt?.forEachIndexed { index, s ->
+                    if (index == 0)
+                        if (head == "JUMPFALSE")
+                            asm.append(s.tabulate() + "# ($prevCompFun) -> $it\n")
+                        else
+                            asm.append(s.tabulate() + "# $it\n")
+                    else
+                        asm.append(s.tabulate() + "#\n")
+                }
+            }
+            else {
+                stmt?.forEach { asm.append("$it ") } // ASMs grouped as their semantic meaning won't get \n'd
             }
             stmt?.let { asm.append("\n") }
         }
@@ -395,9 +413,8 @@ object NewCompiler {
         return asm.toString()
     }
 
-
     private fun Byte.to2Hex() = this.toUint().toString(16).toUpperCase().padStart(2, '0') + 'h'
-    private fun String.tabulate(columnSize: Int = 48) = this + " ".repeat(maxOf(1, columnSize - this.length))
+    private fun String.tabulate(columnSize: Int = 56) = this + " ".repeat(maxOf(1, columnSize - this.length))
 }
 
 // IR1 is the bunch of functions above
@@ -408,8 +425,14 @@ typealias IR2 = String
  * The address is usually virtual. Can be converted to real address at either (IR2 -> ASM) or (ASM -> Machine) stage.
  */
 typealias Rho = (String) -> Int
-typealias CodeL = (Rho) -> IR2
-typealias CodeR = () -> IR2
+//typealias CodeL = (Rho) -> IR2
+//typealias CodeR = () -> IR2
+inline class CodeL(val function: (Rho) -> IR2) {
+    operator fun invoke(rho: Rho): IR2 { return function(rho) }
+}
+inline class CodeR(val function: () -> IR2) {
+    operator fun invoke(): IR2 { return function() }
+}
 
 
 fun main(args: Array<String>) {
