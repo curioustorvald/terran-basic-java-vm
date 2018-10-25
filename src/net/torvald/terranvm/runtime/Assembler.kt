@@ -361,6 +361,8 @@ class Assembler(val vm: TerranVM) {
     private fun putLabel(name: String, pointer: Int) {
         val name = labelMarker + name.toLowerCase()
         if (labelTable[name] != null && labelTable[name] != pointer) {
+            // don't delete this check -- every time shit happens, it means somewhere in the code is not right, I FUCKING GUARANTEE
+            // now go bug-killing my fella
             throw InternalError("Labeldef conflict for $name -- old: ${labelTable[name]}, new: $pointer")
         }
         else {
@@ -758,14 +760,19 @@ class Assembler(val vm: TerranVM) {
                             zeroFillToAlignWord(theRealPayload.size)
                         }
                         "FLOAT" -> {
-                            val number = words[2].toFloat()
+                            val number = if (words.getOrNull(2) == null)
+                                0f
+                            else
+                                words[2].toFloat()
 
                             debug("--> Float payload: '$number'")
 
                             number.toLittle().forEach { ret.add(it) }
                         }
                         "INT" -> {
-                            val int = if (words[2].startsWith(labelMarker)) {
+                            val int = if (words.getOrNull(2) == null)
+                                    0
+                            else if (words[2].startsWith(labelMarker)) {
                                 labelTable[words[2]] ?: throw NullPointerException("Undefined label: ${words[2]}")
                             }
                             else words[2].toInt()

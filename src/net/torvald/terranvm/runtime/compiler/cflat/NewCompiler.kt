@@ -1,9 +1,8 @@
 package net.torvald.terranvm.runtime.compiler.cflat
 
-import net.torvald.terranvm.runtime.to8HexString
-import net.torvald.terranvm.runtime.toHexString
+import net.torvald.terranvm.runtime.*
 import net.torvald.terranvm.runtime.compiler.cflat.Cflat.ExpressionType.*
-import net.torvald.terranvm.runtime.toUint
+import net.torvald.terrarum.virtualcomputer.terranvmadapter.printASM
 import java.lang.StringBuilder
 import kotlin.UnsupportedOperationException
 import kotlin.collections.HashMap
@@ -238,7 +237,7 @@ object NewCompiler {
     fun VAR_R(l: Int, varname: String, aenv: Rho) = "LOADCONST ${aenv(varname).toHexString()}; LOAD;-_-_-_ Read from variable\n" // NOT using 8hexstring is deliberate
     /** ( address -- ); memory gets changed */
     fun VAR_L(l: Int, varname: String, aenv: Rho) = "LOADCONST ${aenv(varname).toHexString()};-_-_-_ Write to variable, if following command is STORE\n" // NOT using 8hexstring is deliberate; no need for extra store; handled by ASSIGN
-    fun NEWVAR(l: Int, type: String, varname: String) = "NEWVAR${type.toUpperCase()} $varname;\n"
+    fun NEWVAR(l: Int, type: String, varname: String) = "NEWVAR ${type.toUpperCase()} $varname;\n"
     fun JUMP(l: Int, newPC: CodeR) = "JUMP $newPC;\n"
     // FOR NON-COMPARISON OPS
     fun JUMPZ(l: Int, newPC: CodeR) = "JUMPZ $newPC;\n"
@@ -337,6 +336,8 @@ object NewCompiler {
             val tokens = it.split(Regex(" +"))
             val head = tokens[0]
             val arg1 = tokens.getOrNull(1)
+            val arg2 = tokens.getOrNull(2)
+            val arg3 = tokens.getOrNull(3)
 
             if (it.isEmpty())
                 continue
@@ -387,21 +388,26 @@ object NewCompiler {
                             "PUSH r1"
                     )
                 }
+                "SECT" -> { listOf(".$arg1;") }
+                "NEWVAR" -> { listOf("$arg1 $arg2;") }
                 else -> {
                     listOf("# Unknown IR2: $it")
                 }
             }
 
             // keep this as is
+            val tabLen = 50
             if (addDebugComments) {
                 stmt?.forEachIndexed { index, s ->
                     if (index == 0)
                         if (head == "JUMPFALSE")
-                            asm.append(s.tabulate() + "# ($prevCompFun) -> $it\n")
+                            asm.append(s.tabulate(tabLen) + "# ($prevCompFun) -> $it\n")
                         else
-                            asm.append(s.tabulate() + "# $it\n")
+                            asm.append(s.tabulate(tabLen) + "# $it\n")
+                    else if (index == stmt.lastIndex)
+                        asm.append(s.tabulate(tabLen) + "#\n")
                     else
-                        asm.append(s.tabulate() + "#\n")
+                        asm.append(s.tabulate(tabLen) + "#\n")
                 }
             }
             else {
@@ -439,6 +445,9 @@ fun main(args: Array<String>) {
     val testProg = NewCompiler.testProgram
     val tree = Cflat.buildTree(Cflat.tokenise(testProg))
 
+    val vm = TerranVM(4096)
+    val assembler = Assembler(vm)
+
     println(tree)
 
     //val code = NewCompiler.TEST_VARS
@@ -449,6 +458,14 @@ fun main(args: Array<String>) {
 
     println("## IR2: ##")
     println(ir2)
+
+    val asm = NewCompiler.toASM(ir2)
+
     println("## ASM: ##")
-    println(NewCompiler.toASM(ir2))
+    println(asm)
+
+    val vmImage = assembler(asm)
+
+    println("## OPCODE: ##")
+    vmImage.bytes.printASM()
 }
