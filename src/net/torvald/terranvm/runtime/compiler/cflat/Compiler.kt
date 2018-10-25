@@ -418,7 +418,7 @@ object Cflat {
 
     /** No preprocessor should exist at this stage! */
     fun tokenise(program: String): ArrayList<LineStructure> {
-        fun debug1(any: Any) { if (false) println(any) }
+        fun debug1(any: Any) { if (true) println(any) }
 
         ///////////////////////////////////
         // STEP 0. Divide things cleanly //
@@ -440,7 +440,7 @@ object Cflat {
                     throw IllegalTokenException("at line $currentProgramLineNumber with token '$sb'")
                 }
 
-                debug1("!! split: depth $structureDepth, word $sb")
+                debug1("!! split: depth $structureDepth, word '$sb'")
 
                 currentLine.depth = structureDepth // !important
                 currentLine.tokens.add(sb.toString())
@@ -1598,9 +1598,39 @@ object Cflat {
 
         // contradiction: auto AND extern
 
+        debug1("[asTreeNode] tokens: $tokens")
+
         val firstAssignIndex = tokens.indexOf("=")
         val firstLeftParenIndex = tokens.indexOf("(")
         val lastRightParenIndex = tokens.lastIndexOf(")")
+
+        // special case for FOR :
+        //        int i = 0 // i must be declared beforehand !!; think of C < 99
+        //        for (i = 2 + (3 * 4), i <= 10, i = i + 2) { // separated by comma, parens are mandatory
+        //            dosometing();
+        //        }
+        if (tokens[0] == "for") {
+            // for tokens inside of firstLeftParen..lastRightParen,
+            // split tokens by ',' (will result in 3 tokens, may or may not empty)
+            // recurse call those three
+            //  e.g. forNode.arguments[0] = asTreeNode( ... )
+            //       forNode.arguments[1] = asTreeNode( ... )
+            //       forNode.arguments[2] = asTreeNode( ... )
+
+            val forNode = SyntaxTreeNode(ExpressionType.FUNCTION_CALL, null, "for", lineNumber)
+
+            val subTokens = tokens.subList(firstLeftParenIndex, lastRightParenIndex)
+            val commas = listOf(0, subTokens.indexOf(","), subTokens.lastIndexOf(","), subTokens.size)
+            val forArgs = (0..2).map { subTokens.subList(1 + commas[it], commas[it + 1]) }.map { asTreeNode(lineNumber, it) }
+            forArgs.forEach {
+                forNode.addArgument(it)
+            }
+
+            debug1("[asTreeNode] for tree: \n$forNode")
+
+            return forNode
+        }
+
         val functionCallTokens: List<String>? =
                 if (firstLeftParenIndex == -1)
                     null
@@ -2025,7 +2055,7 @@ object Cflat {
                 if (hashSet.contains(token)) return index
             }
 
-            throw SyntaxError("at $lineNumber -- unknown operator '$token'")
+            throw SyntaxError("[infix-to-tree] at $lineNumber -- unknown operator '$token'")
         }
 
         val tokens = tokens.reversed()
@@ -2035,14 +2065,14 @@ object Cflat {
         val treeArgsStack = Stack<Any>()
 
         fun addToTree(token: String) {
-            debug("!! adding '$token'")
+            debug("[infix-to-tree] adding '$token'")
 
             fun argsCountOf(operator: String) = if (unaryOps.contains(operator)) 1 else 2
             fun popAsTree(): SyntaxTreeNode {
                 val rawElem = treeArgsStack.pop()
 
                 if (rawElem is String) {
-                    debug("call from turnInfixTokensIntoTree().addToTree().popAsTree()")
+                    debug("[infix-to-tree] call from turnInfixTokensIntoTree().addToTree().popAsTree()")
                     return asTreeNode(lineNumber, listOf(rawElem))
                 }
                 else if (rawElem is SyntaxTreeNode)
@@ -2069,7 +2099,7 @@ object Cflat {
         }
 
 
-        debug("reversed tokens: $tokens")
+        debug("[infix-to-tree] reversed tokens: $tokens")
 
 
         tokens.forEachIndexed { index, rawToken ->
@@ -2120,13 +2150,13 @@ object Cflat {
         if (treeArgsStack.size != 1) {
             throw InternalError("Stack size is wrong -- supposed to be 1, but it's ${treeArgsStack.size}\nstack: $treeArgsStack")
         }
-        debug("finalised tree:\n${treeArgsStack.peek()}")
+        debug("[infix-to-tree] finalised tree:\n${treeArgsStack.peek()}")
 
 
         return if (treeArgsStack.peek() is SyntaxTreeNode)
                 treeArgsStack.peek() as SyntaxTreeNode
         else {
-            debug("call from turnInfixTokensIntoTree().if (treeArgsStack.peek() is SyntaxTreeNode).else")
+            debug("[infix-to-tree] call from turnInfixTokensIntoTree().if (treeArgsStack.peek() is SyntaxTreeNode).else")
             asTreeNode(lineNumber, listOf(treeArgsStack.peek() as String))
         }
     }
