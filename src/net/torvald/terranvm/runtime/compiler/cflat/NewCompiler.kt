@@ -29,14 +29,18 @@ object NewCompiler {
         int r;
         //c = (3 + 4) * (7 - 2);
 
-        c = 3;
+        c = -3;
 
-        if (c == 42) {
+        if (c > 42) {
             c = 0;
         }
         else {
             c = 1;
         }
+
+        //void newfunction(int k) {
+        //    dosomething(k, -k);
+        //}
 
         //d = "Hello, world!";
         float dd;
@@ -176,9 +180,16 @@ object NewCompiler {
                         "=" -> { CodeR { ASSIGN(l, CodeL { VAR_L(l, node.arguments[0].name!!, aenv) }, traverse1(node.arguments[1]), aenv) }}
 
                         "==" -> { CodeR { EQU(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "!=" -> { CodeR { NEQ(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        ">=" -> { CodeR { GEQ(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "<=" -> { CodeR { LEQ(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        ">" -> { CodeR { GT(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
+                        "<" -> { CodeR { LS(l, traverse1(node.arguments[0]), traverse1(node.arguments[1])) }}
 
                         "if" -> { CodeR { IF(l, traverse1(node.arguments[0]), traverse1(node.statements[0])) }}
                         "ifelse" -> { CodeR { IFELSE(l, traverse1(node.arguments[0]), traverse1(node.statements[0]), traverse1(node.statements[1])) }}
+
+                        "#_unaryminus" -> { CodeR { NEG(l, traverse1(node.arguments[0])) } }
 
                         else -> { CodeR { _REM(l, "Unknown OP or func call is WIP: ${node.name}") }}
                     }
@@ -371,7 +382,7 @@ object NewCompiler {
                 "JUMP" -> {
                     listOf("JMP @$arg1;")
                 }
-                "ISEQUAL" -> {
+                "ISEQUAL", "ISNOTEQUAL", "ISGREATER", "ISLESSER", "ISGREATEQUAL", "ISLESSEQUAL" -> {
                     prevCompFun = head // it's guaranteed compfunction is followed by JUMPFALSE (see IF/IFELSE/WHILE)
 
                     listOf("POP r2;",
@@ -384,8 +395,8 @@ object NewCompiler {
                 }
                 "NEG" -> {
                     listOf("POP r1;",
-                            "SUB r1, r0, r1",
-                            "PUSH r1"
+                            "SUB r1, r0, r1;",
+                            "PUSH r1;"
                     )
                 }
                 "SECT" -> { listOf(".$arg1;") }
@@ -395,7 +406,7 @@ object NewCompiler {
                 }
             }
 
-            // keep this as is
+            // keep this as is; it puts \n and original IR2 as formatted comments
             val tabLen = 50
             if (addDebugComments) {
                 stmt?.forEachIndexed { index, s ->
