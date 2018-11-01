@@ -38,6 +38,7 @@ object NewCompiler {
             c = 1;
         }
 
+        void newfunction(int k) {
             dosomething(k, -k);
         }
 
