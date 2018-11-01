@@ -38,9 +38,8 @@ object NewCompiler {
             c = 1;
         }
 
-        //void newfunction(int k) {
-        //    dosomething(k, -k);
-        //}
+            dosomething(k, -k);
+        }
 
         //d = "Hello, world!";
         float dd;
@@ -271,6 +270,8 @@ object NewCompiler {
     fun GEQ(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISGREATEQUAL;\n"
     fun GT(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISGREATER;\n"
     fun LS(l: Int, e1: CodeR, e2: CodeR) = e1() + e2() + "ISLESSER;\n"
+
+    // TODO NEWFUNC -- how do I deal with the function arguments?
 
     //fun FOR
     // TODO  for ( e1 ; e2 ; e3 ) s' === e1 ; while ( e2 ) { s' ; e3 ; }
