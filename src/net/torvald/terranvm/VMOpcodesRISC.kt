@@ -197,13 +197,13 @@ object VMOpcodesRISC {
         val reg = vm.readregInt(src)
         when (dest) {
             1 -> vm.pc = reg
-            2 -> throw Exception("Security violation") //vm.sp = reg
-            3 -> throw Exception("Security violation") //vm.lr = reg
+            2 -> throw SecurityViolationException("Unacceptable op: SRW r$dest, r$src") //vm.sp = reg
+            3 -> throw SecurityViolationException("Unacceptable op: SRW r$dest, r$src") //vm.lr = reg
             else -> throw IllegalArgumentException("Unknown special register index: $dest")
         }
     }
     fun SXCHG(dest: Register, src: Register) {
-        throw Exception("Security violation")
+        throw SecurityViolationException("Unacceptable op: SXCHG any, any")
 
         /*val destVal = vm.readregInt(dest)
         val srcVal = when (src) {
@@ -914,6 +914,7 @@ object VMOpcodesRISC {
 
 
 
+    class SecurityViolationException(msg: String?) : Exception(msg)
 
 
 }
