@@ -187,18 +187,18 @@ object VMOpcodesRISC {
     }
     fun SRR(dest: Register, src: Register) {
         vm.writeregInt(dest, when (src) {
-            1 -> vm.pc
-            2 -> vm.sp
-            3 -> vm.lr
+            0 -> vm.pc
+            1 -> vm.sp
+            2 -> vm.lr
             else -> throw IllegalArgumentException("Unknown special register index: $src")
         })
     }
     fun SRW(dest: Register, src: Register) {
         val reg = vm.readregInt(src)
         when (dest) {
-            1 -> vm.pc = reg
-            2 -> throw SecurityViolationException("Unacceptable op: SRW r$dest, r$src") //vm.sp = reg
-            3 -> throw SecurityViolationException("Unacceptable op: SRW r$dest, r$src") //vm.lr = reg
+            0 -> vm.pc = reg
+            1 -> throw SecurityViolationException("Unacceptable op: SRW r$dest, r$src") //vm.sp = reg
+            2 -> throw SecurityViolationException("Unacceptable op: SRW r$dest, r$src") //vm.lr = reg
             else -> throw IllegalArgumentException("Unknown special register index: $dest")
         }
     }
@@ -230,17 +230,17 @@ object VMOpcodesRISC {
     }
 
     fun MALLOC(dest: Register, size: Register) { vm.writeregInt(dest, vm.malloc(vm.readregInt(size)).memAddr) }
-    fun RETURN() { POP(0); vm.pc = vm.lr shl 2 /* LR must contain OFFSET, not actual address */ }
+    fun RETURN() { POP(0); vm.pc = vm.lr /* LR must contain the actual address */ }
     /**
-     * Register must contain address for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C) but not pre-divided
+     * Register must contain address (not offset) for program counter, must be aligned (0x..0, 0x..4, 0x..8, 0x..C) but not pre-divided
      */
     fun JSR(register: Register) {
         val addr = vm.readregInt(register)
-        JSRI(addr)
+        JSRI(addr ushr 2)
     }
-
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JSRI(offset: Int) {
-        _PUSHWORDI(vm.pc ushr 2) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
+        _PUSHWORDI(vm.pc) // PC is incremented by 4 right before any opcode is executed  @see TerranVM.kt
         JMP(offset)
     }
 
@@ -462,10 +462,12 @@ object VMOpcodesRISC {
         memspace[vm.readregInt(dest)] = halfword.and(0xFF).toByte()
         memspace[vm.readregInt(dest) + 1] = halfword.ushr(8).and(0xFF).toByte()
     }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun LOADWORDIMEM(dest: Register, offset: Int) {
         val index = offset shl 2
         vm.writeregInt(dest, vm.memory[index].toUint() or vm.memory[index + 1].toUint().shl(8) or vm.memory[index + 2].toUint().shl(16) or vm.memory[index + 3].toUint().shl(24))
     }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun STOREWORDIMEM(dest: Register, offset: Int) {
         val index = offset shl 2
         val destValue = vm.readregInt(dest)
@@ -479,13 +481,13 @@ object VMOpcodesRISC {
      * Push whatever value in the dest register into the stack
      */
     fun PUSH(dest: Register) {
-        if (vm.sp < vm.stackSize!!) {
+        if (vm.sp < vm.stackSize!! * 4) {
             val value = vm.readregInt(dest)
-            vm.memory[vm.ivtSize + 4 * vm.sp    ] = value.byte1()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 1] = value.byte2()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 2] = value.byte3()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 3] = value.byte4()
-            vm.sp++
+            vm.memory[vm.ivtSize + vm.sp    ] = value.byte1()
+            vm.memory[vm.ivtSize + vm.sp + 1] = value.byte2()
+            vm.memory[vm.ivtSize + vm.sp + 2] = value.byte3()
+            vm.memory[vm.ivtSize + vm.sp + 3] = value.byte4()
+            vm.sp += 4
 
             // old code
             //vm.callStack[vm.sp++] = vm.readregInt(dest)
@@ -495,15 +497,15 @@ object VMOpcodesRISC {
     }
 
     /**
-     * Push memory address offset immediate into the stack
+     * Push memory address immediate into the stack
      */
-    private fun _PUSHWORDI(offset: Int) {
-        if (vm.sp < vm.stackSize!!) {
-            vm.memory[vm.ivtSize + 4 * vm.sp    ] = offset.byte1()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 1] = offset.byte2()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 2] = offset.byte3()
-            vm.memory[vm.ivtSize + 4 * vm.sp + 3] = offset.byte4()
-            vm.sp++
+    private fun _PUSHWORDI(addr: Int) {
+        if (vm.sp < vm.stackSize!! * 4) {
+            vm.memory[vm.ivtSize + vm.sp    ] = addr.byte1()
+            vm.memory[vm.ivtSize + vm.sp + 1] = addr.byte2()
+            vm.memory[vm.ivtSize + vm.sp + 2] = addr.byte3()
+            vm.memory[vm.ivtSize + vm.sp + 3] = addr.byte4()
+            vm.sp += 4
 
             // old code
             //vm.callStack[vm.sp++] = offset shl 2
@@ -516,16 +518,16 @@ object VMOpcodesRISC {
      * Pop whatever value in the stack and write the value to the register
      */
     fun POP(dest: Register) {
-        vm.sp--
+        vm.sp -= 4
 
         val value = ByteArray(4)
-        value[0] = vm.memory[vm.ivtSize + 4 * vm.sp]
-        value[1] = vm.memory[vm.ivtSize + 4 * vm.sp + 1]
-        value[2] = vm.memory[vm.ivtSize + 4 * vm.sp + 2]
-        value[3] = vm.memory[vm.ivtSize + 4 * vm.sp + 3]
+        value[0] = vm.memory[vm.ivtSize + vm.sp]
+        value[1] = vm.memory[vm.ivtSize + vm.sp + 1]
+        value[2] = vm.memory[vm.ivtSize + vm.sp + 2]
+        value[3] = vm.memory[vm.ivtSize + vm.sp + 3]
 
         // fill with FF for security
-        System.arraycopy(vm.bytes_ffffffff, 0, vm.memory, vm.ivtSize + 4 * vm.sp, 4)
+        System.arraycopy(vm.bytes_ffffffff, 0, vm.memory, vm.ivtSize + vm.sp, 4)
 
         if (dest == 0) {
             vm.lr = value.toLittleInt()
@@ -560,13 +562,19 @@ object VMOpcodesRISC {
     }*/
 
 
-
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JMP(offset: Int) { vm.pc = offset shl 2 }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JZ (offset: Int) { if (vm.cp == 0) JMP(offset) }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JNZ(offset: Int) { if (vm.cp != 0) JMP(offset) }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JGT(offset: Int) { if (vm.cp >  0) JMP(offset) }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JLS(offset: Int) { if (vm.cp <  0) JMP(offset) }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JFW(offset: Int) { vm.pc = Math.floorMod(vm.pc + (offset shl 2), 0xFFFFFF) }
+    /** It takes offset rather than the address because of limited bit space in the opcode */
     fun JBW(offset: Int) { vm.pc = Math.floorMod(vm.pc - (offset shl 2), 0xFFFFFF) }
 
 

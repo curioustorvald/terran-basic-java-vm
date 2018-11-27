@@ -363,7 +363,7 @@ jmp @loop;
 loadwordimem r2, @startingptr;  #
 add r2, r2, r4;                 # r2 now contains real address (startingptr + distance)
 
-srw r1, r2;                     # pc <- r2
+srw r0, r2;                     # pc <- r2
 
 
 jmp @loop;

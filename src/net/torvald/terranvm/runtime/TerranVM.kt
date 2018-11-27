@@ -49,6 +49,7 @@ class TerranVM(inMemSize: Int,
     private val DEBUG = true
     private val ERROR = true
 
+    /** Memory offsets; bytes_they_take * 4 */
     var stackSize: Int? = null
         private set
 
@@ -341,8 +342,11 @@ class TerranVM(inMemSize: Int,
     var r15: Int; get() = context.r15; set(value) { context.r15= value }
 
     var cp: Int; get() = context.cp; set(value) { context.cp= value } // compare register
+    /** Memory address (not offset !) */
     var pc: Int; get() = context.pc; set(value) { context.pc= value } // program counter
+    /** Memory address (not offset !) */
     var sp: Int; get() = context.sp; set(value) { context.sp= value } // stack pointer
+    /** It would be easier for you to put memory address in here (not offset !) */
     var lr: Int; get() = context.lr; set(value) { context.lr= value } // link register
     var st: Int; get() = context.st; set(value) { context.st= value } // starting point
 

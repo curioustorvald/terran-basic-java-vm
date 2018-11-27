@@ -114,7 +114,7 @@ object NewCompiler {
 
     // TREE TO IR1
 
-    fun toIR1(tree: Cflat.SyntaxTreeNode): Pair<CodeR, Rho> {
+    fun toIR1(tree: Cflat.SyntaxTreeNode): Pair<Code, Rho> {
         //val parentCode: Sequence<CodeR> = sequenceOf( { "" } )
         val variableAddr = HashMap<String, Int>()
         var varCnt = 0
@@ -191,7 +191,26 @@ object NewCompiler {
 
                         "#_unaryminus" -> { CodeR { NEG(l, traverse1(node.arguments[0])) } }
 
-                        else -> { CodeR { _REM(l, "Unknown OP or func call is WIP: ${node.name}") }}
+                        // calling arbitrary function
+                        else -> {
+                            // see p.42 ?
+                            val finalCmd = StringBuilder()
+
+                            finalCmd.append(ALLOCATSTACK(node.arguments.size))
+
+                            // push CodeR args passing into the stack, reversed order
+                            node.arguments.reversed().map { traverse1(it) }.forEach {
+                                finalCmd.append(PUSH(it))
+                            }
+
+                            finalCmd.append(MARKFUNCCALL())
+
+                            finalCmd.append(CALLFUNC(node.arguments.size))
+
+                            // TODO slide
+
+                            CodeR { finalCmd.toString() } // we're doing this because I couldn't build func composition
+                        }
                     }
                 }
                 else if (node.expressionType == INTERNAL_FUNCTION_CALL) {
@@ -200,11 +219,14 @@ object NewCompiler {
                             addvar(node.arguments[0].literalValue as String, l)
                             return CodeR { NEWVAR(l, node.arguments[1].literalValue as String, node.arguments[0].literalValue as String) }
                         }
-                        else -> { return CodeR  { _REM(l, "Unknown internal function: ${node.name}") }}
+                        else -> { return CodeR { _REM(l, "Unknown internal function: ${node.name}") }}
                     }
                 }
                 else if (node.name == Cflat.rootNodeName) {
                     return CodeR { _PARSE_HEAD(node.statements.map { traverse1(it) }) }
+                }
+                else if (node.expressionType == FUNCTION_DEF) {
+
                 }
                 else {
                     throw UnsupportedOperationException("Unsupported node:\n[NODE START]\n$node\n[NODE END]")
@@ -228,6 +250,13 @@ object NewCompiler {
 
     // These are the definition of IR1. Invoke this "function" and string will come out, which is IR2.
     // l: Int means Line Number
+
+    // EXPRESSIONS
+    // Think these as:
+    //      Proper impl of the func "CodeR" requires "Operation" and "E"s; it'd be easier if we're on Haskell, but to
+    //      make proper impl in the Kotlin, the code gets too long.
+    //      Think of these as "spilled" version of the proper one.
+    //      Function "CodeR" returns IR2, and so does these spilled versions.
 
     private fun _REM(l: Int, message: String): IR2 = "\nREM Ln$l : ${message.replace('\n', '$')};\n"
     private fun _PARSE_HEAD(e: List<CodeR>): IR2 = e.fold("") { acc, it -> acc + it.invoke() } + "HALT;\n"
@@ -274,8 +303,34 @@ object NewCompiler {
 
     // TODO NEWFUNC -- how do I deal with the function arguments?
 
+
     //fun FOR
     // TODO  for ( e1 ; e2 ; e3 ) s' === e1 ; while ( e2 ) { s' ; e3 ; }
+    fun NOP() = ""
+    fun PUSH() = "PUSH;-_-_-_ Inline ASM\n"
+    fun PUSHEP() = "PUSHEP;\n"
+    fun PUSHFP() = "PUSHFP;\n"
+    fun PUSH(e: CodeR) = e() + "PUSH;\n"
+    fun MARKFUNCCALL() = PUSHEP() + PUSHFP()
+    fun CALLFUNC(m: Int) = "CALLFUNC $m;\n"
+    fun ALLOCATSTACK(m: Int) = "ALLOCATSTACK $m;\n"
+
+
+
+    // STATEMENTS
+    // also "spilled" version of function "Code"
+
+    // SEXP stands for Statements-to-EXPression; my wild guess from my compiler prof's sense of naming, who is sexually
+    // attracted to the language Haskell
+    /** @params codeR an any function that takes nothing and returns IR2 (like LIT, ADD, VAR_R, JUMP) */
+    fun SEXP(l: Int, codeR: CodeR, rho: Rho): IR2 = codeR() + "POP;\n"
+    /** @params codeR an any function that takes Rho and returns IR2 (like ASSIGN, VAR_L) */
+    fun SEXP(l: Int, codeL: CodeL, rho: Rho): IR2 = codeL(rho) + "POP;\n"
+
+    fun SSEQ(l: Int, s: List<CodeR>, rho: Rho): IR2 =
+            if (s.isEmpty()) "" else s.first().invoke() + SSEQ(l, s.drop(1), rho)
+
+
 
 
     private fun labelUnit(lineNum: Int, code: CodeR): IR2 {
@@ -287,6 +342,13 @@ object NewCompiler {
 
 
     // IR2 to ASM
+
+    private const val IR1_COMMENT_MARKER = "-_-_-_"
+    private const val EP = "r14"
+    private const val FP = "r15"
+
+    private const val PC = "r0"
+    private const val SP = "r1" // special register
 
     /**
         - IR2 conditional:
@@ -327,7 +389,7 @@ object NewCompiler {
     }
 
     fun toASM(ir2: IR2, addDebugComments: Boolean = true): String {
-        val irList1 = ir2.replace(Regex("""-_-_-_[^\n]*\n"""), "") // get rid of debug comment
+        val irList1 = ir2.replace(Regex("""$IR1_COMMENT_MARKER[^\n]*\n"""), "") // get rid of debug comment
                         .replace(Regex("""; *"""), "\n") // get rid of traling spaces after semicolon
                         .replace(Regex("""\n+"""), "\n") // get rid of empty lines
                         .split('\n') // CAPTCHA Sarah Connor
@@ -403,6 +465,28 @@ object NewCompiler {
                 }
                 "SECT" -> { listOf(".$arg1;") }
                 "NEWVAR" -> { listOf("$arg1 $arg2;") }
+                "PUSH" -> { listOf("PUSH r1;") }
+                "PUSHEP" -> { listOf("PUSH $EP;") }
+                "PUSHFP" -> { listOf("PUSH $FP;") }
+                "CALLFUNC" -> {
+                            // instruction CALL (fig 2.27)
+                    listOf("SRR $FP, $SP;", // set FP
+                            "SRR r1, $PC;",  // swap(p, q); put PC into r1 (= p)
+                            "POP r2;", // swap(p, q); pop into r2 (= q)
+                            "PUSH r1;", // swap(p, q); push p
+                            // instruction ENTER(m) part here (fig 2.28)
+                            "LOADWORDILO r1, ${arg1!!.toInt()}", // EP = SP + m
+                            "ADDINT $EP, r1, $FP", // EP = SP + m; FP still holds SP
+                            // the last of CALL (jump)
+                            "SRW r2, $PC;" // set PC as q (will do unconditional jump as PC is being overwritten)
+                    )
+                }
+                "ALLOCATSTACK" -> {
+                    val list = mutableListOf<String>()
+                    repeat(arg1!!.toInt()) { list.add("PUSH r0;") } // we can just increment SP, but the stack will remain 0xFFFFFFFF which makes debugging trickier
+                    /*return*/ list.toList()
+                }
+                "JSR" -> { listOf("JSR;") }
                 else -> {
                     listOf("# Unknown IR2: $it")
                 }
@@ -452,7 +536,13 @@ inline class CodeL(val function: (Rho) -> IR2) {
 inline class CodeR(val function: () -> IR2) {
     operator fun invoke(): IR2 { return function() }
 }
-
+inline class Code(val function: (Rho) -> IR2) {
+    operator fun invoke(rho: Rho): IR2 { return function(rho) }
+}
+// due to my laziness, CodeR is also a Stmt; after all, "e;" is a statement
+/*inline class Stmt(val function: (Rho?) -> IR2) {
+    operator fun invoke(rho: Rho?): IR2 { return function(rho) }
+}*/
 
 fun main(args: Array<String>) {
     val testProg = NewCompiler.testProgram
