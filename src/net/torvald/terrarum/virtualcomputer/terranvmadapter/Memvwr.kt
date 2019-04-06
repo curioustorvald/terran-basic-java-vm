@@ -57,6 +57,7 @@ class Memvwr(val vm: TerranVM) : JFrame("TerranVM Memory Viewer - Core Memory") 
 
 
         sb.append("uptime: ${vm.uptime} ms\n")
+        sb.append("ips: ${vm.instPerSec}\n")
 
 
 

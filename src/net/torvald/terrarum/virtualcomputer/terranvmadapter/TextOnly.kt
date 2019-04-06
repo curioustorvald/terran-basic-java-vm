@@ -24,6 +24,14 @@ import net.torvald.terranvm.toReadableOpcode
  */
 class TextOnly : Game() {
 
+    private val ipsCounter = """
+            .code;
+            loadwordilo r1, 42;
+            loadbyte r2, r1, r0;
+            storebyte r1, r2, r0;
+            jmp 19h;
+        """.trimIndent()
+
     lateinit var background: Texture
     lateinit var execLed: Texture
     lateinit var waitLed: Texture
@@ -61,7 +69,8 @@ class TextOnly : Game() {
 
         val assembler = Assembler(vm)
 
-        val programImage = assembler(Loader())
+        //val programImage = assembler(Loader())
+        val programImage = assembler(ipsCounter)
         val code = programImage.bytes
 
 

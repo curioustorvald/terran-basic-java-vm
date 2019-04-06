@@ -7,6 +7,7 @@ import java.io.OutputStream
 import java.io.Serializable
 import java.nio.charset.Charset
 import kotlin.collections.ArrayList
+import kotlin.math.roundToLong
 
 
 typealias Number = Double
@@ -46,7 +47,7 @@ class TerranVM(inMemSize: Int,
     val bytes_ffffffff = (-1).toLittle()
     val bytes_00000000 = byteArrayOf(0, 0, 0, 0)
 
-    private val DEBUG = true
+    private val DEBUG = false
     private val ERROR = true
 
     /** Memory offsets; bytes_they_take * 4 */
@@ -350,6 +351,10 @@ class TerranVM(inMemSize: Int,
     var lr: Int; get() = context.lr; set(value) { context.lr= value } // link register
     var st: Int; get() = context.st; set(value) { context.st= value } // starting point
 
+    var instPerSec = 0L
+    private var ipsTimer = 0L // ms
+
+
     fun writeregFloat(register: Int, data: Float) {
         when (register) {
             1 -> r1 = data.toRawBits()
@@ -629,7 +634,7 @@ halt;
             return intOOM.size + intSegfault.size + intDivZero.size + intIllegalOp.size + intStackOverflow.size + intMathFuck.size
         }
 
-        return 0;
+        return 0
     }
 
     fun softReset() {
@@ -639,6 +644,8 @@ halt;
 
         // reset malloc table
         mallocList.clear()
+
+        instPerSec = 0
 
         // reset registers
         r1 = 0
@@ -685,8 +692,6 @@ halt;
 
 
     var delayInMills: Int? = null
-    var instPerMill: Int? = null
-
 
     fun execDebugMain(any: Any?) { if (DEBUG) println(any) }
     fun execDebugError(any: Any?) { if (ERROR) System.err.println(any) }
@@ -728,9 +733,12 @@ halt;
 
         isRunning = true
         uptimeHolder = System.currentTimeMillis()
+        var ipsCtr = 0L
 
 
         while (!terminate) {
+            val ipsCtrNanoSec = System.nanoTime()
+
             //if (DEBUG && runcnt >= 500) break
             //runcnt++
 
@@ -779,6 +787,7 @@ halt;
 
             // execute
             pc += 4
+            ipsCtr += 1
 
             // invoke function
             try {
@@ -836,6 +845,15 @@ halt;
 
             if (delayInMills != null) {
                 Thread.sleep(delayInMills!!.toLong())
+            }
+
+
+            // count instructions per second
+            ipsTimer += System.nanoTime() - ipsCtrNanoSec
+            if (ipsTimer >= 1000000000) {
+                instPerSec = (ipsCtr * (1000000000.0 / ipsTimer)).roundToLong()
+                ipsTimer -= 1000000000
+                ipsCtr -= instPerSec
             }
         }
 

@@ -114,7 +114,7 @@ object NewCompiler {
 
     // TREE TO IR1
 
-    fun toIR1(tree: Cflat.SyntaxTreeNode): Pair<Code, Rho> {
+    fun toIR1(tree: Cflat.SyntaxTreeNode): Pair<CodeR, Rho> {
         //val parentCode: Sequence<CodeR> = sequenceOf( { "" } )
         val variableAddr = HashMap<String, Int>()
         var varCnt = 0
@@ -225,9 +225,9 @@ object NewCompiler {
                 else if (node.name == Cflat.rootNodeName) {
                     return CodeR { _PARSE_HEAD(node.statements.map { traverse1(it) }) }
                 }
-                else if (node.expressionType == FUNCTION_DEF) {
+                /*else if (node.expressionType == FUNCTION_DEF) {
 
-                }
+                }*/
                 else {
                     throw UnsupportedOperationException("Unsupported node:\n[NODE START]\n$node\n[NODE END]")
                 }

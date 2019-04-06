@@ -15,8 +15,7 @@ import java.util.*
  * Created by minjaesong on 2017-11-18.
  */
 open class PeriMDA(val W: Int = 80, val H: Int = 25, 
-                   val vmExecDelay: Int? = null, 
-                   val vmInstPerMill: Int? = null, 
+                   val vmExecDelay: Int? = null,
                    newMemSize: Int? = null,
                    val font: BitmapFont? = LCDFont()
 ) : GdxPeripheralWrapper(newMemSize ?: (W * H)) {
