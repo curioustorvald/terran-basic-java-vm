@@ -892,20 +892,21 @@ halt;
     companion object {
         val charset: Charset = Charset.forName("CP437")
 
-        const val interruptCount = 24
+        const val interruptCount = 64
         
-        const val INT_DIV_BY_ZERO = 0
-        const val INT_ILLEGAL_OP = 1
-        const val INT_OUT_OF_MEMORY = 2
-        const val INT_STACK_OVERFLOW = 3
-        const val INT_MATH_ERROR = 4
-        const val INT_SEGFAULT = 5
-        const val INT_KEYPRESS = 6
-        const val INT_PERI_INPUT = 7
-        const val INT_PERI_OUTPUT = 8
-        const val INT_INTERRUPT = 9
-        const val INT_SERIAL0 = 10
-        const val INT_SERIAL1 = 11
+        const val INT_NULL_PTR = 0
+        const val INT_DIV_BY_ZERO = 1
+        const val INT_ILLEGAL_OP = 2
+        const val INT_OUT_OF_MEMORY = 3
+        const val INT_STACK_OVERFLOW = 4
+        const val INT_MATH_ERROR = 5
+        const val INT_SEGFAULT = 6
+        const val INT_KEYPRESS = 7
+        const val INT_PERI_INPUT = 8
+        const val INT_PERI_OUTPUT = 9
+        const val INT_INTERRUPT = 10
+        const val INT_SERIAL0 = 11
+        const val INT_SERIAL1 = 12
 
         const val INT_RASTER_FBUFFER = 16 // required to fire interrupt following every screen refresh
 
